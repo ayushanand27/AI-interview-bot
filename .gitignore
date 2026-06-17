@@ -1,0 +1,37 @@
+﻿# Environment
+.env
+.env.local
+frontend/.env
+frontend/.env.production
+
+# Virtual environment
+.venv/
+venv/
+
+# Database file
+*.db
+*.sqlite3
+
+# Uploads / models
+uploads/
+yolov8n.pt
+*.pt
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db

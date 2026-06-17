@@ -1,0 +1,102 @@
+{
+  "features": [
+    {
+      "name": "RECRUITER DASHBOARD",
+      "pass": true,
+      "details": {
+        "list_status": 200,
+        "session_count": 11,
+        "sample_sessions": [
+          {
+            "session_id": "71ae0157-3f53-4b88-b32f-2a8c37b9b956",
+            "candidate_name": "Test Resume",
+            "role_title": "Backend Engineer",
+            "date": "2026-06-06T02:25:13.607316",
+            "final_score": 55.75,
+            "recommendation": "Maybe",
+            "status": "ended",
+            "recording_available": false
+          },
+          {
+            "session_id": "22d3a359-bad1-49d7-bf0c-8ab2afc8d8a9",
+            "candidate_name": "Resume",
+            "role_title": "Backend Developer",
+            "date": "2026-06-02T05:55:47.942321",
+            "final_score": null,
+            "recommendation": null,
+            "status": "completed",
+            "recording_available": false
+          },
+          {
+            "session_id": "983de644-313e-4d67-9925-a193a309b994",
+            "candidate_name": "Resume",
+            "role_title": "Backend Developer",
+            "date": "2026-06-02T05:55:38.110755",
+            "final_score": 53.0,
+            "recommendation": "Maybe",
+            "status": "ended",
+            "recording_available": false
+          }
+        ],
+        "detail_status": 200,
+        "transcript_items": 2,
+        "has_final_score": true,
+        "integrity_level": "clean",
+        "violations_count": 0,
+        "recording_available": false
+      }
+    },
+    {
+      "name": "RECORDING",
+      "pass": false,
+      "details": {
+        "uploads_dir_exists": false,
+        "webm_files": [],
+        "webm_count": 0,
+        "upload_test_status": 200,
+        "upload_test_body": {
+          "session_id": "cf5b3649-257f-4265-848b-ef57aa5ee8c2",
+          "recording_filename": "cf5b3649-257f-4265-848b-ef57aa5ee8c2_recording.webm",
+          "message": "Recording saved successfully"
+        },
+        "webm_files_after": [
+          "cf5b3649-257f-4265-848b-ef57aa5ee8c2_recording.webm"
+        ],
+        "get_recording_status": 200,
+        "get_recording_content_type": "video/webm",
+        "get_recording_bytes": 132
+      }
+    },
+    {
+      "name": "PDF REPORT",
+      "pass": true,
+      "details": {
+        "status": 200,
+        "content_type": "application/pdf",
+        "pdf_path": "C:\\Users\\ayush\\ai_interview_platform\\SmartSkale-InterviewBot\\scripts\\verify_report_sample.pdf",
+        "pdf_bytes": 3754,
+        "is_pdf_magic": true,
+        "pdf_text_preview": "Interview Report\nCandidate: Test Resume\nRole: Recording Verify\nDate: 2026-06-06 03:54 UTC\nDuration: 1 minute(s)\nStatus: ended \u00b7 1/1 questions answered\nOverall score\nOriginal score: 30.0 / 100\nAdjusted score: 30.0 / 100 \u2014 Recommendation: No Hire\nProctoring & integrity\nIntegrity level: clean\nTotal violations: 0\nScore penalty: 0%\nNo violations recorded.\nSession recording\nRecording available: Yes\nFile: cf5b3649-257f-4265-848b-ef57aa5ee8c2_recording.webm\nQuestion 1\nCan you describe your experience with verifying recordings in the context of API testing, and how you ensure\nthe accuracy and reliability of these recordings?\nAnswer\nQuick test answer for recording verification.\nJudge feedback\nOverall question score: 30.0 / 100\n\u007f Technical Accuracy: 20/100 \u2014 The answer lacked specific details about API testing and recording verification,\nand did not provide any technical examples or methodologies.\n\u007f Completeness: 40/100 \u2014 The candidate touched on the topic of accuracy and reliability, but failed to cover\nkey aspects such as data validation, error handling, and testing frameworks.\n\n\u007f Communication Clarity: 60/100 \u2014 The answer was brief and to the point, but lacked clear structure and\norganization, making it difficult to follow.\n\u007f Depth and Insight: 0/100 \u2014 The candidate did not demonstrate any deeper understanding of the topic, and\nfailed to provide any specific examples or anecdotes to support their claims.\nSummary: The candidate's answer was brief and lacked specific details, failing to demonstrate a clear\nunderstanding of the topic. They touched on accuracy and reliability, but failed to cover key aspects and provide\ntechnical examples. Improvements could be made in terms of structure, organization, and depth of knowledge.\nStrengths: brief and to the point\nImprovements: provide specific technical examples and methodologies; cover key aspects such as data\nvalidation and error handling; improve structure and organization\n",
+        "field_checks": {
+          "candidate_info": true,
+          "scores": true,
+          "violations": true,
+          "recording_info": true
+        }
+      }
+    }
+  ],
+  "latest_session_id": "71ae0157-3f53-4b88-b32f-2a8c37b9b956",
+  "verify_environment": {
+    "status": 200,
+    "body": {
+      "allowed": true,
+      "reason": null,
+      "warnings": [
+        "User agent logged: verify-script"
+      ],
+      "session_id": "2dbcab0b-ba22-4247-9436-777947be6e26",
+      "environment_logged": true
+    }
+  }
+}

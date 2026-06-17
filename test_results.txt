@@ -1,0 +1,56 @@
+SmartSkale InterviewBot - Full Test Results
+==================================================
+
+TOTAL: 51 PASS, 0 FAIL
+
+PASS | Health check | {'status': 'ok'}
+PASS | API status | 
+PASS | DB connected | 
+PASS | Proctoring loaded | 
+PASS | Register candidate | Account created. Please check your email to verify
+PASS | Login candidate | 
+PASS | Candidate token returned | 
+PASS | Get current user | role=candidate
+PASS | Forgot password | {'message': 'If this email exists, you will receive a reset link shortly.'}
+PASS | Resend verification | {'message': 'Verification email sent'}
+PASS | Create interview session | status=201
+PASS | Session ID returned | 18c2b395-9fe1-48
+PASS | Generate questions | questions=2
+PASS | Get current question | 
+PASS | Question text returned | Can you explain how FastAPI handles asynchronous r
+PASS | Submit answer 1 | 
+PASS | Get question 2 | 
+PASS | Submit answer 2 | complete=True
+PASS | End interview | 
+PASS | Final score returned | score=62.0
+PASS | Recommendation returned | Maybe
+PASS | Candidate PDF report | size=4545 bytes
+PASS | Is valid PDF | 
+PASS | Proctoring health | {'status': 'healthy', 'module': 'eye_detection'}
+PASS | Proctor reset | 
+PASS | Proctor warnings | 
+PASS | Integrity report | 
+PASS | Register recruiter | 
+PASS | Login recruiter | 
+PASS | Recruiter token returned | 
+PASS | Recruiter sessions list | count=35
+PASS | Recruiter PDF report | size=4691 bytes
+PASS | Recruiter PDF valid | 
+PASS | Create assessment | status=200 resp={'success': True, 'message': 'Assessment created successfully', 'data': {'token'
+PASS | Invite token returned | 10cd9350-9af9-46
+PASS | Validate invite link | valid=True
+PASS | Invite candidate register | status=200
+PASS | Users in DB | count=39
+PASS | Sessions in DB | count=58
+PASS | Completed sessions | count=34
+PASS | Invites in DB | count=8
+PASS | Upload recording | status=200 resp={'session_id': '18c2b395-9fe1-48d2-9a95-44dd789eb1f8', 'reco
+PASS | Candidate get own recording | status=200 size=104
+PASS | Recording file returned | size=104 bytes
+PASS | Recruiter get recording | status=200
+PASS | Uploads folder exists | path=C:\Users\ayush\ai_interview_platform\SmartSkale-InterviewBot\uploads
+PASS | WebM recording saved | count=5
+PASS | MP4 conversion exists | mp4=0 webm=5 ffmpeg=yes
+PASS | Session recording file | looking for 18c2b395*
+PASS | Recording filename in DB | webm=18c2b395-9fe1-48d2-9a95-44dd789eb1f8_recording.webm
+PASS | MP4 filename in DB | mp4=None webm=18c2b395-9fe1-48d2-9a95-44dd789eb1f8_recording.webm ffmpeg=yes

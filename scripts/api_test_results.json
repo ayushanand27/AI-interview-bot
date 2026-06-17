@@ -1,0 +1,134 @@
+[
+  {
+    "test": "TEST 1 - Health Check",
+    "passed": true,
+    "summary": "/health=200 {'status': 'ok'} | /status=200 keys=['version', 'app_name', 'database_connected', 'proctoring_loaded', 'total_sessions']",
+    "notes": ""
+  },
+  {
+    "test": "TEST 2 - Register candidate",
+    "passed": true,
+    "summary": "HTTP 201 | message=Account created. Please check your email to verify your account.",
+    "notes": "verification_token in DB: yes"
+  },
+  {
+    "test": "TEST 3 - Login",
+    "passed": true,
+    "summary": "token=obtained (password used: password123)",
+    "notes": ""
+  },
+  {
+    "test": "TEST 4 - Verify email",
+    "passed": true,
+    "summary": "HTTP 200 | {'success': True, 'message': 'Email verified successfully'}",
+    "notes": "If already verified, token may be cleared \u2014 check is_verified in DB"
+  },
+  {
+    "test": "TEST 5 - Forgot password",
+    "passed": true,
+    "summary": "HTTP 200 | {'message': 'If this email exists, you will receive a reset link shortly.'}",
+    "notes": "reset_token in DB: yes"
+  },
+  {
+    "test": "TEST 6 - Reset password",
+    "passed": true,
+    "summary": "HTTP 200 | {'message': 'Password reset successfully. You can now login with your new password.'}",
+    "notes": ""
+  },
+  {
+    "test": "TEST 7 - Create session",
+    "passed": true,
+    "summary": "HTTP 201 | session_id=5d17f46d-8555-47a8-bc8b-295899e7da8a",
+    "notes": "Endpoint requires multipart form + resume PDF (not JSON)"
+  },
+  {
+    "test": "TEST 8 - Generate questions",
+    "passed": true,
+    "summary": "HTTP 200 | {\"session_id\": \"5d17f46d-8555-47a8-bc8b-295899e7da8a\", \"status\": \"questions_ready\", \"total_questions\": 2, \"message\": \"Questions generated. Fetch the current question to begin.\"}",
+    "notes": ""
+  },
+  {
+    "test": "TEST 9 - Current question",
+    "passed": true,
+    "summary": "HTTP 200 | index=0 has_question=True",
+    "notes": ""
+  },
+  {
+    "test": "TEST 10 - Submit answer",
+    "passed": true,
+    "summary": "HTTP 200 | keys=['session_id', 'status', 'answered_question_index', 'message', 'has_more_questions', 'is_complete', 'remaining_questions'] is_complete=False",
+    "notes": ""
+  },
+  {
+    "test": "TEST 10b - Submit answer 2",
+    "passed": true,
+    "summary": "HTTP 200 | is_complete=True",
+    "notes": ""
+  },
+  {
+    "test": "TEST 11 - End interview",
+    "passed": true,
+    "summary": "HTTP 200 | final_score={'final_score': 45.0, 'recommendation': 'No Hire', 'per_question_scores': [{'index': 1, 'question': 'Can you explain how you handle data validation in FastAPI and give an example of a scenario where you implemented it in your projects?', 'score': 57.0, 'reasoning': 'The candidate demonstrated a basic understanding of FastAPI, but failed to provide a clear and comprehensive explanation of data validation. They also lacked concrete examples and implementation details, indicating a need for improvement in these areas.'}, {'index': 2, 'question': \"How do you manage dependency injection in FastAPI, and what are some best practices you've learned through your experience to ensure efficient code maintenance and testing?\", 'score': 33.0, 'reasoning': \"The candidate's answer was brief and lacked clarity, but showed some understanding of dependency injection. However, they failed to provide a clear explanation of how to implement it in FastAPI and did not offer any best practices for efficient code maintenance and testing.\"}], 'top_strengths': ['Basic understanding of FastAPI', 'brief and to the point'], 'top_improvements': ['Provide concrete examples of data validation in FastAPI', 'Explain how data validation is implemented in FastAPI', 'Demonstrate a deeper understanding of data validation in FastAPI', 'provide a clear explanation of dependency injection in FastAPI'], 'score_breakdown': {'max_possible': 100, 'candidate_score': 45.0, 'thresholds': {'Strong Hire': 85, 'Hire': 70, 'Maybe': 50, 'No Hire': 0}}} recommendation=None",
+    "notes": ""
+  },
+  {
+    "test": "TEST 12 - Candidate report",
+    "passed": true,
+    "summary": "HTTP 200 | size=4243 bytes saved=test_candidate_report.pdf",
+    "notes": ""
+  },
+  {
+    "test": "TEST 13 - Proctor health",
+    "passed": true,
+    "summary": "HTTP 200 | {'status': 'healthy', 'module': 'eye_detection'}",
+    "notes": ""
+  },
+  {
+    "test": "TEST 14 - Proctor analyze",
+    "passed": true,
+    "summary": "HTTP 400 | {\"detail\":\"Invalid frame: OpenCV(4.13.0) D:\\\\a\\\\opencv-python\\\\opencv-python\\\\opencv\\\\modules\\\\imgcodecs\\\\src\\\\loadsave.cpp:1310: error: (-215:Assertion failed) !buf.empty() in function 'cv::imdecode_",
+    "notes": ""
+  },
+  {
+    "test": "TEST 15 - Register recruiter",
+    "passed": true,
+    "summary": "HTTP 201 | Account created. Please check your email to verify your account.",
+    "notes": ""
+  },
+  {
+    "test": "TEST 16 - Recruiter login",
+    "passed": true,
+    "summary": "HTTP 200 | token=yes",
+    "notes": ""
+  },
+  {
+    "test": "TEST 17 - Recruiter sessions",
+    "passed": true,
+    "summary": "HTTP 200 | sessions_count=24",
+    "notes": ""
+  },
+  {
+    "test": "TEST 18 - Create assessment",
+    "passed": false,
+    "summary": "HTTP 422 | token=None link=None",
+    "notes": ""
+  },
+  {
+    "test": "TEST 19 - Validate invite",
+    "passed": false,
+    "summary": "No invite token",
+    "notes": ""
+  },
+  {
+    "test": "TEST 20 - Recruiter report",
+    "passed": true,
+    "summary": "HTTP 200 | size=4293 bytes",
+    "notes": ""
+  },
+  {
+    "test": "TEST 21 - Database check",
+    "passed": true,
+    "summary": "users=5 sessions=5 invites=2",
+    "notes": "latest users: [(17, 'testrecruiter123@example.com', 'RECRUITER', 0), (16, 'testcandidate123@example.com', 'CANDIDATE', 1)] | latest session: ('5d17f46d855547a8bc8b295899e7da8a', 'ended', 'Python Developer', '{\"final_score\": 45.0, \"recommendation\": \"No Hire\", \"per_question_scores\": [{\"index\": 1, \"question\": \"Can you explain how you handle data validation in FastAPI and give an example of a scenario where you implemented it in your projects?\", \"score\": 57.0, \"reasoning\": \"The candidate demonstrated a basic understanding of FastAPI, but failed to provide a clear and comprehensive explanation of data validation. They also lacked concrete examples and implementation details, indicating a need for improvement in these areas.\"}, {\"index\": 2, \"question\": \"How do you manage dependency injection in FastAPI, and what are some best practices you\\'ve learned through your experience to ensure efficient code maintenance and testing?\", \"score\": 33.0, \"reasoning\": \"The candidate\\'s answer was brief and lacked clarity, but showed some understanding of dependency injection. However, they failed to provide a clear explanation of how to implement it in FastAPI and did not offer any best practices for efficient code maintenance and testing.\"}], \"top_strengths\": [\"Basic understanding of FastAPI\", \"brief and to the point\"], \"top_improvements\": [\"Provide concrete examples of data validation in FastAPI\", \"Explain how data validation is implemented in FastAPI\", \"Demonstrate a deeper understanding of data validation in FastAPI\", \"provide a clear explanation of dependency injection in FastAPI\"], \"score_breakdown\": {\"max_possible\": 100, \"candidate_score\": 45.0, \"thresholds\": {\"Strong Hire\": 85, \"Hire\": 70, \"Maybe\": 50, \"No Hire\": 0}}}')"
+  }
+]

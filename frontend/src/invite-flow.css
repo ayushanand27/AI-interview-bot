@@ -1,0 +1,95 @@
+.invite-flow {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.invite-flow .invite-welcome {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.invite-flow .invite-meta {
+  color: var(--muted);
+  margin: 1rem 0 1.5rem;
+}
+
+.invite-identity-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin: 1rem 0;
+}
+
+@media (max-width: 768px) {
+  .invite-identity-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.invite-identity-panel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  background: var(--surface, #fff);
+}
+
+.invite-identity-panel h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.invite-identity-panel p {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0 0 0.75rem;
+}
+
+.invite-preview {
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #111;
+}
+
+.invite-selfie-video {
+  width: 320px;
+  max-width: 100%;
+  height: 240px;
+  border-radius: 8px;
+  background: #000;
+  object-fit: cover;
+}
+
+.invite-check {
+  color: #16a34a;
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.invite-verified-banner {
+  background: rgba(22, 163, 74, 0.12);
+  border: 1px solid #16a34a;
+  color: #166534;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+  font-weight: 600;
+}
+
+.invite-flow .alert.info {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.invite-flow .link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #2563eb;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}

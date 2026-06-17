@@ -1,0 +1,687 @@
+import { useEffect, useState } from "react";
+import { recruiterApi } from "../api/client";
+import type {
+  RecruiterSessionDetail,
+  RecruiterSessionSummary,
+} from "../types/recruiter";
+import "../recruiter-portal.css";
+
+const VIOLATION_TYPE_LABELS: Record<string, string> = {
+  no_face: "Face not detected",
+  multiple_faces: "Multiple faces detected",
+  looking_sideways: "Looking away (sideways)",
+  looking_down: "Looking down",
+  loud_audio: "Loud environment",
+  tab_switch: "Tab switch",
+  virtual_camera: "Virtual camera",
+  recording_extension: "Screen recording extension",
+  screen_sharing: "Screen sharing",
+  prohibited_object_detected: "Prohibited object detected (cell phone)",
+};
+
+function formatViolationType(type: string): string {
+  return VIOLATION_TYPE_LABELS[type] ?? type.replace(/_/g, " ");
+}
+
+const DOCUMENT_ACCEPT =
+  ".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+function formatScore(score: number | null): string {
+  if (score === null || Number.isNaN(score)) return "—";
+  return String(Math.round(score));
+}
+
+function fullInviteUrl(relativeLink: string): string {
+  return `${window.location.origin}${relativeLink}`;
+}
+
+interface RecruiterDashboardProps {
+  loading: boolean;
+  onLoadingChange: (loading: boolean) => void;
+  onError: (message: string | null) => void;
+  onLogout?: () => void;
+}
+
+export default function RecruiterDashboard({
+  loading,
+  onLoadingChange,
+  onError,
+  onLogout,
+}: RecruiterDashboardProps) {
+  const [sessions, setSessions] = useState<RecruiterSessionSummary[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<RecruiterSessionDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [watchingId, setWatchingId] = useState<string | null>(null);
+
+  const [showAssessmentForm, setShowAssessmentForm] = useState(false);
+  const [jdMode, setJdMode] = useState<"paste" | "pdf">("paste");
+  const [jdText, setJdText] = useState("");
+  const [jdPdfFile, setJdPdfFile] = useState<File | null>(null);
+  const [questionCount, setQuestionCount] = useState(5);
+  const [difficulty, setDifficulty] = useState("Medium");
+  const [expiryHours, setExpiryHours] = useState(48);
+  const [assessmentLoading, setAssessmentLoading] = useState(false);
+  const [questionsPreview, setQuestionsPreview] = useState<string[]>([]);
+  const [pendingInviteLink, setPendingInviteLink] = useState<string | null>(null);
+  const [approvedInviteLink, setApprovedInviteLink] = useState<string | null>(null);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    onLoadingChange(true);
+    onError(null);
+
+    recruiterApi
+      .listSessions()
+      .then((res) => {
+        if (!cancelled) {
+          setSessions(res.data ?? []);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          onError(err instanceof Error ? err.message : "Failed to load sessions");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          onLoadingChange(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onError, onLoadingChange]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setDetail(null);
+      return;
+    }
+
+    let cancelled = false;
+    setDetailLoading(true);
+    onError(null);
+
+    recruiterApi
+      .getSession(selectedId)
+      .then((res) => {
+        if (!cancelled) {
+          setDetail(res.data);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          onError(err instanceof Error ? err.message : "Failed to load session");
+          setDetail(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setDetailLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, onError]);
+
+  async function handleWatchRecording(
+    row: RecruiterSessionSummary,
+    e: React.MouseEvent,
+  ) {
+    e.stopPropagation();
+    setWatchingId(row.session_id);
+    onError(null);
+    try {
+      const blob = await recruiterApi.getRecording(row.session_id);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed to load recording");
+    } finally {
+      setWatchingId(null);
+    }
+  }
+
+  async function handleDownloadReport(
+    row: RecruiterSessionSummary,
+    e: React.MouseEvent,
+  ) {
+    e.stopPropagation();
+    setDownloadingId(row.session_id);
+    onError(null);
+    try {
+      const blob = await recruiterApi.downloadReport(row.session_id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `interview-report-${row.candidate_name.replace(/\s+/g, "-")}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed to download report");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
+  async function handleGenerateQuestions() {
+    if (jdMode === "paste" && !jdText.trim()) {
+      onError("Please paste a job description or switch to Upload JD file.");
+      return;
+    }
+    if (jdMode === "pdf" && !jdPdfFile) {
+      onError(
+        "Please upload a job description file (PDF, Word, or TXT) or switch to Paste JD Text.",
+      );
+      return;
+    }
+    setAssessmentLoading(true);
+    onError(null);
+    setApprovedInviteLink(null);
+    setCopyMessage(null);
+    try {
+      const res = await recruiterApi.createAssessment({
+        jd_text: jdMode === "paste" ? jdText.trim() : "",
+        jd_pdf: jdMode === "pdf" ? jdPdfFile : null,
+        question_count: questionCount,
+        difficulty,
+        expiry_hours: expiryHours,
+      });
+      setQuestionsPreview(res.data.questions_preview);
+      setPendingInviteLink(res.data.invite_link);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed to generate questions");
+    } finally {
+      setAssessmentLoading(false);
+    }
+  }
+
+  function handleApprove() {
+    if (!pendingInviteLink) return;
+    setApprovedInviteLink(pendingInviteLink);
+    setCopyMessage(null);
+  }
+
+  async function handleCopyLink() {
+    if (!approvedInviteLink) return;
+    const url = fullInviteUrl(approvedInviteLink);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopyMessage("Link copied to clipboard.");
+    } catch {
+      setCopyMessage("Could not copy — select and copy the link manually.");
+    }
+  }
+
+  return (
+    <div className="recruiter-portal">
+      <header>
+        <h1>SmartSkale — Recruiter Portal</h1>
+        <p>Create assessments and review completed interviews.</p>
+        {onLogout && (
+          <button
+            type="button"
+            className="rp-secondary"
+            style={{ marginTop: "0.75rem" }}
+            onClick={onLogout}
+          >
+            Log out
+          </button>
+        )}
+      </header>
+
+      <div className="rp-card rp-card-wide" style={{ marginBottom: "1.25rem" }}>
+        <div className="rp-toolbar">
+          <h2 style={{ margin: 0, fontSize: "1.15rem" }}>Assessments</h2>
+          <button
+            type="button"
+            className="rp-primary"
+            style={{ width: "auto", padding: "0.55rem 1.25rem" }}
+            onClick={() => {
+              setShowAssessmentForm((v) => !v);
+              setApprovedInviteLink(null);
+              setCopyMessage(null);
+            }}
+          >
+            {showAssessmentForm ? "Hide form" : "Create New Assessment"}
+          </button>
+        </div>
+
+        {showAssessmentForm && (
+          <>
+            <label>Job description</label>
+            <div className="rp-tabs" style={{ marginBottom: "0.75rem" }}>
+              <button
+                type="button"
+                className={jdMode === "paste" ? "active" : undefined}
+                onClick={() => {
+                  setJdMode("paste");
+                  onError(null);
+                }}
+              >
+                Paste JD Text
+              </button>
+              <button
+                type="button"
+                className={jdMode === "pdf" ? "active" : undefined}
+                onClick={() => {
+                  setJdMode("pdf");
+                  onError(null);
+                }}
+              >
+                Upload JD File
+              </button>
+            </div>
+
+            {jdMode === "paste" ? (
+              <textarea
+                id="jd-text"
+                value={jdText}
+                onChange={(e) => setJdText(e.target.value)}
+                placeholder="Paste the full job description…"
+              />
+            ) : (
+              <div style={{ marginBottom: "1rem" }}>
+                <input
+                  id="jd-pdf"
+                  type="file"
+                  accept={DOCUMENT_ACCEPT}
+                  onChange={(e) => {
+                    setJdPdfFile(e.target.files?.[0] ?? null);
+                  }}
+                />
+                {jdPdfFile && (
+                  <p style={{ marginTop: "0.5rem", color: "var(--rp-muted)", fontSize: "0.9rem" }}>
+                    Selected: {jdPdfFile.name}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="rp-field-row">
+              <div>
+                <label htmlFor="question-count">Number of questions</label>
+                <select
+                  id="question-count"
+                  value={questionCount}
+                  onChange={(e) => setQuestionCount(Number(e.target.value))}
+                >
+                  <option value={2}>2</option>
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={15}>15</option>
+                  <option value={20}>20</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="difficulty">Difficulty</label>
+                <select
+                  id="difficulty"
+                  value={difficulty}
+                  onChange={(e) => setDifficulty(e.target.value)}
+                >
+                  <option value="Easy">Easy</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Hard">Hard</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="expiry">Link expiry</label>
+                <select
+                  id="expiry"
+                  value={expiryHours}
+                  onChange={(e) => setExpiryHours(Number(e.target.value))}
+                >
+                  <option value={24}>24 hours</option>
+                  <option value={48}>48 hours</option>
+                  <option value={72}>72 hours</option>
+                  <option value={168}>1 week</option>
+                </select>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="rp-primary"
+              disabled={assessmentLoading}
+              onClick={() => void handleGenerateQuestions()}
+            >
+              {assessmentLoading ? "Generating…" : "Generate Questions"}
+            </button>
+
+            {questionsPreview.length > 0 && (
+              <div style={{ marginTop: "1.25rem" }}>
+                <h3 style={{ marginBottom: "0.5rem" }}>Question preview</h3>
+                <ol className="rp-questions-preview">
+                  {questionsPreview.map((q, i) => (
+                    <li key={i}>{q}</li>
+                  ))}
+                </ol>
+                <div className="rp-actions">
+                  <button
+                    type="button"
+                    className="rp-secondary"
+                    disabled={assessmentLoading}
+                    onClick={() => void handleGenerateQuestions()}
+                  >
+                    Regenerate
+                  </button>
+                  <button
+                    type="button"
+                    className="rp-primary"
+                    style={{ width: "auto" }}
+                    disabled={!pendingInviteLink}
+                    onClick={handleApprove}
+                  >
+                    Approve &amp; Get Link
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {approvedInviteLink && (
+              <div className="rp-invite-box">
+                <p style={{ margin: "0 0 0.5rem", color: "var(--rp-muted)" }}>
+                  Share this invite link with candidates:
+                </p>
+                <p className="rp-invite-link">{fullInviteUrl(approvedInviteLink)}</p>
+                <div className="rp-actions">
+                  <button type="button" className="rp-secondary" onClick={() => void handleCopyLink()}>
+                    Copy to clipboard
+                  </button>
+                </div>
+                {copyMessage && (
+                  <p style={{ margin: "0.75rem 0 0", color: "var(--rp-success)" }}>{copyMessage}</p>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="rp-card rp-card-wide recruiter-dashboard">
+        <h2 style={{ marginBottom: "1rem", fontSize: "1.15rem" }}>
+          Completed interviews
+        </h2>
+
+        {loading && sessions.length === 0 ? (
+          <p className="loading">Loading interviews…</p>
+        ) : sessions.length === 0 ? (
+          <p style={{ color: "var(--rp-muted)" }}>
+            No completed interviews yet. Candidates must finish and end a session
+            before it appears here.
+          </p>
+        ) : (
+          <div className="recruiter-table-wrap">
+            <table className="recruiter-table">
+              <thead>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Role</th>
+                  <th>Date</th>
+                  <th>Score</th>
+                  <th>Recording</th>
+                  <th>Report</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((row) => (
+                  <tr
+                    key={row.session_id}
+                    className={
+                      selectedId === row.session_id ? "selected" : undefined
+                    }
+                    onClick={() => setSelectedId(row.session_id)}
+                  >
+                    <td>{row.candidate_name}</td>
+                    <td>{row.role_title}</td>
+                    <td>{formatDate(row.date)}</td>
+                    <td>
+                      {formatScore(row.final_score)}
+                      {row.recommendation ? (
+                        <span className="recruiter-rec">
+                          {" "}
+                          · {row.recommendation}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      {row.recording_available ? (
+                        <button
+                          type="button"
+                          className="rp-secondary"
+                          style={{ padding: "0.35rem 0.65rem", fontSize: "0.85rem" }}
+                          disabled={watchingId === row.session_id}
+                          onClick={(e) => handleWatchRecording(row, e)}
+                        >
+                          {watchingId === row.session_id
+                            ? "Loading…"
+                            : "Watch Recording"}
+                        </button>
+                      ) : (
+                        <span style={{ color: "var(--rp-muted)", fontSize: "0.85rem" }}>
+                          No
+                        </span>
+                      )}
+                    </td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        className="rp-secondary"
+                        style={{ padding: "0.35rem 0.65rem", fontSize: "0.85rem" }}
+                        disabled={downloadingId === row.session_id}
+                        onClick={(e) => handleDownloadReport(row, e)}
+                      >
+                        {downloadingId === row.session_id
+                          ? "Downloading…"
+                          : "Download Report"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {selectedId && (
+        <div className="rp-card rp-card-wide" style={{ marginTop: "1.25rem" }}>
+          {detailLoading || !detail ? (
+            <p className="loading">Loading transcript…</p>
+          ) : (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: "1rem",
+                  flexWrap: "wrap",
+                }}
+              >
+                <h2 style={{ marginBottom: "0.5rem", fontSize: "1.15rem" }}>
+                  {detail.candidate_name} — {detail.role_title}
+                </h2>
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="rp-primary"
+                    style={{ width: "auto" }}
+                    disabled={downloadingId === detail.session_id}
+                    onClick={(e) => {
+                      const row = sessions.find(
+                        (s) => s.session_id === detail.session_id,
+                      );
+                      if (row) {
+                        void handleDownloadReport(row, e);
+                      }
+                    }}
+                  >
+                    {downloadingId === detail.session_id
+                      ? "Downloading…"
+                      : "Download Report"}
+                  </button>
+                  {detail.recording_available && (
+                    <button
+                      type="button"
+                      className="rp-secondary"
+                      disabled={watchingId === detail.session_id}
+                      onClick={(e) => {
+                        const row = sessions.find(
+                          (s) => s.session_id === detail.session_id,
+                        );
+                        if (row) {
+                          void handleWatchRecording(row, e);
+                        }
+                      }}
+                    >
+                      {watchingId === detail.session_id
+                        ? "Loading…"
+                        : "Watch Recording"}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p style={{ color: "var(--rp-muted)", marginBottom: "1rem" }}>
+                {formatDate(detail.date)}
+                {detail.duration_minutes != null
+                  ? ` · ${detail.duration_minutes} min`
+                  : ""}{" "}
+                · {detail.answered_count} of {detail.total_questions} answered ·{" "}
+                {detail.status}
+                {detail.recording_available ? " · Recording available" : ""}
+              </p>
+
+              {(detail.original_score != null || detail.adjusted_score != null) && (
+                <div className="summary-overall" style={{ marginBottom: "1rem" }}>
+                  <h3>Scores</h3>
+                  {detail.original_score != null && (
+                    <p>Original score: <strong>{detail.original_score}</strong> / 100</p>
+                  )}
+                  {detail.integrity_penalty_percent > 0 && (
+                    <p>Integrity penalty: <strong>-{detail.integrity_penalty_percent}%</strong></p>
+                  )}
+                  {detail.adjusted_score != null && (
+                    <p>Adjusted score: <strong>{detail.adjusted_score}</strong> / 100</p>
+                  )}
+                  {detail.integrity_level && (
+                    <p>Integrity level: <strong>{detail.integrity_level}</strong></p>
+                  )}
+                </div>
+              )}
+
+              {detail.proctoring_summary?.violations &&
+                detail.proctoring_summary.violations.length > 0 && (
+                  <section className="summary-violations" style={{ marginBottom: "1rem" }}>
+                    <h3>Proctoring violations</h3>
+                    <ul className="summary-violations-list">
+                      {detail.proctoring_summary.violations.map((v, idx) => (
+                        <li key={`${v.time}-${idx}`}>
+                          {new Date(v.time * 1000).toLocaleTimeString()} ·{" "}
+                          {formatViolationType(v.type)} ({v.severity}) · -
+                          {v.penalty_percent}%
+                          {v.message ? ` — ${v.message}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+              {detail.final_score && (
+                <div className="summary-overall" style={{ marginBottom: "1rem" }}>
+                  <h3>Overall score</h3>
+                  <p className="summary-score">
+                    <strong>
+                      {detail.final_score.final_score ??
+                        detail.final_score.candidate_score ??
+                        "—"}
+                    </strong>
+                    <span className="summary-score-max"> / 100</span>
+                  </p>
+                  {detail.final_score.recommendation && (
+                    <p className="summary-recommendation">
+                      Recommendation:{" "}
+                      <strong>{detail.final_score.recommendation}</strong>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {detail.transcript.map((item) => {
+                const j = item.judgment;
+                return (
+                  <div key={item.index} className="summary-item">
+                    <h3>Question {item.index}</h3>
+                    <p>{item.question}</p>
+                    <h3 style={{ marginTop: "0.75rem" }}>Answer</h3>
+                    <p className="answer-text">
+                      {item.answer ?? "(not answered)"}
+                    </p>
+                    {j && !j.error && (
+                      <div className="summary-feedback">
+                        <h3>Judge feedback</h3>
+                        {j.weighted_total != null && (
+                          <p className="summary-question-score">
+                            Score: <strong>{j.weighted_total}</strong> / 100
+                          </p>
+                        )}
+                        {(j.overall_reasoning ?? j.reasoning) && (
+                          <p className="summary-reasoning">
+                            {j.overall_reasoning ?? j.reasoning}
+                          </p>
+                        )}
+                        {j.strengths && j.strengths.length > 0 && (
+                          <div className="summary-feedback-block">
+                            <h4>Strengths</h4>
+                            <ul>
+                              {j.strengths.map((s, idx) => (
+                                <li key={idx}>{s}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {j.improvements && j.improvements.length > 0 && (
+                          <div className="summary-feedback-block">
+                            <h4>Improvements</h4>
+                            <ul>
+                              {j.improvements.map((s, idx) => (
+                                <li key={idx}>{s}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {j?.error === "judging_failed" && (
+                      <div className="alert info" style={{ marginTop: "0.75rem" }}>
+                        Judge feedback unavailable for this answer.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

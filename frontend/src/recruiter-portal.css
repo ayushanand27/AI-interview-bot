@@ -1,0 +1,192 @@
+.recruiter-portal {
+  --rp-bg: #0f172a;
+  --rp-surface: #1e3a5f;
+  --rp-surface-light: #2563eb;
+  --rp-accent: #3b82f6;
+  --rp-accent-hover: #60a5fa;
+  --rp-text: #f8fafc;
+  --rp-muted: #94a3b8;
+  --rp-border: #334155;
+  --rp-error: #f87171;
+  --rp-success: #4ade80;
+
+  min-height: 100vh;
+  background: linear-gradient(160deg, var(--rp-bg) 0%, #1e3a5f 45%, #0f172a 100%);
+  color: var(--rp-text);
+  padding: 2rem 1rem 3rem;
+}
+
+.recruiter-portal header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.recruiter-portal header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--rp-text);
+  margin-bottom: 0.35rem;
+}
+
+.recruiter-portal header p {
+  color: var(--rp-muted);
+  margin: 0;
+}
+
+.recruiter-portal .rp-card {
+  background: rgba(30, 58, 95, 0.85);
+  border: 1px solid var(--rp-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  max-width: 480px;
+  margin: 0 auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.recruiter-portal .rp-card-wide {
+  max-width: 960px;
+}
+
+.recruiter-portal .rp-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.recruiter-portal .rp-tabs button {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--rp-border);
+  background: transparent;
+  color: var(--rp-muted);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.recruiter-portal .rp-tabs button.active {
+  background: var(--rp-accent);
+  border-color: var(--rp-accent);
+  color: #fff;
+}
+
+.recruiter-portal label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--rp-muted);
+  margin-bottom: 0.35rem;
+}
+
+.recruiter-portal input,
+.recruiter-portal select,
+.recruiter-portal textarea {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--rp-border);
+  border-radius: 8px;
+  background: #0f172a;
+  color: var(--rp-text);
+  margin-bottom: 1rem;
+  font: inherit;
+}
+
+.recruiter-portal textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.recruiter-portal .rp-field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.recruiter-portal .rp-primary {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--rp-accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.recruiter-portal .rp-primary:hover:not(:disabled) {
+  background: var(--rp-accent-hover);
+}
+
+.recruiter-portal .rp-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.recruiter-portal .rp-secondary {
+  padding: 0.55rem 1rem;
+  background: transparent;
+  color: var(--rp-text);
+  border: 1px solid var(--rp-border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.recruiter-portal .rp-secondary:hover:not(:disabled) {
+  border-color: var(--rp-accent);
+  color: var(--rp-accent-hover);
+}
+
+.recruiter-portal .rp-alert {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.recruiter-portal .rp-alert.error {
+  background: rgba(248, 113, 113, 0.15);
+  border: 1px solid var(--rp-error);
+  color: #fecaca;
+}
+
+.recruiter-portal .rp-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.recruiter-portal .rp-questions-preview {
+  list-style: decimal;
+  padding-left: 1.25rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.recruiter-portal .rp-questions-preview li {
+  margin-bottom: 0.5rem;
+  line-height: 1.45;
+}
+
+.recruiter-portal .rp-invite-box {
+  background: #0f172a;
+  border: 1px dashed var(--rp-accent);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.recruiter-portal .rp-invite-link {
+  word-break: break-all;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.9rem;
+  color: var(--rp-accent-hover);
+}
+
+.recruiter-portal .rp-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}

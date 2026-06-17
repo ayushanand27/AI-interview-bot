@@ -1,0 +1,13 @@
+.venv
+venv
+__pycache__
+*.pyc
+.git
+frontend
+node_modules
+data/sessions
+*.db
+.env
+smartskale.db
+terminals
+.cursor

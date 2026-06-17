@@ -1,0 +1,89 @@
+"""Recruiter assessment creation routes (JD-based invites)."""
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from pydantic import ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.dependencies import require_role
+from app.db.session import get_db
+from app.models.user import User, UserRole
+from app.schemas.common import BaseResponse
+from app.schemas.recruiter_assessment import (
+    CreateAssessmentRequest,
+    CreateAssessmentResponse,
+    ParseJdPdfResponse,
+)
+from app.services.assessment_service import AssessmentService
+from app.services.interview_service import resolve_job_description
+from app.services.resume_parser import extract_text_from_document
+from app.utils.file_validation import validate_document_upload
+
+router = APIRouter(prefix="/recruiter", tags=["Recruiter Assessment"])
+
+
+@router.post(
+    "/create-assessment",
+    response_model=BaseResponse[CreateAssessmentResponse],
+    summary="Create a JD-based interview assessment and invite link",
+)
+async def create_assessment(
+    question_count: int = Form(...),
+    difficulty: str = Form(...),
+    expiry_hours: int = Form(...),
+    jd_text: str = Form(""),
+    jd_pdf: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    jd_pdf_bytes: bytes | None = None
+    if jd_pdf is not None and jd_pdf.filename:
+        jd_pdf_bytes = await jd_pdf.read()
+
+    try:
+        combined_jd = resolve_job_description(
+            jd_text,
+            jd_pdf_bytes,
+            pdf_filename=jd_pdf.filename if jd_pdf else None,
+            pdf_content_type=jd_pdf.content_type if jd_pdf else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        data = CreateAssessmentRequest(
+            jd_text=combined_jd,
+            question_count=question_count,
+            difficulty=difficulty,
+            expiry_hours=expiry_hours,
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
+    service = AssessmentService(db)
+    result = await service.create_assessment(current_user.id, data)
+    return BaseResponse(
+        success=True,
+        message="Assessment created successfully",
+        data=result,
+    )
+
+
+@router.post(
+    "/parse-jd-pdf",
+    response_model=BaseResponse[ParseJdPdfResponse],
+    summary="Extract job description text from an uploaded document",
+)
+async def parse_jd_pdf(
+    # Frontend sends multipart field name "pdf" (PDF, Word, or TXT).
+    pdf: UploadFile = File(...),
+    _current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    filename = pdf.filename or "job-description.pdf"
+    file_bytes = await pdf.read()
+    validate_document_upload(file_bytes, pdf.content_type, filename)
+    jd_text = extract_text_from_document(file_bytes, filename)
+    return BaseResponse(
+        success=True,
+        message="Job description extracted successfully",
+        data=ParseJdPdfResponse(jd_text=jd_text),
+    )
