@@ -33,4 +33,5 @@ export interface InviteVerifyIdentityResponse {
   verified: boolean;
   confidence: number;
   message: string;
+  low_identity_confidence?: boolean;
 }

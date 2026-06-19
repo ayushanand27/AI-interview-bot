@@ -50,6 +50,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
   const [loading, setLoading] = useState(false);
   const [detailsMode, setDetailsMode] = useState<DetailsMode>("register");
   const [prefilledEmail, setPrefilledEmail] = useState("");
+  const [candidateEmail, setCandidateEmail] = useState("");
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] =
@@ -162,6 +163,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
     setInfo(null);
     try {
       const res = await inviteApi.registerWithStatus(token, { name, email, phone });
+      setCandidateEmail(email);
       await attachToInterview(res);
     } catch (err) {
       if (err instanceof InviteFlowError && err.status === 409) {
@@ -189,6 +191,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
     setInfo(null);
     try {
       const res = await inviteApi.login(token, { email, password, phone });
+      setCandidateEmail(email);
       await attachToInterview(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -249,6 +252,9 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
       setVerifyMessage(null);
       if (res.data.verified) {
         setIdentityVerified(true);
+        if (res.data.low_identity_confidence) {
+          setVerifyMessage(res.data.message);
+        }
       } else {
         setIdentityVerified(false);
         setVerifyMessage(res.data.message);
@@ -619,6 +625,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
           summary={summary}
           sessionId={sessionId}
           inviteToken={token}
+          candidateEmail={candidateEmail}
           recordingSaved={recordingSaved}
           onRestart={() => window.location.reload()}
         />

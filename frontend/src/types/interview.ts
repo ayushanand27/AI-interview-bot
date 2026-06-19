@@ -64,6 +64,7 @@ export interface EndInterviewResponse {
   adjusted_final_score?: number | null;
   integrity_report?: import("./proctor").IntegrityReport | null;
   integrity_level?: string | null;
+  candidate_report_email_sent?: boolean;
 }
 
 export interface AnswerJudgment {

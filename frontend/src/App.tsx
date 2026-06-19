@@ -440,6 +440,8 @@ export default function App() {
 
   const isLoggedIn = accessToken !== null;
   const isRecruiter = user?.role === "recruiter";
+  const needsEmailVerification =
+    isLoggedIn && user?.role === "candidate" && user.is_verified === false;
 
   if (serverError && !isLoggedIn) {
     return (
@@ -538,6 +540,27 @@ export default function App() {
         />
       ) : mobileBlocked ? (
         <MobileBlock />
+      ) : needsEmailVerification ? (
+        <div className="card">
+          <h2>Verify your email</h2>
+          <p className="invite-meta">
+            Please verify your email before starting an interview. We sent a
+            link to <strong>{user?.email}</strong>.
+          </p>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => void handleResendVerification()}
+            disabled={resendLoading}
+          >
+            {resendLoading ? "Sending…" : "Resend verification email"}
+          </button>
+          {resendStatus && (
+            <p className="invite-meta" style={{ marginTop: "1rem" }}>
+              {resendStatus}
+            </p>
+          )}
+        </div>
       ) : (
         <>
           {phase === "setup" && (
@@ -574,6 +597,7 @@ export default function App() {
           {phase === "summary" && summary && (
             <Summary
               summary={summary}
+              candidateEmail={user?.email}
               recordingSaved={recordingSaved}
               onRestart={handleRestart}
             />

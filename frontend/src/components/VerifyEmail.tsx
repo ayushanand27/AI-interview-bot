@@ -20,10 +20,10 @@ export default function VerifyEmail() {
 
     let cancelled = false;
 
-    async function verify() {
+    async function verify(verificationToken: string) {
       try {
         const response = await fetch(
-          `${API_BASE}/api/v1/auth/verify-email?token=${encodeURIComponent(token)}`,
+          `${API_BASE}/api/v1/auth/verify-email?token=${encodeURIComponent(verificationToken)}`,
         );
         const data = (await response.json()) as {
           success?: boolean;
@@ -55,7 +55,7 @@ export default function VerifyEmail() {
       }
     }
 
-    void verify();
+    void verify(token);
     return () => {
       cancelled = true;
     };

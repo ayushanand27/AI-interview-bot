@@ -42,6 +42,8 @@ export interface RecruiterSessionDetail {
     score_penalty_percent?: number;
     integrity_level?: string;
   } | null;
+  low_identity_confidence?: boolean;
+  identity_similarity_score?: number | null;
   recording_available: boolean;
   recording_filename: string | null;
   transcript: TranscriptItem[];

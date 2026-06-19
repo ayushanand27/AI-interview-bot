@@ -659,6 +659,26 @@ export const interviewApi = {
 
 
 
+  fetchJdUrl(url: string) {
+
+    return request<{ jd_text: string; source: string }>(
+
+      "/api/v1/interviews/fetch-jd-url",
+
+      {
+
+        method: "POST",
+
+        body: JSON.stringify({ url }),
+
+      },
+
+    );
+
+  },
+
+
+
   generateQuestions(sessionId: string, questionCount: number) {
 
     return request<{ total_questions: number; message: string }>(

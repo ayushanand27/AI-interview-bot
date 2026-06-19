@@ -107,9 +107,15 @@ def _session_to_detail(row: DBSession) -> RecruiterSessionDetail:
 
     penalty = 0.0
     integrity_level = None
+    low_identity_confidence = False
+    identity_similarity_score = None
     if proctoring:
         penalty = float(proctoring.get("score_penalty_percent", 0.0))
         integrity_level = proctoring.get("integrity_level")
+        low_identity_confidence = bool(proctoring.get("low_identity_confidence"))
+        raw_similarity = proctoring.get("identity_similarity_score")
+        if isinstance(raw_similarity, (int, float)):
+            identity_similarity_score = float(raw_similarity)
 
     return RecruiterSessionDetail(
         session_id=row.session_id,
@@ -128,6 +134,8 @@ def _session_to_detail(row: DBSession) -> RecruiterSessionDetail:
         integrity_penalty_percent=penalty,
         integrity_level=integrity_level,
         proctoring_summary=proctoring,
+        low_identity_confidence=low_identity_confidence,
+        identity_similarity_score=identity_similarity_score,
         recording_available=bool(row.recording_filename),
         recording_filename=row.recording_filename,
         transcript=transcript,

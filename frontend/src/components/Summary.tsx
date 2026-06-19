@@ -10,6 +10,7 @@ interface SummaryProps {
   summary: EndInterviewResponse;
   sessionId?: string;
   inviteToken?: string;
+  candidateEmail?: string;
   recordingSaved?: boolean;
   onRestart: () => void;
 }
@@ -42,6 +43,7 @@ export default function Summary({
   summary,
   sessionId: sessionIdProp,
   inviteToken,
+  candidateEmail,
   recordingSaved,
   onRestart,
 }: SummaryProps) {
@@ -140,6 +142,13 @@ export default function Summary({
     <div className="card">
       <div className="alert success">{summary.message}</div>
 
+      {summary.candidate_report_email_sent && candidateEmail && (
+        <div className="alert info" style={{ marginTop: "0.75rem" }}>
+          A copy of your report has been sent to{" "}
+          <strong>{candidateEmail}</strong>.
+        </div>
+      )}
+
       {recordingSaved && (
         <div className="alert success" style={{ marginTop: "0.75rem" }}>
           Interview recording saved successfully.
@@ -152,11 +161,6 @@ export default function Summary({
           <p className="summary-score">
             Overall score: <strong>{displayScore}</strong>
             <span className="summary-score-max"> / 100</span>
-          </p>
-        )}
-        {final?.recommendation && (
-          <p className="summary-recommendation">
-            Recommendation: <strong>{final.recommendation}</strong>
           </p>
         )}
         <p className="summary-integrity-level">

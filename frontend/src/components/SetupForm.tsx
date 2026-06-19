@@ -4,6 +4,9 @@ import { interviewApi } from "../api/client";
 const DOCUMENT_ACCEPT =
   ".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
 
+const JD_FETCH_ERROR =
+  "Could not extract JD from this URL — please paste manually";
+
 type JdInputMode = "paste" | "pdf";
 
 export type SetupFormData = {
@@ -27,7 +30,10 @@ function isActiveInterviewError(message: string): boolean {
 
 export default function SetupForm({ loading, onStart }: SetupFormProps) {
   const [jdMode, setJdMode] = useState<JdInputMode>("paste");
+  const [jdText, setJdText] = useState("");
+  const [jdUrl, setJdUrl] = useState("");
   const [jdError, setJdError] = useState<string | null>(null);
+  const [fetchingJd, setFetchingJd] = useState(false);
   const [stuckSession, setStuckSession] = useState(false);
   const [clearingStuck, setClearingStuck] = useState(false);
   const pendingStartRef = useRef<SetupFormData | null>(null);
@@ -46,10 +52,32 @@ export default function SetupForm({ loading, onStart }: SetupFormProps) {
     }
   }
 
+  async function handleFetchJd() {
+    const url = jdUrl.trim();
+    if (!url) {
+      setJdError("Enter a job posting URL first.");
+      return;
+    }
+    setFetchingJd(true);
+    setJdError(null);
+    try {
+      const result = await interviewApi.fetchJdUrl(url);
+      setJdText(result.jd_text);
+      setJdMode("paste");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : JD_FETCH_ERROR;
+      setJdError(
+        message.toLowerCase().includes("extract") ? message : JD_FETCH_ERROR,
+      );
+    } finally {
+      setFetchingJd(false);
+    }
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    const job_description = String(form.get("job_description") || "").trim();
+    const job_description = jdMode === "paste" ? jdText.trim() : "";
     const job_description_pdf =
       (form.get("job_description_pdf") as File | null) ?? null;
     const hasPdf =
@@ -72,7 +100,7 @@ export default function SetupForm({ loading, onStart }: SetupFormProps) {
       experience_level: String(form.get("experience_level") || "mid"),
       topic_focus: String(form.get("topic_focus") || ""),
       question_count: Number(form.get("question_count") || 5),
-      job_description: jdMode === "paste" ? job_description : "",
+      job_description,
       job_description_pdf: jdMode === "pdf" && hasPdf ? job_description_pdf : null,
       resume_pdf: (form.get("resume_pdf") as File | null) ?? null,
     });
@@ -155,10 +183,37 @@ export default function SetupForm({ loading, onStart }: SetupFormProps) {
           </button>
         </div>
 
+        <div style={{ marginBottom: "0.75rem" }}>
+          <label htmlFor="jd_url" style={{ fontSize: "0.9rem" }}>
+            Or paste a job URL
+          </label>
+          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.35rem" }}>
+            <input
+              id="jd_url"
+              type="url"
+              value={jdUrl}
+              onChange={(e) => setJdUrl(e.target.value)}
+              placeholder="https://www.naukri.com/job-listings-..."
+              disabled={fetchingJd || loading}
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => void handleFetchJd()}
+              disabled={fetchingJd || loading || !jdUrl.trim()}
+            >
+              {fetchingJd ? "Fetching…" : "Fetch JD"}
+            </button>
+          </div>
+        </div>
+
         {jdMode === "paste" ? (
           <textarea
             id="job_description"
             name="job_description"
+            value={jdText}
+            onChange={(e) => setJdText(e.target.value)}
             placeholder="Paste the job description here so the interview can be tailored to the role"
             rows={6}
           />

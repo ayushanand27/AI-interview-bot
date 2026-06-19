@@ -443,6 +443,8 @@ class InterviewService:
             integrity_level=integrity_level,
         )
 
+        report_email_sent = candidate_report_email_already_sent(session.session_id)
+
         return EndInterviewResponse(
             session_id=session.session_id,
             status=session.status,
@@ -459,6 +461,7 @@ class InterviewService:
             adjusted_final_score=adjusted_final_score,
             integrity_report=integrity_report,
             integrity_level=integrity_level,
+            candidate_report_email_sent=report_email_sent,
         )
 
     def _to_session_response(self, session: InterviewSession) -> InterviewSessionResponse:

@@ -54,7 +54,9 @@ class VerifyEnvironmentRequest(BaseModel):
     user_agent: str = ""
     detected_extensions: list[DetectedExtensionItem] = []
     virtual_camera_detected: bool = False
+    virtual_camera_uncertain: bool = False
     screen_sharing_active: bool = False
+    screen_sharing_capability: bool = False
 
 
 def _analyze_response(
@@ -259,11 +261,22 @@ def verify_environment(body: VerifyEnvironmentRequest):
         msg = "Virtual camera detected - please use your real webcam"
         block_reasons.append(msg)
         warning_mgr.record_client_violation("virtual_camera", msg)
+    elif body.virtual_camera_uncertain:
+        msg = (
+            "Unusual camera setup detected — flagged for review; "
+            "use your real webcam if possible"
+        )
+        warnings.append(msg)
+        warning_mgr.record_client_violation("virtual_camera_suspected", msg)
 
     if body.screen_sharing_active:
         msg = "Screen sharing is active — stop sharing before starting the interview"
         block_reasons.append(msg)
         warning_mgr.record_client_violation("screen_sharing", msg)
+    elif body.screen_sharing_capability:
+        warnings.append(
+            "Screen capture device detected — do not share your screen during the interview"
+        )
 
     if body.user_agent:
         warnings.append(f"User agent logged: {body.user_agent[:120]}")

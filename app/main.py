@@ -21,7 +21,6 @@ from app.core.config import settings
 from app.core.limiter import limiter
 from app.core.exceptions import AppException
 from app.api.v1.router import api_router
-from app.judge.router import router as judge_router
 from app.proctoring.api import mountable_app as proctoring_app
 from app.routes.interview_routes import router as interview_router
 from app.api.v1.recruiter_assessment import router as recruiter_assessment_router
@@ -87,7 +86,6 @@ app.include_router(api_router)
 app.include_router(recruiter_assessment_router, prefix="/api/v1")
 app.include_router(invite_router, prefix="/api/v1")
 app.include_router(interview_router, prefix="/api/v1")
-app.include_router(judge_router, prefix="/api/v1")
 app.mount("/proctor", proctoring_app)
 
 # Mounted sub-app needs its own limiter state for /proctor/* routes

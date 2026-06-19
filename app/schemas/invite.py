@@ -50,3 +50,4 @@ class InviteVerifyIdentityResponse(BaseModel):
     verified: bool
     confidence: float
     message: str
+    low_identity_confidence: bool = False

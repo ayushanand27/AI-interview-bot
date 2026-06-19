@@ -23,15 +23,18 @@ from app.models.schemas import (
     AudioTranscribeResponse,
     CurrentQuestionResponse,
     EndInterviewResponse,
+    FetchJdUrlRequest,
+    FetchJdUrlResponse,
     GenerateQuestionsRequest,
     GenerateQuestionsResponse,
     InterviewSessionResponse,
     RecordingUploadResponse,
 )
 from app.services.interview_service import interview_service, resolve_job_description
+from app.services.jd_scraper import fetch_jd_from_url
 from app.services.resume_parser import extract_text_from_document
 from app.utils.file_validation import validate_document_upload
-from app.core.exceptions import AppException
+from app.core.exceptions import AppException, ForbiddenException
 
 router = APIRouter(prefix="/interviews", tags=["Interviews"])
 
@@ -67,6 +70,21 @@ async def reset_active_session(
 
 
 @router.post(
+    "/fetch-jd-url",
+    response_model=FetchJdUrlResponse,
+    summary="Extract job description text from a job posting URL",
+)
+@limiter.limit(INTERVIEW_LIMIT)
+async def fetch_jd_url(
+    request: Request,
+    payload: FetchJdUrlRequest,
+    current_user: User = Depends(get_current_user),
+) -> FetchJdUrlResponse:
+    jd_text, source = await fetch_jd_from_url(payload.url)
+    return FetchJdUrlResponse(jd_text=jd_text, source=source)
+
+
+@router.post(
     "/sessions",
     response_model=InterviewSessionResponse,
     status_code=status.HTTP_201_CREATED,
@@ -84,6 +102,11 @@ async def create_session(
     resume_pdf: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ) -> InterviewSessionResponse:
+    if current_user.role == UserRole.CANDIDATE and not current_user.is_verified:
+        raise ForbiddenException(
+            "Please verify your email before starting an interview."
+        )
+
     filename = resume_pdf.filename or "resume.pdf"
     resume_bytes = await resume_pdf.read()
     try:

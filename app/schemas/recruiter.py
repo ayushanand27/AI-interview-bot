@@ -42,6 +42,8 @@ class RecruiterSessionDetail(BaseModel):
     integrity_penalty_percent: float = 0.0
     integrity_level: Optional[str] = None
     proctoring_summary: Optional[dict[str, Any]] = None
+    low_identity_confidence: bool = False
+    identity_similarity_score: Optional[float] = None
     recording_available: bool = False
     recording_filename: Optional[str] = None
     transcript: list[TranscriptItem]

@@ -23,6 +23,7 @@ VIOLATION_TYPE_LABELS = {
     "loud_audio": "Loud environment",
     "tab_switch": "Tab switch",
     "virtual_camera": "Virtual camera",
+    "virtual_camera_suspected": "Unusual camera setup",
     "recording_extension": "Screen recording extension",
     "screen_sharing": "Screen sharing",
     "prohibited_object_detected": "Prohibited object detected (cell phone)",
@@ -120,6 +121,12 @@ class WarningManager:
 
         if violation_type == "recording_extension":
             return "critical", SEVERITY_PENALTIES["critical"]
+
+        if violation_type == "screen_sharing":
+            return "moderate", SEVERITY_PENALTIES["moderate"]
+
+        if violation_type == "virtual_camera_suspected":
+            return "minor", SEVERITY_PENALTIES["minor"]
 
         if violation_type == "prohibited_object_detected":
             return "moderate", SEVERITY_PENALTIES["moderate"]

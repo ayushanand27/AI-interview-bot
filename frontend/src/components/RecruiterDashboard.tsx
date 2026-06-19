@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { recruiterApi } from "../api/client";
+import { interviewApi, recruiterApi } from "../api/client";
 import type {
   RecruiterSessionDetail,
   RecruiterSessionSummary,
@@ -14,6 +14,7 @@ const VIOLATION_TYPE_LABELS: Record<string, string> = {
   loud_audio: "Loud environment",
   tab_switch: "Tab switch",
   virtual_camera: "Virtual camera",
+  virtual_camera_suspected: "Unusual camera setup",
   recording_extension: "Screen recording extension",
   screen_sharing: "Screen sharing",
   prohibited_object_detected: "Prohibited object detected (cell phone)",
@@ -25,6 +26,9 @@ function formatViolationType(type: string): string {
 
 const DOCUMENT_ACCEPT =
   ".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
+
+const JD_FETCH_ERROR =
+  "Could not extract JD from this URL — please paste manually";
 
 function formatDate(iso: string): string {
   try {
@@ -66,6 +70,8 @@ export default function RecruiterDashboard({
   const [showAssessmentForm, setShowAssessmentForm] = useState(false);
   const [jdMode, setJdMode] = useState<"paste" | "pdf">("paste");
   const [jdText, setJdText] = useState("");
+  const [jdUrl, setJdUrl] = useState("");
+  const [fetchingJd, setFetchingJd] = useState(false);
   const [jdPdfFile, setJdPdfFile] = useState<File | null>(null);
   const [questionCount, setQuestionCount] = useState(5);
   const [difficulty, setDifficulty] = useState("Medium");
@@ -181,6 +187,28 @@ export default function RecruiterDashboard({
     }
   }
 
+  async function handleFetchJd() {
+    const url = jdUrl.trim();
+    if (!url) {
+      onError("Enter a job posting URL first.");
+      return;
+    }
+    setFetchingJd(true);
+    onError(null);
+    try {
+      const result = await interviewApi.fetchJdUrl(url);
+      setJdText(result.jd_text);
+      setJdMode("paste");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : JD_FETCH_ERROR;
+      onError(
+        message.toLowerCase().includes("extract") ? message : JD_FETCH_ERROR,
+      );
+    } finally {
+      setFetchingJd(false);
+    }
+  }
+
   async function handleGenerateQuestions() {
     if (jdMode === "paste" && !jdText.trim()) {
       onError("Please paste a job description or switch to Upload JD file.");
@@ -288,6 +316,31 @@ export default function RecruiterDashboard({
               >
                 Upload JD File
               </button>
+            </div>
+
+            <div style={{ marginBottom: "0.75rem" }}>
+              <label htmlFor="jd-url" style={{ fontSize: "0.9rem" }}>
+                Or paste a job URL
+              </label>
+              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.35rem" }}>
+                <input
+                  id="jd-url"
+                  type="url"
+                  value={jdUrl}
+                  onChange={(e) => setJdUrl(e.target.value)}
+                  placeholder="https://www.indeed.com/viewjob?..."
+                  disabled={fetchingJd || assessmentLoading}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  className="rp-secondary"
+                  onClick={() => void handleFetchJd()}
+                  disabled={fetchingJd || assessmentLoading || !jdUrl.trim()}
+                >
+                  {fetchingJd ? "Fetching…" : "Fetch JD"}
+                </button>
+              </div>
             </div>
 
             {jdMode === "paste" ? (
@@ -569,6 +622,20 @@ export default function RecruiterDashboard({
                 {detail.status}
                 {detail.recording_available ? " · Recording available" : ""}
               </p>
+
+              {detail.low_identity_confidence && (
+                <div className="alert warning" style={{ marginBottom: "1rem" }}>
+                  Identity verification flagged for review
+                  {detail.identity_similarity_score != null && (
+                    <>
+                      {" "}
+                      (face match score:{" "}
+                      {detail.identity_similarity_score.toFixed(2)})
+                    </>
+                  )}
+                  . ID photo and selfie similarity was below the confidence threshold.
+                </div>
+              )}
 
               {(detail.original_score != null || detail.adjusted_score != null) && (
                 <div className="summary-overall" style={{ marginBottom: "1rem" }}>

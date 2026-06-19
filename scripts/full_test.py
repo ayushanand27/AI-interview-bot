@@ -9,6 +9,7 @@ import os
 import shutil
 import sqlite3
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -127,6 +128,119 @@ Must know async programming and SQLAlchemy.
         timeout=30,
     )
     test("Resend verification", r.status_code == 200, str(r.json()))
+
+    time.sleep(0.5)
+    verification_token = None
+    if DB_PATH.exists():
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT verification_token FROM users WHERE email = ?",
+                (candidate_email,),
+            ).fetchone()
+            if row:
+                verification_token = row[0]
+    if verification_token:
+        r = requests.get(
+            f"{BASE}/api/v1/auth/verify-email",
+            params={"token": verification_token},
+            timeout=15,
+        )
+        test("Verify candidate email", r.status_code == 200, str(r.json())[:60])
+    else:
+        test("Verify candidate email", False, "no verification_token in DB")
+
+    # Invite-flow login security (password required before session resume)
+    inv_login_email = f"inv_login_{uuid.uuid4().hex[:8]}@example.com"
+    rec_login_email = f"rec_login_{uuid.uuid4().hex[:8]}@example.com"
+    requests.post(
+        f"{BASE}/api/v1/auth/register",
+        json={
+            "full_name": "Invite Login Recruiter",
+            "email": rec_login_email,
+            "password": "password123",
+            "role": "recruiter",
+        },
+        timeout=30,
+    )
+    rec_login_resp = requests.post(
+        f"{BASE}/api/v1/auth/login",
+        json={"email": rec_login_email, "password": "password123"},
+        timeout=15,
+    )
+    rec_login_token = token_from_login(rec_login_resp)
+    inv_assess = requests.post(
+        f"{BASE}/api/v1/recruiter/create-assessment",
+        headers={"Authorization": f"Bearer {rec_login_token}"},
+        data={
+            "jd_text": "Python developer with REST APIs.",
+            "question_count": "2",
+            "difficulty": "Medium",
+            "expiry_hours": "48",
+        },
+        timeout=180,
+    )
+    inv_login_token = ""
+    if inv_assess.status_code == 200:
+        inv_body = inv_assess.json()
+        inv_data = inv_body.get("data", inv_body)
+        invite_link = inv_data.get("invite_link", "") if isinstance(inv_data, dict) else ""
+        if invite_link:
+            inv_login_token = invite_link.rstrip("/").split("/")[-1]
+
+    if inv_login_token:
+        requests.post(
+            f"{BASE}/api/v1/invite/{inv_login_token}/register",
+            json={"name": "Invite Login Candidate", "email": inv_login_email, "phone": ""},
+            timeout=60,
+        )
+        wrong_inv_login = requests.post(
+            f"{BASE}/api/v1/invite/{inv_login_token}/login",
+            json={
+                "email": inv_login_email,
+                "password": "definitely-wrong-password",
+                "phone": "",
+            },
+            timeout=30,
+        )
+        test(
+            "Invite login wrong password",
+            wrong_inv_login.status_code == 401,
+            f"status={wrong_inv_login.status_code}",
+        )
+
+        inv_reset_token = None
+        if DB_PATH.exists():
+            with sqlite3.connect(DB_PATH) as conn:
+                row = conn.execute(
+                    "SELECT reset_token FROM users WHERE email = ?",
+                    (inv_login_email,),
+                ).fetchone()
+                if row:
+                    inv_reset_token = row[0]
+        if inv_reset_token:
+            requests.post(
+                f"{BASE}/api/v1/auth/reset-password",
+                json={"token": inv_reset_token, "new_password": "password123"},
+                timeout=15,
+            )
+            ok_inv_login = requests.post(
+                f"{BASE}/api/v1/invite/{inv_login_token}/login",
+                json={"email": inv_login_email, "password": "password123", "phone": ""},
+                timeout=30,
+            )
+            ok_body = ok_inv_login.json().get("data", {}) if ok_inv_login.status_code == 200 else {}
+            test(
+                "Invite login correct password",
+                ok_inv_login.status_code == 200
+                and bool(ok_body.get("session_id"))
+                and bool(ok_body.get("access_token")),
+                f"status={ok_inv_login.status_code}",
+            )
+        else:
+            test("Invite login correct password", False, "no reset_token in DB")
+    else:
+        test("Invite login wrong password", False, "skipped - no invite token")
+        test("Invite login correct password", False, "skipped - no invite token")
 
     # ============ INTERVIEW TESTS ============
 

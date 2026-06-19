@@ -298,4 +298,105 @@ Quick summary:
 
 ---
 
+## AWS Deployment
+
+Deploy on a single **Ubuntu EC2 t2.micro** (free tier) with nginx serving the React build and proxying API traffic to uvicorn behind PM2.
+
+### Prerequisites
+
+- EC2 instance: **Ubuntu 22.04+**, instance type **t2.micro** (or larger if proctoring feels slow)
+- Security group inbound rules:
+  - **22** (SSH)
+  - **80** (HTTP — nginx)
+  - **8080** (optional — only if you need direct backend access for debugging; production uses nginx on port 80)
+- GitHub repo access (HTTPS clone URL)
+- API keys: OpenAI, Groq, and a strong `SECRET_KEY`
+
+### First-time setup
+
+```bash
+# On the EC2 instance (as a user with sudo):
+git clone https://github.com/YOUR_ORG/YOUR_REPO.git /var/www/ai-interview-bot
+cd /var/www/ai-interview-bot
+
+# Edit deploy/setup.sh — set REPO_URL and BRANCH before running, or clone manually as above
+chmod +x deploy/setup.sh
+sudo ./deploy/setup.sh
+```
+
+After setup completes, **edit `/var/www/ai-interview-bot/.env`** with production values (see checklist below), then:
+
+```bash
+pm2 restart ai-interview-bot-backend
+sudo nginx -s reload
+```
+
+Open `http://<EC2_PUBLIC_IP>/` in a browser. Health check: `http://<EC2_PUBLIC_IP>/health`.
+
+### Re-deploy after code changes
+
+```bash
+cd /var/www/ai-interview-bot
+chmod +x deploy/deploy.sh
+./deploy/deploy.sh
+```
+
+### What the deploy folder contains
+
+| File | Purpose |
+|---|---|
+| `deploy/nginx.conf` | Serves `frontend/dist` on port 80; proxies `/api/`, `/health`, and `/proctor/` to `127.0.0.1:8080` |
+| `deploy/ecosystem.config.js` | PM2 config — `uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 2` |
+| `deploy/setup.sh` | One-time EC2 provisioning (apt, venv, build, nginx, PM2) |
+| `deploy/deploy.sh` | Pull latest code, rebuild frontend, migrate, restart |
+
+### Production `.env` checklist (EC2)
+
+Paste these into `/var/www/ai-interview-bot/.env` after setup. **Required** keys will prevent startup if missing.
+
+**Required**
+
+| Variable | Example / notes |
+|---|---|
+| `SECRET_KEY` | `openssl rand -hex 32` |
+| `DATABASE_URL` | `sqlite+aiosqlite:////var/www/ai-interview-bot/data/smartskale.db` (persistent path) |
+| `OPENAI_API_KEY` | OpenAI key — questions + Whisper |
+| `GROQ_API_KEY` | Groq key — answer judging |
+
+**Production (strongly recommended)**
+
+| Variable | Example / notes |
+|---|---|
+| `APP_ENV` | `production` |
+| `FRONTEND_URL` | `http://<EC2_PUBLIC_IP>` or your domain |
+| `ALLOWED_ORIGINS` | Same as `FRONTEND_URL` (comma-separated if multiple) |
+| `UPLOAD_DIR` | `/var/www/ai-interview-bot/uploads` |
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `587` |
+| `SMTP_EMAIL` | Gmail address for verification / reset emails |
+| `SMTP_PASSWORD` | Gmail App Password (16 chars) |
+
+**Optional (defaults exist in `app/core/config.py`)**
+
+| Variable | Default |
+|---|---|
+| `DEBUG` | `False` |
+| `OPENAI_MODEL` | `gpt-4o` |
+| `ALGORITHM` | `HS256` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` |
+| `INTERVIEW_QUESTION_COUNT` | `5` |
+| `MAX_ANSWER_LENGTH` | `2000` |
+| `QUESTION_TIMER_SECONDS` | `180` |
+| `SESSION_IDLE_TIMEOUT_MINUTES` | `15` |
+| `MAX_FILE_SIZE_MB` | `10` |
+
+**Frontend build (same-server nginx — usually leave unset)**
+
+| Variable | Notes |
+|---|---|
+| `VITE_API_URL` | Leave **empty** so the browser uses relative `/api` and `/proctor` paths through nginx |
+| `VITE_QUESTION_TIMER_SECONDS` | Optional override for UI timer (default `180`) |
+
+---
+
 

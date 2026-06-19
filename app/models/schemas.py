@@ -52,6 +52,15 @@ class InterviewSessionResponse(BaseModel):
     created_at: datetime
 
 
+class FetchJdUrlRequest(BaseModel):
+    url: str = Field(..., min_length=8, description="Public job posting URL")
+
+
+class FetchJdUrlResponse(BaseModel):
+    jd_text: str
+    source: str
+
+
 class GenerateQuestionsRequest(BaseModel):
     """Override question count per session if needed."""
 
@@ -150,6 +159,7 @@ class EndInterviewResponse(BaseModel):
     adjusted_final_score: Optional[float] = None
     integrity_report: Optional[dict] = None
     integrity_level: Optional[str] = None
+    candidate_report_email_sent: bool = False
 
 
 class RecordingUploadResponse(BaseModel):

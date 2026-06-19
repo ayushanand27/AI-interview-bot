@@ -8,12 +8,17 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+# Histogram correlation below this flags low_identity_confidence for recruiter review.
+IDENTITY_SIMILARITY_THRESHOLD = 0.4
+
 
 @dataclass
 class FaceVerificationResult:
     verified: bool
     confidence: float
     message: str
+    low_identity_confidence: bool = False
+    similarity_score: float = 0.0
 
 
 def _decode_base64_image(data: str) -> np.ndarray | None:
@@ -48,7 +53,7 @@ def _face_histogram(face_bgr: np.ndarray) -> np.ndarray:
 
 
 def verify_faces_from_base64(id_image_base64: str, selfie_base64: str) -> FaceVerificationResult:
-    """Detect faces in ID and selfie; pass when both contain a detectable face."""
+    """Detect faces in ID and selfie; compare color histogram similarity."""
     id_image = _decode_base64_image(id_image_base64)
     selfie_image = _decode_base64_image(selfie_base64)
 
@@ -74,11 +79,21 @@ def verify_faces_from_base64(id_image_base64: str, selfie_base64: str) -> FaceVe
 
     id_hist = _face_histogram(id_face[0])
     selfie_hist = _face_histogram(selfie_face[0])
-    _ = float(cv2.compareHist(id_hist, selfie_hist, cv2.HISTCMP_CORREL))
+    similarity = float(cv2.compareHist(id_hist, selfie_hist, cv2.HISTCMP_CORREL))
+    confidence = max(0.0, min(1.0, similarity))
+    low_identity = similarity < IDENTITY_SIMILARITY_THRESHOLD
 
-    confidence = 0.8
+    message = "Identity verified successfully."
+    if low_identity:
+        message = (
+            "Identity verified with low confidence — your session has been flagged "
+            "for recruiter review."
+        )
+
     return FaceVerificationResult(
         verified=True,
         confidence=confidence,
-        message="Identity verified successfully.",
+        message=message,
+        low_identity_confidence=low_identity,
+        similarity_score=similarity,
     )

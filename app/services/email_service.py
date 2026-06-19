@@ -112,6 +112,38 @@ def send_verification_email(to_email: str, name: str, token: str):
     _send_email(to_email, subject, html)
 
 
+def send_invite_welcome_password_email(to_email: str, name: str, token: str) -> bool:
+    """Send invite candidates a link to set their password after auto-registration."""
+    link = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
+
+    print(f"\n[EMAIL] Invite welcome / set-password link for {to_email}:")
+    print(f"[EMAIL] {link}\n")
+
+    subject = "Your interview account is ready — set your password"
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">Welcome to SmartSkale</h2>
+        <p>Hello {name},</p>
+        <p>
+            Your interview account has been created. Use the link below to set a password
+            so you can log back in later to view your results.
+        </p>
+        <a href="{link}"
+           style="background: #4F46E5; color: white; padding: 12px 24px;
+                  text-decoration: none; border-radius: 6px; display: inline-block;">
+            Set your password
+        </a>
+        <p style="margin-top: 16px; color: #666; font-size: 14px;">
+            Or copy this link: {link}
+        </p>
+        <p style="color: #666; font-size: 14px;">
+            This link expires in 24 hours.
+        </p>
+    </div>
+    """
+    return _send_email(to_email, subject, html)
+
+
 def send_password_reset_email(to_email: str, name: str, token: str):
     link = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
 

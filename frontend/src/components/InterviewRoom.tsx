@@ -6,7 +6,11 @@ import type { CurrentQuestionResponse } from "../types/interview";
 import type { ProctorAnalyzeResponse } from "../types/proctor";
 
 import { useTabSwitchDetection } from "../hooks/useTabSwitchDetection";
-import { detectVirtualCamera } from "../hooks/useExtensionDetection";
+import {
+  detectScreenRecordingExtensions,
+  detectScreenSharingActive,
+  detectVirtualCamera,
+} from "../hooks/useExtensionDetection";
 import { confirmAnswerSubmit, getAnswerWarnings, MAX_ANSWER_LENGTH } from "../utils/validateAnswer";
 import { startAmbientAudioMonitor } from "../utils/audioMonitor";
 
@@ -14,6 +18,7 @@ const LOUD_AUDIO_MESSAGE = "Please maintain a quiet environment";
 const TAB_SWITCH_MESSAGE = "Tab switch detected - this has been logged";
 const PROCTOR_INTERVAL_MS = 3000;
 const VIRTUAL_CAMERA_CHECK_MS = 30000;
+const ENVIRONMENT_CHECK_MS = 20000;
 const VIOLATION_FLASH_MS = 3000;
 const PROCTOR_BANNER_DISMISS_MS = 3000;
 const SESSION_IDLE_MS = 15 * 60 * 1000;
@@ -506,7 +511,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
   useEffect(() => {
     async function checkVirtualCamera() {
       const result = await detectVirtualCamera(streamRef.current);
-      if (!result.detected) return;
+      if (!result.blockRecommended) return;
 
       const message =
         result.message ?? "Virtual camera detected - please use your real webcam";
@@ -527,6 +532,52 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     }, VIRTUAL_CAMERA_CHECK_MS);
 
     return () => clearInterval(virtualCamIntervalId);
+  }, [sessionId, showViolationFlash]);
+
+  useEffect(() => {
+    const reportedExtensions = new Set<string>();
+
+    async function checkEnvironmentIntegrity() {
+      const stream = streamRef.current;
+
+      if (detectScreenSharingActive(stream)) {
+        const message = "Screen sharing detected during interview";
+        showViolationFlash(message);
+        void proctorApi
+          .reportClientViolation(sessionId, "screen_sharing", message)
+          .then((res) => {
+            if (res.recorded) {
+              setPenaltyPercent(res.score_penalty_percent ?? 0);
+            }
+          })
+          .catch(() => {});
+      }
+
+      const extensionScan = await detectScreenRecordingExtensions();
+      for (const ext of extensionScan.detected) {
+        if (reportedExtensions.has(ext.id)) continue;
+        reportedExtensions.add(ext.id);
+
+        const message = `Recording extension detected during interview: ${ext.name}`;
+        showViolationFlash(message);
+        void proctorApi
+          .reportClientViolation(sessionId, "recording_extension", message)
+          .then((res) => {
+            if (res.recorded) {
+              setPenaltyPercent(res.score_penalty_percent ?? 0);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+
+    const envIntervalId = setInterval(() => {
+      void checkEnvironmentIntegrity();
+    }, ENVIRONMENT_CHECK_MS);
+
+    void checkEnvironmentIntegrity();
+
+    return () => clearInterval(envIntervalId);
   }, [sessionId, showViolationFlash]);
 
   useEffect(() => {

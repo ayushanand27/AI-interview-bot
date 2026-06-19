@@ -46,7 +46,9 @@ export interface VerifyEnvironmentRequest {
   user_agent: string;
   detected_extensions: Array<{ id: string; name: string }>;
   virtual_camera_detected: boolean;
+  virtual_camera_uncertain?: boolean;
   screen_sharing_active: boolean;
+  screen_sharing_capability?: boolean;
 }
 
 export interface VerifyEnvironmentResponse {

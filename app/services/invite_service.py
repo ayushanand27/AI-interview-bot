@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -40,6 +40,7 @@ from app.schemas.invite import (
     InviteVerifyIdentityResponse,
 )
 from app.services.identity_verification import verify_faces_from_base64
+from app.services.email_service import send_invite_welcome_password_email
 
 
 def _difficulty_to_experience(difficulty: str) -> str:
@@ -231,17 +232,22 @@ class InviteService:
             )
 
         password = secrets.token_urlsafe(16)
+        reset_token = str(uuid4())
+        reset_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
         user = User(
             full_name=data.name.strip(),
             email=data.email,
             hashed_password=hash_password(password),
             role=UserRole.CANDIDATE,
             is_active=True,
+            is_verified=True,
+            reset_token=reset_token,
+            reset_token_expiry=reset_expiry,
         )
         self.db.add(user)
         await self.db.flush()
 
-        return await self._attach_candidate_to_invite(
+        response = await self._attach_candidate_to_invite(
             invite=invite,
             token=token,
             user=user,
@@ -249,6 +255,12 @@ class InviteService:
             email=str(data.email),
             phone=data.phone,
         )
+        send_invite_welcome_password_email(
+            str(data.email),
+            data.name.strip(),
+            reset_token,
+        )
+        return response
 
     async def login_candidate(
         self, token: str, data: InviteLoginRequest
@@ -259,12 +271,6 @@ class InviteService:
             raise BadRequestException(invalid.reason)
 
         assert invite is not None
-
-        existing_registration = await self._resume_existing_registration(
-            token, str(data.email)
-        )
-        if existing_registration is not None:
-            return existing_registration
 
         result = await self.db.execute(select(User).where(User.email == data.email))
         user = result.scalar_one_or_none()
@@ -278,6 +284,14 @@ class InviteService:
             raise ForbiddenException(
                 "This invite link is for candidates only. Please use a candidate account."
             )
+
+        user.is_verified = True
+
+        existing_registration = await self._resume_existing_registration(
+            token, str(data.email)
+        )
+        if existing_registration is not None:
+            return existing_registration
 
         return await self._attach_candidate_to_invite(
             invite=invite,
@@ -324,10 +338,22 @@ class InviteService:
         record.selfie_path = selfie_path.name
         record.verified = verification.verified
         record.confidence_score = verification.confidence
+
+        if verification.low_identity_confidence:
+            session_row = await self.db.get(DBSession, data.session_id)
+            if session_row is not None:
+                summary = dict(session_row.proctoring_summary or {})
+                summary["low_identity_confidence"] = True
+                summary["identity_similarity_score"] = round(
+                    verification.similarity_score, 4
+                )
+                session_row.proctoring_summary = summary
+
         await self.db.commit()
 
         return InviteVerifyIdentityResponse(
             verified=verification.verified,
             confidence=verification.confidence,
             message=verification.message,
+            low_identity_confidence=verification.low_identity_confidence,
         )

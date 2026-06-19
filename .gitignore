@@ -35,3 +35,6 @@ frontend/tsconfig.tsbuildinfo
 # OS
 .DS_Store
 Thumbs.db
+
+# Deploy logs
+deploy/*.log

@@ -46,10 +46,14 @@ export default function PreInterviewChecklist({
   const [automaticScan, setAutomaticScan] = useState(false);
   const [virtualCamera, setVirtualCamera] = useState<VirtualCameraResult>({
     detected: false,
+    confidence: "none",
+    blockRecommended: false,
+    warnOnly: false,
     deviceLabels: [],
     message: null,
   });
   const [screenSharingActive, setScreenSharingActive] = useState(false);
+  const [screenSharingCapability, setScreenSharingCapability] = useState(false);
   const [checking, setChecking] = useState(false);
 
   const [closedTabs, setClosedTabs] = useState(false);
@@ -72,6 +76,7 @@ export default function PreInterviewChecklist({
       setAutomaticScan(result.extensions.scanSupported);
       setVirtualCamera(result.virtualCamera);
       setScreenSharingActive(result.screenSharingActive);
+      setScreenSharingCapability(result.screenSharingCapability);
     } finally {
       setChecking(false);
     }
@@ -111,7 +116,7 @@ export default function PreInterviewChecklist({
     disabledExtensions &&
     isFullscreen &&
     !hasExtensions &&
-    !virtualCamera.detected &&
+    !virtualCamera.blockRecommended &&
     !screenSharingActive;
 
   useEffect(() => {
@@ -134,8 +139,11 @@ export default function PreInterviewChecklist({
           id: e.id,
           name: e.name,
         })),
-        virtual_camera_detected: virtualCamera.detected,
+        virtual_camera_detected: virtualCamera.blockRecommended,
+        virtual_camera_uncertain: virtualCamera.warnOnly,
         screen_sharing_active: screenSharingActive,
+        screen_sharing_capability:
+          screenSharingCapability && !screenSharingActive,
       })
       .then((res) => {
         if (cancelled) return;
@@ -162,8 +170,10 @@ export default function PreInterviewChecklist({
     checking,
     sessionId,
     detectedExtensions,
-    virtualCamera.detected,
+    virtualCamera.blockRecommended,
+    virtualCamera.warnOnly,
     screenSharingActive,
+    screenSharingCapability,
   ]);
 
   async function grantCameraAccess() {
@@ -281,8 +291,21 @@ export default function PreInterviewChecklist({
                   </div>
                 )}
 
-                {virtualCamera.detected && virtualCamera.message && (
+                {virtualCamera.blockRecommended && virtualCamera.message && (
                   <div className="alert error" style={{ marginTop: "0.75rem" }}>
+                    {virtualCamera.message}
+                    {virtualCamera.deviceLabels.length > 0 && (
+                      <ul style={{ marginTop: "0.5rem", paddingLeft: "1.25rem" }}>
+                        {virtualCamera.deviceLabels.map((label) => (
+                          <li key={label}>{label}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {virtualCamera.warnOnly && virtualCamera.message && (
+                  <div className="alert warning" style={{ marginTop: "0.75rem" }}>
                     {virtualCamera.message}
                     {virtualCamera.deviceLabels.length > 0 && (
                       <ul style={{ marginTop: "0.5rem", paddingLeft: "1.25rem" }}>
@@ -297,6 +320,13 @@ export default function PreInterviewChecklist({
                 {screenSharingActive && (
                   <div className="alert error" style={{ marginTop: "0.75rem" }}>
                     Screen sharing is active. Stop sharing your screen before continuing.
+                  </div>
+                )}
+
+                {screenSharingCapability && !screenSharingActive && (
+                  <div className="alert warning" style={{ marginTop: "0.75rem" }}>
+                    A screen-capture device was detected. Do not share your screen during
+                    the interview — you may continue, but this will be flagged.
                   </div>
                 )}
               </>
@@ -442,7 +472,7 @@ export default function PreInterviewChecklist({
             ? "Grant camera and audio access to continue."
             : hasExtensions
               ? "Disable detected recording extensions to continue."
-              : virtualCamera.detected
+              : virtualCamera.blockRecommended
                 ? virtualCamera.message ?? "Use your real webcam to continue."
                 : envVerifying
                   ? "Waiting for environment verification…"
