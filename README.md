@@ -1,5 +1,15 @@
 # SmartSkale InterviewBot
 
+## Live Demo
+
+**URL:** http://13.207.191.193
+
+Hosted on **AWS EC2 free tier** (t3.micro, Mumbai region). The frontend, API, and proctoring endpoints are served from a single instance via nginx.
+
+Question generation may be temporarily rate-limited depending on OpenAI API quota.
+
+---
+
 ## What Is This?
 An AI-powered proctored interview platform.
 Candidates take technical interviews with webcam 
@@ -9,6 +19,35 @@ results, and download reports.
 Two ways to take an interview:
 1. Mock Interview - candidate practices on their own
 2. Recruiter Invite - company sends a link to candidate
+
+---
+
+## Architecture
+
+Production runs on a single **AWS EC2** instance (Ubuntu 24.04, t3.micro free tier, Mumbai region):
+
+```
+Browser → nginx (:80)
+            ├── /              → React/Vite static build (frontend/dist)
+            ├── /api/          → FastAPI backend (127.0.0.1:8080)
+            ├── /health        → backend health check
+            └── /proctor/      → proctoring sub-app (face/object detection)
+
+PM2 → uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 2
+```
+
+| Component | Role |
+|---|---|
+| **FastAPI backend** (Python) | REST API, auth, interviews, recruiter portal, reports |
+| **React + TypeScript frontend** | Candidate and recruiter UIs (Vite build) |
+| **SQLite + SQLAlchemy + Alembic** | Database and schema migrations |
+| **OpenAI API** | Mock-interview question generation; Whisper speech-to-text |
+| **Groq API** | Answer evaluation (judge); recruiter JD-only question generation |
+| **nginx** | Reverse proxy — serves frontend, proxies `/api/`, `/health`, `/proctor/` |
+| **PM2** | Process manager — keeps uvicorn running with auto-restart |
+| **Proctoring** | MediaPipe (face/pose), YOLOv8n (prohibited-object detection), OpenCV |
+
+Local development uses the same stack without nginx/PM2: Vite dev server on port 5173 and uvicorn on port 8080.
 
 ---
 
@@ -124,20 +163,23 @@ Two ways to take an interview:
 |---|---|---|
 | Backend | FastAPI + Python | Async, auto docs |
 | Frontend | React + Vite + TypeScript | Fast, typed |
-| Database | SQLite → PostgreSQL ready | Simple deploy |
-| ORM | SQLAlchemy 2.0 async | No raw SQL |
+| Database | SQLite (SQLAlchemy 2.0 async) | Simple deploy; PostgreSQL-ready |
 | Migrations | Alembic | Schema versioning |
 | Auth | JWT + bcrypt | Secure, stateless |
-| Question Gen | OpenAI GPT-4o | Best reasoning |
-| Answer Judge | Groq Llama 3.1 | Fast + cheap |
+| Question Gen | OpenAI GPT-4o | Mock-interview questions |
+| Recruiter Q Gen | Groq Llama 3.1 | JD-only assessment questions |
+| Answer Judge | Groq Llama 3.1 | Fast + cheap scoring |
 | Transcription | OpenAI Whisper | Speech to text |
 | Face Detection | MediaPipe | Local, no cloud |
+| Object Detection | YOLOv8n (Ultralytics) | Cell-phone / prohibited-object checks |
 | Identity Check | OpenCV | Face presence |
 | PDF Reports | ReportLab | Pure Python |
 | PDF Parsing | PyMuPDF | Resume + JD |
 | Recording | WebM → MP4 (ffmpeg) | Universal playback |
 | Email | Gmail SMTP | Free |
 | Rate Limiting | SlowAPI | Brute force protection |
+| Production server | nginx + PM2 + uvicorn | EC2 deployment |
+| Hosting | AWS EC2 (Ubuntu 24.04) | Free-tier t3.micro |
 
 ---
 
@@ -203,7 +245,7 @@ With the backend running on port 8080:
 python scripts/full_test.py
 ```
 
-Covers auth, mock interview, proctoring, recruiter portal, invite flow, PDF reports, and recording upload/playback. Expected: **51/51 PASS**. Results are written to `test_results.txt`.
+Covers auth, mock interview, proctoring, recruiter portal, invite flow, PDF reports, and recording upload/playback. Expected: **54/54 PASS**. Results are written to `test_results.txt`.
 
 ---
 
@@ -291,40 +333,32 @@ No code changes needed. SQLAlchemy ORM handles both.
 
 ## Deployment
 
-Quick summary:
-- Backend: Railway (Dockerfile included; install ffmpeg in image for MP4)
-- Frontend: Vercel (set `VITE_API_URL` to Railway URL)
-- Database: Railway volume at `/app/data` for SQLite, or Railway PostgreSQL
+**Production:** AWS EC2 (Ubuntu 24.04, t3.micro free tier, Mumbai) — see [Live Demo](#live-demo).
 
----
+The `deploy/` folder contains scripts used for the live instance. Alternative hosting (Render via `Dockerfile` + `render.yaml`) is also supported but not the current production setup.
 
-## AWS Deployment
-
-Deploy on a single **Ubuntu EC2 t2.micro** (free tier) with nginx serving the React build and proxying API traffic to uvicorn behind PM2.
-
-### Prerequisites
-
-- EC2 instance: **Ubuntu 22.04+**, instance type **t2.micro** (or larger if proctoring feels slow)
-- Security group inbound rules:
-  - **22** (SSH)
-  - **80** (HTTP — nginx)
-  - **8080** (optional — only if you need direct backend access for debugging; production uses nginx on port 80)
-- GitHub repo access (HTTPS clone URL)
-- API keys: OpenAI, Groq, and a strong `SECRET_KEY`
-
-### First-time setup
+### First-time setup on EC2
 
 ```bash
-# On the EC2 instance (as a user with sudo):
-git clone https://github.com/YOUR_ORG/YOUR_REPO.git /var/www/ai-interview-bot
+# SSH into your EC2 instance, then:
+git clone https://github.com/ayushanand27/AI-interview-bot.git /var/www/ai-interview-bot
 cd /var/www/ai-interview-bot
 
-# Edit deploy/setup.sh — set REPO_URL and BRANCH before running, or clone manually as above
 chmod +x deploy/setup.sh
 sudo ./deploy/setup.sh
 ```
 
-After setup completes, **edit `/var/www/ai-interview-bot/.env`** with production values (see checklist below), then:
+`deploy/setup.sh` (run as root) will:
+
+1. Update apt and install Python, nginx, Node.js 20, PM2, ffmpeg, and OpenCV libraries
+2. Create a Python venv and `pip install -r requirements.txt`
+3. Download proctoring models (`download_model.py`, YOLOv8n weights)
+4. Build the frontend (`npm ci && npm run build` — leave `VITE_API_URL` unset for same-origin nginx)
+5. Copy `deploy/nginx.conf` into `/etc/nginx/sites-available/` and enable the site
+6. Run `alembic upgrade head`
+7. Start the backend with PM2 (`deploy/ecosystem.config.js`)
+
+After setup, **edit `/var/www/ai-interview-bot/.env`** with production values (see [Production `.env` checklist](#production-env-checklist-ec2) below), then:
 
 ```bash
 pm2 restart ai-interview-bot-backend
@@ -341,34 +375,92 @@ chmod +x deploy/deploy.sh
 ./deploy/deploy.sh
 ```
 
-### What the deploy folder contains
+`deploy/deploy.sh` will:
+
+1. `git pull origin main`
+2. `pip install -r requirements.txt` (inside `.venv`)
+3. Rebuild the frontend (`npm ci && npm run build`)
+4. `alembic upgrade head`
+5. `pm2 restart ai-interview-bot-backend`
+6. `sudo nginx -s reload`
+
+### EC2 prerequisites
+
+- Instance: **Ubuntu 24.04**, type **t3.micro** (free tier) or larger if proctoring feels slow
+- Security group inbound: **22** (SSH), **80** (HTTP)
+- **8080** optional — only for direct backend debugging; production traffic goes through nginx on port 80
+
+### Deploy folder reference
 
 | File | Purpose |
 |---|---|
-| `deploy/nginx.conf` | Serves `frontend/dist` on port 80; proxies `/api/`, `/health`, and `/proctor/` to `127.0.0.1:8080` |
-| `deploy/ecosystem.config.js` | PM2 config — `uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 2` |
-| `deploy/setup.sh` | One-time EC2 provisioning (apt, venv, build, nginx, PM2) |
-| `deploy/deploy.sh` | Pull latest code, rebuild frontend, migrate, restart |
+| `deploy/nginx.conf` | Serves `frontend/dist` on port 80; proxies `/api/`, `/health`, `/proctor/` to `127.0.0.1:8080` |
+| `deploy/ecosystem.config.js` | PM2 — `uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 2`, auto-restart |
+| `deploy/setup.sh` | One-time EC2 provisioning |
+| `deploy/deploy.sh` | Pull, rebuild, migrate, restart |
+
+---
+
+## AWS Deployment
+
+Detailed EC2 checklist and environment variables for the live instance.
+
+### Prerequisites
+
+- EC2 instance: **Ubuntu 24.04**, type **t3.micro** (Mumbai / ap-south-1 free tier)
+- Security group inbound rules:
+  - **22** (SSH)
+  - **80** (HTTP — nginx)
+  - **8080** (optional — direct backend access for debugging only)
+- GitHub repo: https://github.com/ayushanand27/AI-interview-bot (`main` branch)
+- API keys: OpenAI, Groq, and a strong `SECRET_KEY`
+
+### First-time setup
+
+Same steps as [Deployment → First-time setup on EC2](#first-time-setup-on-ec2):
+
+```bash
+git clone https://github.com/ayushanand27/AI-interview-bot.git /var/www/ai-interview-bot
+cd /var/www/ai-interview-bot
+chmod +x deploy/setup.sh
+sudo ./deploy/setup.sh
+```
+
+After setup completes, **edit `/var/www/ai-interview-bot/.env`** with production values, then:
+
+```bash
+pm2 restart ai-interview-bot-backend
+sudo nginx -s reload
+```
+
+### Re-deploy after code changes
+
+```bash
+cd /var/www/ai-interview-bot
+chmod +x deploy/deploy.sh
+./deploy/deploy.sh
+```
 
 ### Production `.env` checklist (EC2)
 
-Paste these into `/var/www/ai-interview-bot/.env` after setup. **Required** keys will prevent startup if missing.
+Paste these into `/var/www/ai-interview-bot/.env` after setup. Values match `.env.example`; **required** keys prevent startup if missing.
 
-**Required**
+**Required** (from `.env.example`)
 
 | Variable | Example / notes |
 |---|---|
 | `SECRET_KEY` | `openssl rand -hex 32` |
-| `DATABASE_URL` | `sqlite+aiosqlite:////var/www/ai-interview-bot/data/smartskale.db` (persistent path) |
-| `OPENAI_API_KEY` | OpenAI key — questions + Whisper |
-| `GROQ_API_KEY` | Groq key — answer judging |
+| `DATABASE_URL` | `sqlite+aiosqlite:////var/www/ai-interview-bot/data/smartskale.db` (persistent path on EC2) |
+| `OPENAI_API_KEY` | OpenAI key — mock-interview questions + Whisper |
+| `GROQ_API_KEY` | Groq key — answer judging + recruiter question generation |
+| `INTERVIEW_QUESTION_COUNT` | Default question count (e.g. `5`) |
 
-**Production (strongly recommended)**
+**Production (strongly recommended on EC2)**
 
 | Variable | Example / notes |
 |---|---|
 | `APP_ENV` | `production` |
-| `FRONTEND_URL` | `http://<EC2_PUBLIC_IP>` or your domain |
+| `FRONTEND_URL` | `http://13.207.191.193` or your domain |
 | `ALLOWED_ORIGINS` | Same as `FRONTEND_URL` (comma-separated if multiple) |
 | `UPLOAD_DIR` | `/var/www/ai-interview-bot/uploads` |
 | `SMTP_HOST` | `smtp.gmail.com` |
