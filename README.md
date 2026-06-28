@@ -215,8 +215,8 @@ If ffmpeg is not installed, recordings are still saved and played back as WebM.
 
 ### Backend Setup
 ```bash
-git clone https://github.com/smartskale001/SmartSkale-InterviewBot.git
-cd SmartSkale-InterviewBot
+git clone https://github.com/ayushanand27/AI-interview-bot.git
+cd AI-interview-bot
 pip install -r requirements.txt
 cp .env.example .env
 # Fill in your API keys in .env
