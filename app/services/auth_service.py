@@ -176,6 +176,7 @@ class AuthService:
             reset_token = str(uuid4())
             user.reset_token = reset_token
             user.reset_token_expiry = datetime.now(timezone.utc) + timedelta(hours=1)
+            await self.db.flush()
             send_password_reset_email(user.email, user.full_name, reset_token)
 
         return {
@@ -201,6 +202,7 @@ class AuthService:
         user.hashed_password = hash_password(new_password)
         user.reset_token = None
         user.reset_token_expiry = None
+        await self.db.flush()
         return {
             "message": "Password reset successfully. You can now login with your new password."
         }

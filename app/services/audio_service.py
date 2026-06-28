@@ -1,17 +1,18 @@
-"""Speech-to-text via OpenAI Whisper API."""
+"""Speech-to-text via Groq Whisper API."""
 
 from __future__ import annotations
 
 import io
 from pathlib import Path
 
-from openai import APIConnectionError, APIError, OpenAI, RateLimitError
+from groq import APIConnectionError, APIError, RateLimitError
 
 from app.core.config import settings
 from app.core.exceptions import AIException
+from app.services.groq_client import get_groq_client
 
 ALLOWED_AUDIO_EXTENSIONS = {".webm", ".mp4", ".wav", ".mpeg", ".mp3", ".m4a", ".ogg", ".oga"}
-MAX_AUDIO_BYTES = 25 * 1024 * 1024  # Whisper API limit
+MAX_AUDIO_BYTES = 25 * 1024 * 1024  # API limit
 
 
 def _guess_extension(filename: str | None, content_type: str | None) -> str:
@@ -37,32 +38,25 @@ def _guess_extension(filename: str | None, content_type: str | None) -> str:
 
 
 def transcribe_audio(audio_file: bytes, filename: str = "audio.webm") -> str:
-    """
-    Send audio bytes to OpenAI Whisper and return transcribed text.
-
-    Args:
-        audio_file: Raw audio bytes (webm, mp4, wav, etc.).
-        filename: Filename with extension for the API (affects format detection).
-    """
+    """Send audio bytes to Groq Whisper and return transcribed text."""
     if not audio_file:
         raise ValueError("Audio file is empty")
     if len(audio_file) > MAX_AUDIO_BYTES:
         raise ValueError("Audio file exceeds 25 MB limit")
 
-    if not settings.OPENAI_API_KEY:
-        raise ValueError("OPENAI_API_KEY is not configured")
+    if not settings.GROQ_API_KEY.strip():
+        raise ValueError("GROQ_API_KEY is not configured")
 
     ext = _guess_extension(filename, None)
     if not filename.lower().endswith(ext):
         filename = f"recording{ext}"
 
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
     buffer = io.BytesIO(audio_file)
     buffer.name = filename
 
     try:
-        transcription = client.audio.transcriptions.create(
-            model="whisper-1",
+        transcription = get_groq_client().audio.transcriptions.create(
+            model=settings.GROQ_WHISPER_MODEL,
             file=buffer,
         )
     except (RateLimitError, APIConnectionError, APIError) as exc:
@@ -76,10 +70,14 @@ def transcribe_audio(audio_file: bytes, filename: str = "audio.webm") -> str:
 
     text = (transcription.text or "").strip()
     if not text:
-        raise ValueError("Could not transcribe any speech from the audio")
-    if len(text) > settings.MAX_ANSWER_LENGTH:
-        raise ValueError(
-            f"Transcribed answer exceeds {settings.MAX_ANSWER_LENGTH} characters. "
-            "Please shorten your response or type your answer."
+        raise AIException(
+            "Could not transcribe audio. Please speak clearly or type your answer."
         )
+
+    if len(text) > settings.MAX_ANSWER_LENGTH:
+        raise AIException(
+            f"Transcribed answer exceeds {settings.MAX_ANSWER_LENGTH} characters. "
+            "Please shorten your response."
+        )
+
     return text

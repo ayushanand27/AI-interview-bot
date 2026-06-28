@@ -1,21 +1,24 @@
-"""Reusable OpenAI client for generating interview questions."""
+"""Interview question generation via Groq (configurable model + API key)."""
+
+from __future__ import annotations
 
 import json
 from typing import Optional
 
-from openai import APIConnectionError, APIError, OpenAI, RateLimitError
+from groq import APIConnectionError, APIError, RateLimitError
 
 from app.core.config import get_settings
 from app.core.exceptions import AIException
+from app.services.assessment_service import _parse_questions_from_llm_text
+from app.services.groq_client import get_groq_client
 
 
 class LLMService:
-    """Wraps OpenAI chat completions for technical interview content."""
+    """Generates mock-interview questions from resume + job description."""
 
     def __init__(self) -> None:
         settings = get_settings()
-        self._client = OpenAI(api_key=settings.OPENAI_API_KEY)
-        self._model = settings.OPENAI_MODEL
+        self._model = settings.GROQ_MODEL
 
     def generate_interview_questions(
         self,
@@ -27,11 +30,6 @@ class LLMService:
         resume_text: Optional[str] = None,
         job_description: Optional[str] = None,
     ) -> list[str]:
-        """
-        Generate concise technical interview questions.
-
-        Returns a list of plain-text questions (one per interview step).
-        """
         focus_line = (
             f"Focus topics: {topic_focus}."
             if topic_focus
@@ -71,15 +69,15 @@ class LLMService:
         )
 
         try:
-            response = self._client.chat.completions.create(
+            response = get_groq_client().chat.completions.create(
                 model=self._model,
                 temperature=0.7,
-                response_format={"type": "json_object"},
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
             )
+            content = response.choices[0].message.content or ""
         except (RateLimitError, APIConnectionError, APIError) as exc:
             raise AIException(
                 "Question generation is temporarily unavailable. Please try again in a moment."
@@ -89,28 +87,27 @@ class LLMService:
                 "Question generation failed. Please try again in a moment."
             ) from exc
 
-        try:
-            content = response.choices[0].message.content or "{}"
-            payload = json.loads(content)
-            questions = payload.get("questions", [])
-        except (json.JSONDecodeError, IndexError, AttributeError) as exc:
-            raise AIException(
-                "Question generation returned an invalid response. Please try again."
-            ) from exc
-
-        if not isinstance(questions, list) or not questions:
+        if not content.strip():
             raise AIException("Question generation returned no questions. Please try again.")
 
-        # Normalize and trim to requested count
-        cleaned = [str(q).strip() for q in questions if str(q).strip()]
-        return cleaned[:question_count]
+        jd_hint = job_description or resume_text or role_title
+        questions = _parse_questions_from_llm_text(
+            content,
+            question_count,
+            jd_hint,
+            experience_level,
+        )
+
+        if not questions:
+            raise AIException("Question generation returned no questions. Please try again.")
+
+        return questions[:question_count]
 
 
 _llm_service: LLMService | None = None
 
 
 def get_llm_service() -> LLMService:
-    """Lazy singleton so the app boots before OPENAI_API_KEY is set."""
     global _llm_service
     if _llm_service is None:
         _llm_service = LLMService()

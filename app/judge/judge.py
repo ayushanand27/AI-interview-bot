@@ -2,10 +2,8 @@ import json
 from app.core.config import settings
 from app.core.exceptions import AIException
 from app.judge.rubric import Rubric, get_rubric
-from groq import Groq
+from app.services.groq_client import get_groq_client
 from typing import Optional
-
-client = Groq(api_key=settings.GROQ_API_KEY)
 
 SYSTEM_PROMPT = """You are an expert technical interviewer acting as an impartial judge.
 You evaluate candidate answers based on a provided rubric with specific criteria and weightages.
@@ -14,8 +12,8 @@ You return ONLY valid JSON. No markdown, no preamble, no extra text."""
 
 def _chat(user_prompt: str) -> str:
     try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+        response = get_groq_client().chat.completions.create(
+            model=settings.GROQ_MODEL,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},

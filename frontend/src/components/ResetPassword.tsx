@@ -29,9 +29,13 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-      const result = await authApi.resetPassword(token, password);
+        const result = await authApi.resetPassword(token, password);
+      const message =
+        result?.message ??
+        (result as { data?: { message?: string } })?.data?.message ??
+        "Password reset successfully. You can now login with your new password.";
       sessionStorage.setItem("ss_password_reset_done", "1");
-      setSuccess(result.message);
+      setSuccess(message);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reset password");
     } finally {

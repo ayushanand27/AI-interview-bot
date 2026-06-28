@@ -34,12 +34,14 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"            # JWT signing algorithm
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
-    # ── OpenAI ────────────────────────────────────────────
-    OPENAI_API_KEY: str                 # Required — app won't start without it
-    OPENAI_MODEL: str = "gpt-4o"        # Model for question generation / general LLM
+    # ── OpenAI (optional legacy) ──────────────────────────
+    OPENAI_API_KEY: str = ""            # Optional — not required when using Groq
+    OPENAI_MODEL: str = "gpt-4o"
 
-    # ── Groq (Judge / Scoring) ───────────────────────────
-    GROQ_API_KEY: str                   # Required for LLM judge/evaluator
+    # ── Groq (questions, judging, transcription) ────────
+    GROQ_API_KEY: str
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
+    GROQ_WHISPER_MODEL: str = "whisper-large-v3"
 
     # ── Interview flow ────────────────────────────────────
     INTERVIEW_QUESTION_COUNT: int = 5  # Default questions when client omits count

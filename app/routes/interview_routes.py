@@ -149,7 +149,7 @@ async def create_session(
     response_model=GenerateQuestionsResponse,
     summary="Generate interview questions",
     description=(
-        "Uses OpenAI to generate technical questions for this session. "
+        "Uses Groq to generate technical questions for this session. "
         "Use the `session_id` from your create-session response."
     ),
 )

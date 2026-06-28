@@ -41,8 +41,8 @@ PM2 → uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 2
 | **FastAPI backend** (Python) | REST API, auth, interviews, recruiter portal, reports |
 | **React + TypeScript frontend** | Candidate and recruiter UIs (Vite build) |
 | **SQLite + SQLAlchemy + Alembic** | Database and schema migrations |
-| **OpenAI API** | Mock-interview question generation; Whisper speech-to-text |
-| **Groq API** | Answer evaluation (judge); recruiter JD-only question generation |
+| **OpenAI API** | Optional legacy fallback (not required) |
+| **Groq API** | Mock-interview question generation; answer evaluation; recruiter JD questions; Whisper transcription |
 | **nginx** | Reverse proxy — serves frontend, proxies `/api/`, `/health`, `/proctor/` |
 | **PM2** | Process manager — keeps uvicorn running with auto-restart |
 | **Proctoring** | MediaPipe (face/pose), YOLOv8n (prohibited-object detection), OpenCV |
@@ -166,10 +166,10 @@ Local development uses the same stack without nginx/PM2: Vite dev server on port
 | Database | SQLite (SQLAlchemy 2.0 async) | Simple deploy; PostgreSQL-ready |
 | Migrations | Alembic | Schema versioning |
 | Auth | JWT + bcrypt | Secure, stateless |
-| Question Gen | OpenAI GPT-4o | Mock-interview questions |
+| Question Gen | Groq Llama 3.1 | Mock-interview questions |
 | Recruiter Q Gen | Groq Llama 3.1 | JD-only assessment questions |
 | Answer Judge | Groq Llama 3.1 | Fast + cheap scoring |
-| Transcription | OpenAI Whisper | Speech to text |
+| Transcription | Groq Whisper | Speech to text |
 | Face Detection | MediaPipe | Local, no cloud |
 | Object Detection | YOLOv8n (Ultralytics) | Cell-phone / prohibited-object checks |
 | Identity Check | OpenCV | Face presence |
@@ -253,8 +253,10 @@ Covers auth, mock interview, proctoring, recruiter portal, invite flow, PDF repo
 
 | Variable | Purpose | Example |
 |---|---|---|
-| OPENAI_API_KEY | Questions + Whisper | sk-... |
-| GROQ_API_KEY | Answer judging | gsk-... |
+| GROQ_API_KEY | Questions, judging, Whisper transcription | gsk-... |
+| GROQ_MODEL | Question + judge model | llama-3.1-8b-instant |
+| GROQ_WHISPER_MODEL | Audio transcription | whisper-large-v3 |
+| OPENAI_API_KEY | Optional legacy (not required with Groq) | sk-... |
 | SECRET_KEY | JWT signing | random 32 chars |
 | DATABASE_URL | Database | sqlite+aiosqlite:///./smartskale.db |
 | ALLOWED_ORIGINS | Frontend URL | http://localhost:5173 |
@@ -451,8 +453,10 @@ Paste these into `/var/www/ai-interview-bot/.env` after setup. Values match `.en
 |---|---|
 | `SECRET_KEY` | `openssl rand -hex 32` |
 | `DATABASE_URL` | `sqlite+aiosqlite:////var/www/ai-interview-bot/data/smartskale.db` (persistent path on EC2) |
-| `OPENAI_API_KEY` | OpenAI key — mock-interview questions + Whisper |
-| `GROQ_API_KEY` | Groq key — answer judging + recruiter question generation |
+| `GROQ_API_KEY` | Groq key — questions, judging, transcription |
+| `GROQ_MODEL` | e.g. `llama-3.1-8b-instant` |
+| `GROQ_WHISPER_MODEL` | e.g. `whisper-large-v3` |
+| `OPENAI_API_KEY` | Optional — only if not using Groq |
 | `INTERVIEW_QUESTION_COUNT` | Default question count (e.g. `5`) |
 
 **Production (strongly recommended on EC2)**

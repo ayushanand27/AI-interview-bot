@@ -122,6 +122,36 @@ Must know async programming and SQLAlchemy.
     )
     test("Forgot password", r.status_code == 200, str(r.json()))
 
+    new_password = "newpass45678"
+    reset_token = None
+    time.sleep(0.5)
+    if DB_PATH.exists():
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT reset_token FROM users WHERE email = ?",
+                (candidate_email,),
+            ).fetchone()
+            if row:
+                reset_token = row[0]
+    if reset_token:
+        r = requests.post(
+            f"{BASE}/api/v1/auth/reset-password",
+            json={"token": reset_token, "new_password": new_password},
+            timeout=15,
+        )
+        test("Reset candidate password", r.status_code == 200, str(r.json())[:80])
+        r = requests.post(
+            f"{BASE}/api/v1/auth/login",
+            json={"email": candidate_email, "password": new_password},
+            timeout=15,
+        )
+        test("Login after password reset", r.status_code == 200)
+        cand_token = token_from_login(r)
+        cand_headers = {"Authorization": f"Bearer {cand_token}"}
+    else:
+        test("Reset candidate password", False, "no reset_token in DB")
+        test("Login after password reset", False, "skipped")
+
     r = requests.post(
         f"{BASE}/api/v1/auth/resend-verification",
         json={"email": candidate_email},

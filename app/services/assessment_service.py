@@ -6,16 +6,12 @@ import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from groq import Groq
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.db.interview_invite_model import InterviewInvite
 from app.schemas.recruiter_assessment import CreateAssessmentRequest, CreateAssessmentResponse
-
-
-def _groq_client() -> Groq:
-    return Groq(api_key=settings.GROQ_API_KEY)
+from app.services.groq_client import get_groq_client
 
 
 def _strip_markdown_code_block(text: str) -> str:
@@ -149,8 +145,8 @@ def generate_questions_from_jd(
 
     content = ""
     try:
-        response = _groq_client().chat.completions.create(
-            model="llama-3.1-8b-instant",
+        response = get_groq_client().chat.completions.create(
+            model=settings.GROQ_MODEL,
             temperature=0.6,
             messages=[
                 {"role": "system", "content": system_prompt},

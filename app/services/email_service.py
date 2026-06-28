@@ -76,11 +76,13 @@ def _send_email_with_attachment(
         logger.error("[EMAIL] Check: 2) 2FA enabled on Gmail account")
         logger.error("[EMAIL] Check: 3) No spaces in SMTP_PASSWORD in .env")
         logger.warning(f"[EMAIL FALLBACK] To: {to_email} | Subject: {subject}")
+        logger.warning(f"[EMAIL FALLBACK] Body preview: {html_body[:500]}")
         return False
 
     except Exception as e:
         logger.error(f"[EMAIL] Failed to send: {e}")
         logger.warning(f"[EMAIL FALLBACK] To: {to_email} | Subject: {subject}")
+        logger.warning(f"[EMAIL FALLBACK] Body preview: {html_body[:500]}")
         return False
 
 
