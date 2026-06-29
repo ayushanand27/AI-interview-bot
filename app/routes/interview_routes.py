@@ -31,6 +31,7 @@ from app.models.schemas import (
     RecordingUploadResponse,
 )
 from app.services.interview_service import interview_service, resolve_job_description
+from app.services.session_persistence import abandon_active_sessions_for_user_async
 from app.services.jd_scraper import fetch_jd_from_url
 from app.services.resume_parser import extract_text_from_document
 from app.utils.file_validation import validate_document_upload
@@ -66,6 +67,7 @@ async def reset_active_session(
     request: Request,
     current_user: User = Depends(get_current_user),
 ):
+    await abandon_active_sessions_for_user_async(current_user.id)
     return interview_service.reset_active_sessions(current_user.id)
 
 
@@ -133,6 +135,7 @@ async def create_session(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    await abandon_active_sessions_for_user_async(current_user.id)
     return interview_service.create_session(
         user_id=current_user.id,
         role_title=role_title,

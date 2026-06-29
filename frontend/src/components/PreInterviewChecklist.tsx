@@ -216,29 +216,16 @@ export default function PreInterviewChecklist({
 
   return (
     <div className="card">
-      <h2 style={{ marginBottom: "0.5rem", fontSize: "1.2rem" }}>
-        Before you start your interview
-      </h2>
-      <p style={{ color: "var(--muted)", marginBottom: "1.5rem", fontSize: "0.9rem" }}>
+      <h2 className="checklist-title">Before you start your interview</h2>
+      <p className="checklist-intro">
         This is a proctored session. Complete each step in order before proceeding.
       </p>
 
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "1.25rem",
-          marginBottom: "1.5rem",
-        }}
-      >
+      <div className="checklist-steps">
         <section>
-          <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>
-            Step 1 — Camera &amp; audio access
-          </h3>
+          <h3 className="checklist-step-title">Step 1 — Camera &amp; audio access</h3>
           {cameraGranted ? (
-            <div className="alert success" style={{ marginTop: 0 }}>
-              Camera &amp; Audio: Ready
-            </div>
+            <div className="alert success alert-flush">Camera &amp; Audio: Ready</div>
           ) : (
             <>
               <button
@@ -253,9 +240,7 @@ export default function PreInterviewChecklist({
                   : "Grant Camera & Audio Access"}
               </button>
               {cameraError && (
-                <div className="alert error" style={{ marginTop: 0 }}>
-                  {cameraError}
-                </div>
+                <div className="alert error alert-flush">{cameraError}</div>
               )}
             </>
           )}
@@ -263,17 +248,17 @@ export default function PreInterviewChecklist({
 
         {cameraGranted && (
           <section>
-            <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>
+            <h3 className="checklist-step-title">
               Step 2 — Screen recording extensions &amp; camera check
             </h3>
             {checking ? (
-              <div className="alert info" style={{ marginTop: 0 }}>
+              <div className="alert info alert-flush">
                 Scanning for screen recording extensions and virtual cameras…
               </div>
             ) : (
               <>
                 {hasExtensions ? (
-                  <div className="alert error" style={{ marginTop: 0 }}>
+                  <div className="alert error alert-flush">
                     {detectedExtensions.map((ext) => (
                       <p key={ext.id} style={{ marginBottom: "0.35rem" }}>
                         {extensionBlockMessage(ext)}
@@ -281,21 +266,21 @@ export default function PreInterviewChecklist({
                     ))}
                   </div>
                 ) : automaticScan ? (
-                  <div className="alert success" style={{ marginTop: 0 }}>
+                  <div className="alert success alert-flush">
                     No screen recording extensions detected.
                   </div>
                 ) : (
-                  <div className="alert info" style={{ marginTop: 0 }}>
+                  <div className="alert info alert-flush">
                     Please confirm that no screen recording extensions (Loom,
                     Screencastify, Nimbus, etc.) are active in your browser.
                   </div>
                 )}
 
                 {virtualCamera.blockRecommended && virtualCamera.message && (
-                  <div className="alert error" style={{ marginTop: "0.75rem" }}>
+                  <div className="alert error alert-stack">
                     {virtualCamera.message}
                     {virtualCamera.deviceLabels.length > 0 && (
-                      <ul style={{ marginTop: "0.5rem", paddingLeft: "1.25rem" }}>
+                      <ul className="checklist-list">
                         {virtualCamera.deviceLabels.map((label) => (
                           <li key={label}>{label}</li>
                         ))}
@@ -305,10 +290,10 @@ export default function PreInterviewChecklist({
                 )}
 
                 {virtualCamera.warnOnly && virtualCamera.message && (
-                  <div className="alert warning" style={{ marginTop: "0.75rem" }}>
+                  <div className="alert warning alert-stack">
                     {virtualCamera.message}
                     {virtualCamera.deviceLabels.length > 0 && (
-                      <ul style={{ marginTop: "0.5rem", paddingLeft: "1.25rem" }}>
+                      <ul className="checklist-list">
                         {virtualCamera.deviceLabels.map((label) => (
                           <li key={label}>{label}</li>
                         ))}
@@ -318,13 +303,13 @@ export default function PreInterviewChecklist({
                 )}
 
                 {screenSharingActive && (
-                  <div className="alert error" style={{ marginTop: "0.75rem" }}>
+                  <div className="alert error alert-stack">
                     Screen sharing is active. Stop sharing your screen before continuing.
                   </div>
                 )}
 
                 {screenSharingCapability && !screenSharingActive && (
-                  <div className="alert warning" style={{ marginTop: "0.75rem" }}>
+                  <div className="alert warning alert-stack">
                     A screen-capture device was detected. Do not share your screen during
                     the interview — you may continue, but this will be flagged.
                   </div>
@@ -332,27 +317,13 @@ export default function PreInterviewChecklist({
               </>
             )}
             <label
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "0.75rem",
-                cursor: hasExtensions ? "not-allowed" : "pointer",
-                color: "var(--text)",
-                fontWeight: 400,
-                marginTop: "0.75rem",
-                opacity: hasExtensions ? 0.6 : 1,
-              }}
+              className={`checklist-checkbox-label${hasExtensions ? " is-disabled" : ""}`}
             >
               <input
                 type="checkbox"
                 checked={disabledExtensions}
                 onChange={(e) => setDisabledExtensions(e.target.checked)}
                 disabled={hasExtensions}
-                style={{
-                  width: "auto",
-                  marginTop: "3px",
-                  accentColor: "var(--accent)",
-                }}
               />
               <span>
                 <strong>Disable screen recording extensions</strong> — Extensions
@@ -374,28 +345,12 @@ export default function PreInterviewChecklist({
 
         {cameraGranted && (
           <section>
-            <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>
-              Step 3 — Close other tabs
-            </h3>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "0.75rem",
-                cursor: "pointer",
-                color: "var(--text)",
-                fontWeight: 400,
-              }}
-            >
+            <h3 className="checklist-step-title">Step 3 — Close other tabs</h3>
+            <label className="checklist-checkbox-label" style={{ marginTop: 0 }}>
               <input
                 type="checkbox"
                 checked={closedTabs}
                 onChange={(e) => setClosedTabs(e.target.checked)}
-                style={{
-                  width: "auto",
-                  marginTop: "3px",
-                  accentColor: "var(--accent)",
-                }}
               />
               <span>
                 <strong>Close other tabs &amp; windows</strong> (optional but
@@ -408,10 +363,8 @@ export default function PreInterviewChecklist({
 
         {cameraGranted && (
           <section>
-            <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>
-              Step 4 — Fullscreen mode
-            </h3>
-            <p style={{ color: "var(--muted)", fontSize: "0.9rem", marginBottom: "0.5rem" }}>
+            <h3 className="checklist-step-title">Step 4 — Fullscreen mode</h3>
+            <p className="checklist-step-note">
               Fullscreen is required during the interview. Enter fullscreen after
               camera access is granted.
             </p>
@@ -424,9 +377,7 @@ export default function PreInterviewChecklist({
                 Enter fullscreen
               </button>
             ) : (
-              <div className="alert success" style={{ marginTop: 0 }}>
-                Fullscreen active.
-              </div>
+              <div className="alert success alert-flush">Fullscreen active.</div>
             )}
           </section>
         )}
@@ -435,9 +386,7 @@ export default function PreInterviewChecklist({
           <div className="alert info">Verifying interview environment…</div>
         )}
 
-        {envBlockReason && (
-          <div className="alert error">{envBlockReason}</div>
-        )}
+        {envBlockReason && <div className="alert error">{envBlockReason}</div>}
 
         {envWarnings.length > 0 && (
           <div className="alert info">
@@ -451,23 +400,13 @@ export default function PreInterviewChecklist({
       </div>
 
       <div className="actions">
-        <button
-          className="primary"
-          disabled={!canProceed}
-          onClick={handleReady}
-        >
+        <button className="primary" disabled={!canProceed} onClick={handleReady}>
           {loading ? "Starting…" : "I'm ready — Start Interview"}
         </button>
       </div>
 
       {!canProceed && (
-        <p
-          style={{
-            marginTop: "0.75rem",
-            fontSize: "0.8rem",
-            color: "var(--muted)",
-          }}
-        >
+        <p className="checklist-hint">
           {!cameraGranted
             ? "Grant camera and audio access to continue."
             : hasExtensions

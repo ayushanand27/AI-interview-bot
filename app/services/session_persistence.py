@@ -9,12 +9,15 @@ import asyncio
 import concurrent.futures
 import json
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import create_engine, func, select, update
+from sqlalchemy.orm import sessionmaker as sync_sessionmaker
 
+from app.core.config import settings
 from app.db.session import AsyncSessionLocal
 from app.db.session_model import Session as DBSess
 from app.models.schemas import SessionStatus
@@ -24,6 +27,42 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SESSIONS_DIR = PROJECT_ROOT / "data" / "sessions"
 
 _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
+
+def _sync_database_url() -> str:
+    url = settings.DATABASE_URL
+    if url.startswith("sqlite+aiosqlite"):
+        return url.replace("sqlite+aiosqlite", "sqlite", 1)
+    if url.startswith("postgresql+asyncpg"):
+        return url.replace("postgresql+asyncpg", "postgresql+psycopg2", 1)
+    return url
+
+
+@lru_cache
+def _get_sync_session_local():
+    engine = create_engine(_sync_database_url(), pool_pre_ping=True)
+    return sync_sessionmaker(bind=engine, expire_on_commit=False)
+
+
+def _save_session_sync(session: InterviewSession) -> None:
+    now = datetime.now(timezone.utc)
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        obj = db.get(DBSess, session.session_id)
+        if obj is None:
+            db.add(_interview_session_to_row(session, now))
+        else:
+            _apply_session_fields(obj, session, now)
+        db.commit()
+
+
+def _load_session_sync(session_id: UUID) -> Optional[InterviewSession]:
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        obj = db.get(DBSess, session_id)
+        if obj is not None:
+            return _row_to_interview_session(obj)
+    return None
 
 
 def _run_async(coro):
@@ -190,18 +229,18 @@ def _load_session_from_json(session_id: UUID) -> Optional[InterviewSession]:
 
 def save_session_to_disk(session: InterviewSession) -> Path:
     """Persist session to the database."""
-    _run_async(_save_session_async(session))
+    _save_session_sync(session)
     return PROJECT_ROOT / "smartskale.db"
 
 
 def load_session_from_disk(session_id: UUID) -> Optional[InterviewSession]:
     """Load session from the database (JSON files used only as legacy fallback)."""
-    loaded = _run_async(_load_session_async(session_id))
+    loaded = _load_session_sync(session_id)
     if loaded is not None:
         return loaded
     legacy = _load_session_from_json(session_id)
     if legacy is not None:
-        _run_async(_save_session_async(legacy))
+        _save_session_sync(legacy)
     return legacy
 
 
@@ -396,6 +435,19 @@ async def _mark_candidate_report_email_sent_async(session_id: UUID) -> bool:
             return False
         await db.commit()
         return True
+
+
+async def abandon_active_sessions_for_user_async(user_id: int) -> int:
+    """Abandon stale sessions in DB and sync the in-memory session cache (async-safe)."""
+    from app.services.session_store import session_store
+
+    abandoned_ids = await _abandon_active_sessions_async(user_id)
+    for session_id in abandoned_ids:
+        session = session_store.get(session_id)
+        if session is not None:
+            session.status = SessionStatus.ABANDONED
+            session_store.save(session)
+    return len(abandoned_ids)
 
 
 def abandon_active_sessions_for_user(user_id: int) -> int:

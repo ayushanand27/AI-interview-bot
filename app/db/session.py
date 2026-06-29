@@ -35,13 +35,17 @@ def set_sqlite_pragmas(dbapi_connection, connection_record):
 
 
 # ── Engine ────────────────────────────────────────────────
-# The engine manages the actual connection to SQLite.
-# echo=True logs every SQL query to the terminal in development
-# — very useful for debugging, set to False in production.
+_engine_kwargs: dict = {
+    "echo": settings.sql_echo(),
+    "future": True,
+    "pool_pre_ping": True,
+}
+if settings.DATABASE_URL.startswith("postgresql"):
+    _engine_kwargs.update(pool_size=5, max_overflow=10)
+
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=settings.sql_echo(),  # Off in production; on when DEBUG=True in dev
-    future=True,               # Use SQLAlchemy 2.0 style (always True)
+    **_engine_kwargs,
 )
 
 

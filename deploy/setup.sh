@@ -84,7 +84,13 @@ cd "${APP_DIR}"
 
 echo "==> Creating upload directory..."
 mkdir -p uploads data
-chown -R www-data:www-data uploads data frontend/dist 2>/dev/null || true
+DEPLOY_USER="${SUDO_USER:-ubuntu}"
+if id "${DEPLOY_USER}" >/dev/null 2>&1; then
+  chown -R "${DEPLOY_USER}:${DEPLOY_USER}" "${APP_DIR}"
+  chown -R www-data:www-data uploads data frontend/dist 2>/dev/null || true
+else
+  chown -R www-data:www-data uploads data frontend/dist 2>/dev/null || true
+fi
 
 if [[ ! -f .env ]]; then
   echo "==> WARNING: ${APP_DIR}/.env not found."
@@ -93,7 +99,7 @@ if [[ ! -f .env ]]; then
 fi
 
 echo "==> Running database migrations..."
-alembic upgrade head
+python scripts/bootstrap_db.py
 
 echo "==> Configuring nginx..."
 cp deploy/nginx.conf /etc/nginx/sites-available/ai-interview-bot

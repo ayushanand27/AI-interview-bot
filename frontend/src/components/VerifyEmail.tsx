@@ -64,7 +64,7 @@ export default function VerifyEmail() {
   if (status === "loading") {
     return (
       <div className="app">
-        <div style={{ textAlign: "center", padding: "40px" }}>
+        <div className="card status-panel" style={{ textAlign: "center", padding: "40px", maxWidth: "560px", margin: "0 auto" }}>
           <p>Verifying your email...</p>
         </div>
       </div>
@@ -74,23 +74,16 @@ export default function VerifyEmail() {
   if (status === "success") {
     return (
       <div className="app">
-        <div style={{ textAlign: "center", padding: "40px" }}>
-          <h2 style={{ color: "#16a34a" }}>Email Verified!</h2>
+        <div className="card status-panel" style={{ textAlign: "center", padding: "40px", maxWidth: "560px", margin: "0 auto" }}>
+          <h2 style={{ color: "#86efac" }}>Email Verified!</h2>
           <p>{message || "Your email has been verified successfully."}</p>
           <button
             type="button"
             onClick={() => {
               window.location.href = "/";
             }}
-            style={{
-              background: "#4F46E5",
-              color: "white",
-              padding: "10px 24px",
-              borderRadius: "6px",
-              border: "none",
-              cursor: "pointer",
-              marginTop: "16px",
-            }}
+            className="primary"
+            style={{ marginTop: "16px" }}
           >
             Go to Login
           </button>
@@ -101,23 +94,16 @@ export default function VerifyEmail() {
 
   return (
     <div className="app">
-      <div style={{ textAlign: "center", padding: "40px" }}>
-        <h2 style={{ color: "#dc2626" }}>Verification Failed</h2>
+      <div className="card status-panel" style={{ textAlign: "center", padding: "40px", maxWidth: "560px", margin: "0 auto" }}>
+        <h2 style={{ color: "#fca5a5" }}>Verification Failed</h2>
         <p>{message}</p>
         <button
           type="button"
           onClick={() => {
             window.location.href = "/";
           }}
-          style={{
-            background: "#4F46E5",
-            color: "white",
-            padding: "10px 24px",
-            borderRadius: "6px",
-            border: "none",
-            cursor: "pointer",
-            marginTop: "16px",
-          }}
+          className="primary"
+          style={{ marginTop: "16px" }}
         >
           Back to Login
         </button>

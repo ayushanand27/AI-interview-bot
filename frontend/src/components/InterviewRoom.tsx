@@ -679,7 +679,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
         </div>
 
         {streamWarning && (
-          <div className="alert info" style={{ marginBottom: "1rem" }}>
+          <div className="alert info alert-inline">
             {streamWarning}
           </div>
         )}
@@ -741,17 +741,17 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
               </div>
             )}
             {audioWarning && (
-              <div className="alert info" style={{ marginTop: "0.75rem" }}>
+              <div className="alert info alert-stack">
                 {audioWarning}
               </div>
             )}
             {transcribeNotice && (
-              <div className="alert info" style={{ marginTop: "0.75rem" }}>
+              <div className="alert info alert-stack">
                 {transcribeNotice}
               </div>
             )}
             {warnings.length > 0 && (
-              <div className="alert info" style={{ marginTop: "0.75rem" }}>
+              <div className="alert info alert-stack">
                 {warnings.map((w) => (
                   <div key={w}>⚠ {w}</div>
                 ))}

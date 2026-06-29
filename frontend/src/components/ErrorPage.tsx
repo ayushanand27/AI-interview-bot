@@ -21,7 +21,7 @@ export default function ErrorPage({
     <div className="card error-page">
       <p className="error-page-code">{code}</p>
       <h2>{title ?? defaultTitle}</h2>
-      <p style={{ color: "var(--muted)", marginBottom: "1.25rem" }}>
+      <p className="error-page-message">
         {message ?? defaultMessage}
       </p>
       {onRetry && (

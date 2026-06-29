@@ -5,9 +5,14 @@ Run locally:
     uvicorn app.main:app --reload
 """
 
+import asyncio
 import logging
 import os
+import sys
 from contextlib import asynccontextmanager
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request

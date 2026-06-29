@@ -7,6 +7,18 @@ set -euo pipefail
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${APP_DIR}"
 
+DEPLOY_USER="${SUDO_USER:-$(whoami)}"
+
+echo "==> Ensuring app directory is owned by ${DEPLOY_USER}..."
+if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+  chown -R "${DEPLOY_USER}:${DEPLOY_USER}" "${APP_DIR}"
+else
+  if [[ ! -w "${APP_DIR}/.git" ]]; then
+    echo "Fixing git permissions (one-time)..."
+    sudo chown -R "${DEPLOY_USER}:${DEPLOY_USER}" "${APP_DIR}"
+  fi
+fi
+
 echo "==> Pulling latest code..."
 git pull origin main
 
@@ -24,7 +36,7 @@ npm run build
 cd "${APP_DIR}"
 
 echo "==> Running database migrations..."
-alembic upgrade head
+python scripts/bootstrap_db.py
 
 echo "==> Restarting backend..."
 pm2 restart ai-interview-bot-backend

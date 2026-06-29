@@ -67,7 +67,7 @@ export default function RecruiterLogin() {
         <p>Sign in to create assessments and review completed interviews.</p>
       </header>
 
-      <div className="rp-card">
+      <div className="rp-card status-panel">
         <div className="rp-tabs">
           <button
             type="button"

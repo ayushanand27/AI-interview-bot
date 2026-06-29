@@ -122,10 +122,13 @@ export default function SetupForm({ loading, onStart }: SetupFormProps) {
   }
 
   return (
-    <form className="card" onSubmit={handleSubmit}>
-      <h2 style={{ marginBottom: "1.25rem", fontSize: "1.15rem" }}>
-        Start your interview
-      </h2>
+    <form className="card hero-card stack" onSubmit={handleSubmit}>
+      <div>
+        <h2 className="section-title">Start your interview</h2>
+        <p className="section-subtitle">
+          Upload your resume, add a job description, and generate an interview flow tailored to the role.
+        </p>
+      </div>
 
       <div className="field">
         <label htmlFor="role_title">Role title</label>
@@ -187,7 +190,7 @@ export default function SetupForm({ loading, onStart }: SetupFormProps) {
           <label htmlFor="jd_url" style={{ fontSize: "0.9rem" }}>
             Or paste a job URL
           </label>
-          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.35rem" }}>
+          <div className="panel-grid two-col" style={{ marginTop: "0.35rem", alignItems: "start" }}>
             <input
               id="jd_url"
               type="url"
@@ -195,7 +198,6 @@ export default function SetupForm({ loading, onStart }: SetupFormProps) {
               onChange={(e) => setJdUrl(e.target.value)}
               placeholder="https://www.naukri.com/job-listings-..."
               disabled={fetchingJd || loading}
-              style={{ flex: 1 }}
             />
             <button
               type="button"

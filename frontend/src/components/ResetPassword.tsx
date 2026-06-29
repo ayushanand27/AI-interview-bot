@@ -47,9 +47,10 @@ export default function ResetPassword() {
     <div className="app">
       <header>
         <h1>Reset Password</h1>
+        <p>Set a new password to regain access to your interview account.</p>
       </header>
 
-      <div className="card" style={{ maxWidth: "480px", margin: "0 auto" }}>
+      <div className="card auth-panel stack" style={{ maxWidth: "480px", margin: "0 auto" }}>
         {success ? (
           <>
             <div className="alert success">Password reset! You can now login.</div>

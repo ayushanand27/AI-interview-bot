@@ -29,7 +29,6 @@ from app.proctoring.session_registry import (
     get_warning_manager,
 )
 from app.services.session_persistence import (
-    abandon_active_sessions_for_user,
     candidate_report_email_already_sent,
     mark_candidate_report_email_sent,
     update_recording_filename,
@@ -149,7 +148,6 @@ class InterviewService:
 
     def reset_active_sessions(self, user_id: int) -> dict[str, str]:
         """Manually abandon in-flight sessions so the candidate can start fresh."""
-        abandon_active_sessions_for_user(user_id)
         return {
             "message": "Active session cleared. You can start a new interview."
         }
@@ -165,8 +163,6 @@ class InterviewService:
         resume_text: str | None,
         job_description: str | None,
     ) -> InterviewSessionResponse:
-        abandon_active_sessions_for_user(user_id)
-
         session = session_store.create(
             user_id=user_id,
             role_title=role_title,

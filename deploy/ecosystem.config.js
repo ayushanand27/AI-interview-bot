@@ -16,7 +16,7 @@ module.exports = {
       name: "ai-interview-bot-backend",
       cwd: appDir,
       script: venvUvicorn,
-      args: "app.main:app --host 127.0.0.1 --port 8080 --workers 2",
+      args: "app.main:app --host 127.0.0.1 --port 8080 --workers 1",
       interpreter: "none",
       autorestart: true,
       max_restarts: 10,

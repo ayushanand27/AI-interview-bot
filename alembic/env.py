@@ -44,6 +44,31 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def _prepare_postgres_alembic_version(connection) -> None:
+    """Postgres defaults to VARCHAR(32) for version_num; our revision ids are longer."""
+    if connection.dialect.name != "postgresql":
+        return
+    from sqlalchemy import text
+
+    connection.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS alembic_version (
+                version_num VARCHAR(128) NOT NULL,
+                CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
+            )
+            """
+        )
+    )
+    connection.execute(
+        text(
+            "ALTER TABLE alembic_version "
+            "ALTER COLUMN version_num TYPE VARCHAR(128)"
+        )
+    )
+    connection.commit()
+
+
 def run_migrations_online() -> None:
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
@@ -52,6 +77,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        _prepare_postgres_alembic_version(connection)
         context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():

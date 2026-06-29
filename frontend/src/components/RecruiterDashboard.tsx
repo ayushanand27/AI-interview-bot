@@ -266,8 +266,7 @@ export default function RecruiterDashboard({
         {onLogout && (
           <button
             type="button"
-            className="rp-secondary"
-            style={{ marginTop: "0.75rem" }}
+            className="rp-secondary rp-logout"
             onClick={onLogout}
           >
             Log out
@@ -275,13 +274,12 @@ export default function RecruiterDashboard({
         )}
       </header>
 
-      <div className="rp-card rp-card-wide" style={{ marginBottom: "1.25rem" }}>
+      <div className="rp-card rp-card-wide rp-card-spacing">
         <div className="rp-toolbar">
-          <h2 style={{ margin: 0, fontSize: "1.15rem" }}>Assessments</h2>
+          <h2 className="rp-section-title">Assessments</h2>
           <button
             type="button"
-            className="rp-primary"
-            style={{ width: "auto", padding: "0.55rem 1.25rem" }}
+            className="rp-primary rp-btn-inline"
             onClick={() => {
               setShowAssessmentForm((v) => !v);
               setApprovedInviteLink(null);
@@ -295,7 +293,7 @@ export default function RecruiterDashboard({
         {showAssessmentForm && (
           <>
             <label>Job description</label>
-            <div className="rp-tabs" style={{ marginBottom: "0.75rem" }}>
+            <div className="rp-tabs rp-tabs-spaced">
               <button
                 type="button"
                 className={jdMode === "paste" ? "active" : undefined}
@@ -318,11 +316,11 @@ export default function RecruiterDashboard({
               </button>
             </div>
 
-            <div style={{ marginBottom: "0.75rem" }}>
-              <label htmlFor="jd-url" style={{ fontSize: "0.9rem" }}>
+            <div className="rp-jd-url-block">
+              <label htmlFor="jd-url" className="rp-jd-url-label">
                 Or paste a job URL
               </label>
-              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.35rem" }}>
+              <div className="rp-jd-url-row">
                 <input
                   id="jd-url"
                   type="url"
@@ -330,7 +328,6 @@ export default function RecruiterDashboard({
                   onChange={(e) => setJdUrl(e.target.value)}
                   placeholder="https://www.indeed.com/viewjob?..."
                   disabled={fetchingJd || assessmentLoading}
-                  style={{ flex: 1 }}
                 />
                 <button
                   type="button"
@@ -351,7 +348,7 @@ export default function RecruiterDashboard({
                 placeholder="Paste the full job description…"
               />
             ) : (
-              <div style={{ marginBottom: "1rem" }}>
+              <div className="rp-file-block">
                 <input
                   id="jd-pdf"
                   type="file"
@@ -361,9 +358,7 @@ export default function RecruiterDashboard({
                   }}
                 />
                 {jdPdfFile && (
-                  <p style={{ marginTop: "0.5rem", color: "var(--rp-muted)", fontSize: "0.9rem" }}>
-                    Selected: {jdPdfFile.name}
-                  </p>
+                  <p className="rp-file-name">Selected: {jdPdfFile.name}</p>
                 )}
               </div>
             )}
@@ -420,8 +415,8 @@ export default function RecruiterDashboard({
             </button>
 
             {questionsPreview.length > 0 && (
-              <div style={{ marginTop: "1.25rem" }}>
-                <h3 style={{ marginBottom: "0.5rem" }}>Question preview</h3>
+              <div className="rp-preview-block">
+                <h3 className="rp-preview-title">Question preview</h3>
                 <ol className="rp-questions-preview">
                   {questionsPreview.map((q, i) => (
                     <li key={i}>{q}</li>
@@ -438,8 +433,7 @@ export default function RecruiterDashboard({
                   </button>
                   <button
                     type="button"
-                    className="rp-primary"
-                    style={{ width: "auto" }}
+                    className="rp-primary rp-btn-inline"
                     disabled={!pendingInviteLink}
                     onClick={handleApprove}
                   >
@@ -451,7 +445,7 @@ export default function RecruiterDashboard({
 
             {approvedInviteLink && (
               <div className="rp-invite-box">
-                <p style={{ margin: "0 0 0.5rem", color: "var(--rp-muted)" }}>
+                <p className="rp-invite-hint">
                   Share this invite link with candidates:
                 </p>
                 <p className="rp-invite-link">{fullInviteUrl(approvedInviteLink)}</p>
@@ -461,7 +455,7 @@ export default function RecruiterDashboard({
                   </button>
                 </div>
                 {copyMessage && (
-                  <p style={{ margin: "0.75rem 0 0", color: "var(--rp-success)" }}>{copyMessage}</p>
+                  <p className="rp-copy-success">{copyMessage}</p>
                 )}
               </div>
             )}
@@ -470,14 +464,12 @@ export default function RecruiterDashboard({
       </div>
 
       <div className="rp-card rp-card-wide recruiter-dashboard">
-        <h2 style={{ marginBottom: "1rem", fontSize: "1.15rem" }}>
-          Completed interviews
-        </h2>
+        <h2 className="rp-section-title-spaced">Completed interviews</h2>
 
         {loading && sessions.length === 0 ? (
           <p className="loading">Loading interviews…</p>
         ) : sessions.length === 0 ? (
-          <p style={{ color: "var(--rp-muted)" }}>
+          <p className="rp-empty">
             No completed interviews yet. Candidates must finish and end a session
             before it appears here.
           </p>
@@ -519,8 +511,7 @@ export default function RecruiterDashboard({
                       {row.recording_available ? (
                         <button
                           type="button"
-                          className="rp-secondary"
-                          style={{ padding: "0.35rem 0.65rem", fontSize: "0.85rem" }}
+                          className="rp-secondary rp-btn-compact"
                           disabled={watchingId === row.session_id}
                           onClick={(e) => handleWatchRecording(row, e)}
                         >
@@ -529,16 +520,13 @@ export default function RecruiterDashboard({
                             : "Watch Recording"}
                         </button>
                       ) : (
-                        <span style={{ color: "var(--rp-muted)", fontSize: "0.85rem" }}>
-                          No
-                        </span>
+                        <span className="rp-muted-small">No</span>
                       )}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
-                        className="rp-secondary"
-                        style={{ padding: "0.35rem 0.65rem", fontSize: "0.85rem" }}
+                        className="rp-secondary rp-btn-compact"
                         disabled={downloadingId === row.session_id}
                         onClick={(e) => handleDownloadReport(row, e)}
                       >
@@ -556,28 +544,19 @@ export default function RecruiterDashboard({
       </div>
 
       {selectedId && (
-        <div className="rp-card rp-card-wide" style={{ marginTop: "1.25rem" }}>
+        <div className="rp-card rp-card-wide rp-card-spacing-top">
           {detailLoading || !detail ? (
             <p className="loading">Loading transcript…</p>
           ) : (
             <>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: "1rem",
-                  flexWrap: "wrap",
-                }}
-              >
-                <h2 style={{ marginBottom: "0.5rem", fontSize: "1.15rem" }}>
+              <div className="rp-detail-header">
+                <h2 className="rp-section-title-tight">
                   {detail.candidate_name} — {detail.role_title}
                 </h2>
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                <div className="rp-detail-actions">
                   <button
                     type="button"
-                    className="rp-primary"
-                    style={{ width: "auto" }}
+                    className="rp-primary rp-btn-inline"
                     disabled={downloadingId === detail.session_id}
                     onClick={(e) => {
                       const row = sessions.find(
@@ -613,7 +592,7 @@ export default function RecruiterDashboard({
                   )}
                 </div>
               </div>
-              <p style={{ color: "var(--rp-muted)", marginBottom: "1rem" }}>
+              <p className="rp-detail-meta">
                 {formatDate(detail.date)}
                 {detail.duration_minutes != null
                   ? ` · ${detail.duration_minutes} min`
@@ -624,7 +603,7 @@ export default function RecruiterDashboard({
               </p>
 
               {detail.low_identity_confidence && (
-                <div className="alert warning" style={{ marginBottom: "1rem" }}>
+                <div className="alert warning rp-summary-spaced">
                   Identity verification flagged for review
                   {detail.identity_similarity_score != null && (
                     <>
@@ -638,7 +617,7 @@ export default function RecruiterDashboard({
               )}
 
               {(detail.original_score != null || detail.adjusted_score != null) && (
-                <div className="summary-overall" style={{ marginBottom: "1rem" }}>
+                <div className="summary-overall rp-summary-spaced">
                   <h3>Scores</h3>
                   {detail.original_score != null && (
                     <p>Original score: <strong>{detail.original_score}</strong> / 100</p>
@@ -657,7 +636,7 @@ export default function RecruiterDashboard({
 
               {detail.proctoring_summary?.violations &&
                 detail.proctoring_summary.violations.length > 0 && (
-                  <section className="summary-violations" style={{ marginBottom: "1rem" }}>
+                  <section className="summary-violations rp-summary-spaced">
                     <h3>Proctoring violations</h3>
                     <ul className="summary-violations-list">
                       {detail.proctoring_summary.violations.map((v, idx) => (
@@ -673,7 +652,7 @@ export default function RecruiterDashboard({
                 )}
 
               {detail.final_score && (
-                <div className="summary-overall" style={{ marginBottom: "1rem" }}>
+                <div className="summary-overall rp-summary-spaced">
                   <h3>Overall score</h3>
                   <p className="summary-score">
                     <strong>
@@ -698,7 +677,7 @@ export default function RecruiterDashboard({
                   <div key={item.index} className="summary-item">
                     <h3>Question {item.index}</h3>
                     <p>{item.question}</p>
-                    <h3 style={{ marginTop: "0.75rem" }}>Answer</h3>
+                    <h3 className="rp-answer-title">Answer</h3>
                     <p className="answer-text">
                       {item.answer ?? "(not answered)"}
                     </p>
@@ -738,7 +717,7 @@ export default function RecruiterDashboard({
                       </div>
                     )}
                     {j?.error === "judging_failed" && (
-                      <div className="alert info" style={{ marginTop: "0.75rem" }}>
+                      <div className="alert info alert-stack">
                         Judge feedback unavailable for this answer.
                       </div>
                     )}

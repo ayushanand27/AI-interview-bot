@@ -139,7 +139,7 @@ export default function Summary({
   }
 
   return (
-    <div className="card">
+    <div className="card hero-card">
       <div className="alert success">{summary.message}</div>
 
       {summary.candidate_report_email_sent && candidateEmail && (

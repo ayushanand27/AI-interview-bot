@@ -487,33 +487,17 @@ export default function App() {
           Account created! Please check your email to verify your account.{" "}
           <button
             type="button"
+            className="link-button"
             onClick={() => void handleResendVerification()}
             disabled={resendLoading}
-            style={{
-              background: "none",
-              border: "none",
-              color: "inherit",
-              textDecoration: "underline",
-              cursor: "pointer",
-              padding: 0,
-              font: "inherit",
-            }}
           >
             {resendLoading ? "Sending…" : "Resend verification email"}
           </button>
           <button
             type="button"
+            className="link-button"
             onClick={dismissRegisterVerificationNotice}
-            style={{
-              background: "none",
-              border: "none",
-              color: "inherit",
-              textDecoration: "underline",
-              cursor: "pointer",
-              padding: 0,
-              font: "inherit",
-              marginLeft: "0.75rem",
-            }}
+            style={{ marginLeft: "0.75rem" }}
           >
             Dismiss
           </button>
@@ -526,12 +510,21 @@ export default function App() {
       )}
 
       {!isLoggedIn ? (
-        <Auth
-          loading={loading}
-          onLoadingChange={setLoading}
-          onError={setError}
-          onAuthenticated={handleAuthenticated}
-        />
+        <>
+          <div className="card hero-card" style={{ marginBottom: "1.25rem" }}>
+            <div className="pill" style={{ marginBottom: "1rem" }}>AI-led mock interviews</div>
+            <h2 className="section-title">Practice and evaluate technical interviews in a premium, focused workspace.</h2>
+            <p className="section-subtitle">
+              Upload your resume, tailor the role context, complete a proctored interview, and review structured feedback and recordings.
+            </p>
+          </div>
+          <Auth
+            loading={loading}
+            onLoadingChange={setLoading}
+            onError={setError}
+            onAuthenticated={handleAuthenticated}
+          />
+        </>
       ) : isRecruiter ? (
         <RecruiterDashboard
           loading={loading}
@@ -541,8 +534,8 @@ export default function App() {
       ) : mobileBlocked ? (
         <MobileBlock />
       ) : needsEmailVerification ? (
-        <div className="card">
-          <h2>Verify your email</h2>
+        <div className="card status-panel">
+          <h2 className="section-title">Verify your email</h2>
           <p className="invite-meta">
             Please verify your email before starting an interview. We sent a
             link to <strong>{user?.email}</strong>.

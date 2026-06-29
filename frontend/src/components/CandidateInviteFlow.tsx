@@ -382,7 +382,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
       {info && <div className="alert info">{info}</div>}
 
       {step === "welcome" && inviteInfo && (
-        <div className="card invite-welcome">
+        <div className="card invite-welcome hero-card">
           <h2>Welcome to your interview</h2>
           <p className="invite-meta">
             <strong>{inviteInfo.company}</strong> has invited you to interview for{" "}
@@ -402,7 +402,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
       )}
 
       {step === "details" && (
-        <div className="card">
+        <div className="card auth-panel">
           <h2>{detailsMode === "register" ? "Your details" : "Log in to continue"}</h2>
           {detailsMode === "register" ? (
             <form onSubmit={handleRegister}>
@@ -485,7 +485,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
       )}
 
       {step === "identity" && (
-        <div className="card">
+        <div className="card hero-card">
           <h2>Identity Verification</h2>
           <div className="invite-identity-grid">
             <div className="invite-identity-panel">

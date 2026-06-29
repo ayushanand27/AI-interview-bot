@@ -1,8 +1,8 @@
 export default function MobileBlock() {
   return (
     <div className="card">
-      <h2 style={{ marginBottom: "0.75rem" }}>Desktop required</h2>
-      <p style={{ color: "var(--muted)", lineHeight: 1.6 }}>
+      <h2 className="mobile-block-title">Desktop required</h2>
+      <p className="mobile-block-text">
         Please use a desktop or laptop for the interview. Mobile devices and
         tablets are not supported for proctored sessions — this matches
         industry-standard interview platforms that require a stable webcam,

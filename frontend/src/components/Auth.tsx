@@ -101,7 +101,7 @@ export default function Auth({
   }
 
   return (
-    <div className="card">
+    <div className="card auth-panel stack">
       <div className="auth-toggle" style={{ marginBottom: "1.25rem" }}>
         <button
           type="button"
@@ -135,9 +135,7 @@ export default function Auth({
       {mode === "login" ? (
         showForgotPassword ? (
           <form onSubmit={handleForgotPassword}>
-            <h2 style={{ marginBottom: "1.25rem", fontSize: "1.15rem" }}>
-              Reset your password
-            </h2>
+            <h2 className="section-title">Reset your password</h2>
 
             <div className="field">
               <label htmlFor="forgot_email">Email</label>
@@ -177,9 +175,7 @@ export default function Auth({
           </form>
         ) : (
           <form onSubmit={handleLogin}>
-            <h2 style={{ marginBottom: "1.25rem", fontSize: "1.15rem" }}>
-              Log in to your account
-            </h2>
+            <h2 className="section-title">Log in to your account</h2>
 
             <div className="field">
               <label htmlFor="login_email">Email</label>
@@ -212,15 +208,7 @@ export default function Auth({
                   onError(null);
                 }}
                 disabled={loading}
-                style={{
-                  marginTop: "0.5rem",
-                  background: "none",
-                  border: "none",
-                  color: "var(--accent)",
-                  cursor: "pointer",
-                  padding: 0,
-                  fontSize: "0.85rem",
-                }}
+                style={{ marginTop: "0.5rem", fontSize: "0.85rem" }}
               >
                 Forgot password?
               </button>
@@ -233,9 +221,7 @@ export default function Auth({
         )
       ) : (
         <form onSubmit={handleRegister}>
-          <h2 style={{ marginBottom: "1.25rem", fontSize: "1.15rem" }}>
-            Create an account
-          </h2>
+          <h2 className="section-title">Create an account</h2>
 
           <div className="field">
             <label htmlFor="register_full_name">Full name</label>

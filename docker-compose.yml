@@ -1,0 +1,26 @@
+# Local development only — production EC2 can keep SQLite or use managed Postgres.
+# Start:  docker compose up -d
+# Stop:   docker compose down
+# URL:    postgresql+asyncpg://interview:interview@localhost:5433/interview_bot
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-interview-bot-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: interview
+      POSTGRES_PASSWORD: interview
+      POSTGRES_DB: interview_bot
+    ports:
+      - "5433:5432"
+    volumes:
+      - interview_bot_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U interview -d interview_bot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  interview_bot_pgdata:

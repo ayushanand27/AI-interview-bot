@@ -25,6 +25,83 @@ results: list[str] = []
 state: dict = {}
 
 
+def _database_url() -> str:
+    from dotenv import load_dotenv
+
+    load_dotenv(ROOT / ".env")
+    return os.getenv("DATABASE_URL", f"sqlite+aiosqlite:///{DB_PATH.as_posix()}")
+
+
+def _uses_postgres() -> bool:
+    return _database_url().startswith("postgresql")
+
+
+def db_fetchone(sql: str, params: tuple):
+    if not _uses_postgres():
+        if not DB_PATH.exists():
+            return None
+        with sqlite3.connect(DB_PATH) as conn:
+            return conn.execute(sql, params).fetchone()
+
+    import psycopg2
+    from urllib.parse import urlparse
+
+    url = _database_url().replace("postgresql+asyncpg://", "postgresql://")
+    parsed = urlparse(url)
+    conn = psycopg2.connect(
+        host=parsed.hostname or "127.0.0.1",
+        port=parsed.port or 5432,
+        user=parsed.username,
+        password=parsed.password,
+        dbname=(parsed.path or "/").lstrip("/"),
+    )
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql.replace("?", "%s"), params)
+            return cur.fetchone()
+    finally:
+        conn.close()
+
+
+def db_fetch_counts() -> tuple[int, int, int, int]:
+    if not _uses_postgres():
+        conn = sqlite3.connect(DB_PATH)
+        users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        sessions = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+        ended = conn.execute(
+            "SELECT COUNT(*) FROM sessions WHERE status='ended'"
+        ).fetchone()[0]
+        invites = conn.execute("SELECT COUNT(*) FROM interview_invites").fetchone()[0]
+        conn.close()
+        return users, sessions, ended, invites
+
+    import psycopg2
+    from urllib.parse import urlparse
+
+    url = _database_url().replace("postgresql+asyncpg://", "postgresql://")
+    parsed = urlparse(url)
+    conn = psycopg2.connect(
+        host=parsed.hostname or "127.0.0.1",
+        port=parsed.port or 5432,
+        user=parsed.username,
+        password=parsed.password,
+        dbname=(parsed.path or "/").lstrip("/"),
+    )
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM users")
+            users = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM sessions")
+            sessions = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM sessions WHERE status='ended'")
+            ended = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM interview_invites")
+            invites = cur.fetchone()[0]
+            return users, sessions, ended, invites
+    finally:
+        conn.close()
+
+
 def test(name: str, passed: bool, details: str = "") -> None:
     status = "PASS" if passed else "FAIL"
     line = f"{status} | {name} | {details}"
@@ -125,14 +202,11 @@ Must know async programming and SQLAlchemy.
     new_password = "newpass45678"
     reset_token = None
     time.sleep(0.5)
-    if DB_PATH.exists():
-        with sqlite3.connect(DB_PATH) as conn:
-            row = conn.execute(
-                "SELECT reset_token FROM users WHERE email = ?",
-                (candidate_email,),
-            ).fetchone()
-            if row:
-                reset_token = row[0]
+    row = db_fetchone(
+        "SELECT reset_token FROM users WHERE email = ?",
+        (candidate_email,),
+    )
+    reset_token = row[0] if row else None
     if reset_token:
         r = requests.post(
             f"{BASE}/api/v1/auth/reset-password",
@@ -160,15 +234,11 @@ Must know async programming and SQLAlchemy.
     test("Resend verification", r.status_code == 200, str(r.json()))
 
     time.sleep(0.5)
-    verification_token = None
-    if DB_PATH.exists():
-        with sqlite3.connect(DB_PATH) as conn:
-            row = conn.execute(
-                "SELECT verification_token FROM users WHERE email = ?",
-                (candidate_email,),
-            ).fetchone()
-            if row:
-                verification_token = row[0]
+    row = db_fetchone(
+        "SELECT verification_token FROM users WHERE email = ?",
+        (candidate_email,),
+    )
+    verification_token = row[0] if row else None
     if verification_token:
         r = requests.get(
             f"{BASE}/api/v1/auth/verify-email",
@@ -238,15 +308,11 @@ Must know async programming and SQLAlchemy.
             f"status={wrong_inv_login.status_code}",
         )
 
-        inv_reset_token = None
-        if DB_PATH.exists():
-            with sqlite3.connect(DB_PATH) as conn:
-                row = conn.execute(
-                    "SELECT reset_token FROM users WHERE email = ?",
-                    (inv_login_email,),
-                ).fetchone()
-                if row:
-                    inv_reset_token = row[0]
+        row = db_fetchone(
+            "SELECT reset_token FROM users WHERE email = ?",
+            (inv_login_email,),
+        )
+        inv_reset_token = row[0] if row else None
         if inv_reset_token:
             requests.post(
                 f"{BASE}/api/v1/auth/reset-password",
@@ -503,14 +569,7 @@ Must know async programming and SQLAlchemy.
 
     # ============ DATABASE CHECK ============
 
-    conn = sqlite3.connect(DB_PATH)
-    users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    sessions = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
-    ended = conn.execute(
-        "SELECT COUNT(*) FROM sessions WHERE status='ended'"
-    ).fetchone()[0]
-    invites = conn.execute("SELECT COUNT(*) FROM interview_invites").fetchone()[0]
-    conn.close()
+    users, sessions, ended, invites = db_fetch_counts()
 
     test("Users in DB", users > 0, f"count={users}")
     test("Sessions in DB", sessions > 0, f"count={sessions}")
@@ -584,17 +643,15 @@ Must know async programming and SQLAlchemy.
             f"looking for {session_id[:8]}*",
         )
 
-    conn = sqlite3.connect(DB_PATH)
-    row = conn.execute(
+    row = db_fetchone(
         "SELECT recording_filename, recording_mp4_filename FROM sessions WHERE session_id=?",
         (session_id,),
-    ).fetchone()
+    )
     if row is None:
-        row = conn.execute(
+        row = db_fetchone(
             "SELECT recording_filename, recording_mp4_filename FROM sessions WHERE session_id=?",
             (session_id.replace("-", ""),),
-        ).fetchone()
-    conn.close()
+        )
 
     if row:
         test("Recording filename in DB", bool(row[0]), f"webm={row[0]}")
