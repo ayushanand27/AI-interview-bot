@@ -335,3 +335,52 @@
   color: var(--rp-muted);
   font-size: 0.85rem;
 }
+
+.recruiter-portal .rp-footer {
+  text-align: center;
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.recruiter-portal .rp-footer a {
+  color: var(--rp-muted);
+}
+
+.recruiter-portal .rp-review-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+.recruiter-portal .privacy-section {
+  margin-bottom: 1.5rem;
+}
+
+.recruiter-portal .privacy-section h2 {
+  font-size: 1.05rem;
+  margin-bottom: 0.5rem;
+}
+
+.recruiter-portal .privacy-section ul {
+  padding-left: 1.25rem;
+  line-height: 1.6;
+}
+
+.recruiter-portal .rp-assessment-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.recruiter-portal .rp-expired {
+  color: #f87171;
+  font-size: 0.85rem;
+}

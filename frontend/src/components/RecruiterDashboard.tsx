@@ -4,6 +4,7 @@ import type {
   RecruiterSessionDetail,
   RecruiterSessionSummary,
 } from "../types/recruiter";
+import type { AssessmentSummary } from "../types/assessment";
 import "../recruiter-portal.css";
 
 const VIOLATION_TYPE_LABELS: Record<string, string> = {
@@ -81,6 +82,26 @@ export default function RecruiterDashboard({
   const [pendingInviteLink, setPendingInviteLink] = useState<string | null>(null);
   const [approvedInviteLink, setApprovedInviteLink] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+
+  const [assessments, setAssessments] = useState<AssessmentSummary[]>([]);
+  const [assessmentsLoading, setAssessmentsLoading] = useState(false);
+  const [deletingToken, setDeletingToken] = useState<string | null>(null);
+  const [reviewUpdating, setReviewUpdating] = useState(false);
+
+  function loadAssessments() {
+    setAssessmentsLoading(true);
+    recruiterApi
+      .listAssessments()
+      .then((res) => setAssessments(res.data ?? []))
+      .catch(() => {
+        /* non-blocking — list is optional on dashboard */
+      })
+      .finally(() => setAssessmentsLoading(false));
+  }
+
+  useEffect(() => {
+    loadAssessments();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,6 +255,7 @@ export default function RecruiterDashboard({
       });
       setQuestionsPreview(res.data.questions_preview);
       setPendingInviteLink(res.data.invite_link);
+      loadAssessments();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to generate questions");
     } finally {
@@ -255,6 +277,45 @@ export default function RecruiterDashboard({
       setCopyMessage("Link copied to clipboard.");
     } catch {
       setCopyMessage("Could not copy — select and copy the link manually.");
+    }
+  }
+
+  async function handleDeleteAssessment(token: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!window.confirm("Delete this unused assessment invite?")) return;
+    setDeletingToken(token);
+    onError(null);
+    try {
+      await recruiterApi.deleteAssessment(token);
+      setAssessments((prev) => prev.filter((a) => a.token !== token));
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed to delete assessment");
+    } finally {
+      setDeletingToken(null);
+    }
+  }
+
+  async function handleToggleHumanReview(flagged: boolean) {
+    if (!detail) return;
+    setReviewUpdating(true);
+    onError(null);
+    try {
+      const res = await recruiterApi.setHumanReview(detail.session_id, flagged);
+      const updated = res.data;
+      if (updated) {
+        setDetail(updated);
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.session_id === updated.session_id
+              ? { ...s, human_review_flag: updated.human_review_flag }
+              : s,
+          ),
+        );
+      }
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed to update review flag");
+    } finally {
+      setReviewUpdating(false);
     }
   }
 
@@ -461,6 +522,83 @@ export default function RecruiterDashboard({
             )}
           </>
         )}
+
+        {assessments.length > 0 && (
+          <div className="rp-preview-block">
+            <h3 className="rp-preview-title">Saved assessments</h3>
+            {assessmentsLoading ? (
+              <p className="rp-muted-small">Loading…</p>
+            ) : (
+              <div className="recruiter-table-wrap">
+                <table className="recruiter-table">
+                  <thead>
+                    <tr>
+                      <th>Role preview</th>
+                      <th>Questions</th>
+                      <th>Uses</th>
+                      <th>Expires</th>
+                      <th>Link</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {assessments.map((a) => (
+                      <tr key={a.token}>
+                        <td>
+                          {a.role_preview}
+                          {a.is_expired && (
+                            <span className="rp-expired"> · expired</span>
+                          )}
+                        </td>
+                        <td>
+                          {a.question_count} ({a.difficulty})
+                        </td>
+                        <td>
+                          {a.used_count}/{a.max_uses}
+                        </td>
+                        <td>{formatDate(a.expiry_at)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="rp-secondary rp-btn-compact"
+                            onClick={() => {
+                              void navigator.clipboard.writeText(
+                                fullInviteUrl(a.invite_link),
+                              );
+                              setCopyMessage("Invite link copied.");
+                            }}
+                          >
+                            Copy
+                          </button>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="rp-secondary rp-btn-compact"
+                            disabled={
+                              deletingToken === a.token || a.used_count > 0
+                            }
+                            title={
+                              a.used_count > 0
+                                ? "Cannot delete after a candidate has started"
+                                : "Delete unused invite"
+                            }
+                            onClick={(e) => void handleDeleteAssessment(a.token, e)}
+                          >
+                            {deletingToken === a.token ? "…" : "Delete"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {copyMessage && !approvedInviteLink && (
+              <p className="rp-copy-success">{copyMessage}</p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="rp-card rp-card-wide recruiter-dashboard">
@@ -482,6 +620,7 @@ export default function RecruiterDashboard({
                   <th>Role</th>
                   <th>Date</th>
                   <th>Score</th>
+                  <th>Review</th>
                   <th>Recording</th>
                   <th>Report</th>
                 </tr>
@@ -506,6 +645,13 @@ export default function RecruiterDashboard({
                           · {row.recommendation}
                         </span>
                       ) : null}
+                    </td>
+                    <td>
+                      {row.human_review_flag ? (
+                        <span className="rp-review-badge">Review</span>
+                      ) : (
+                        <span className="rp-muted-small">—</span>
+                      )}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       {row.recording_available ? (
@@ -554,6 +700,25 @@ export default function RecruiterDashboard({
                   {detail.candidate_name} — {detail.role_title}
                 </h2>
                 <div className="rp-detail-actions">
+                  {detail.human_review_flag ? (
+                    <button
+                      type="button"
+                      className="rp-secondary"
+                      disabled={reviewUpdating}
+                      onClick={() => void handleToggleHumanReview(false)}
+                    >
+                      {reviewUpdating ? "Updating…" : "Clear review flag"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="rp-secondary"
+                      disabled={reviewUpdating}
+                      onClick={() => void handleToggleHumanReview(true)}
+                    >
+                      {reviewUpdating ? "Updating…" : "Flag for review"}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="rp-primary rp-btn-inline"
@@ -601,6 +766,12 @@ export default function RecruiterDashboard({
                 {detail.status}
                 {detail.recording_available ? " · Recording available" : ""}
               </p>
+
+              {detail.human_review_flag && (
+                <div className="alert warning rp-summary-spaced">
+                  This session is flagged for human review.
+                </div>
+              )}
 
               {detail.low_identity_confidence && (
                 <div className="alert warning rp-summary-spaced">
@@ -728,6 +899,9 @@ export default function RecruiterDashboard({
           )}
         </div>
       )}
+      <p className="rp-footer">
+        <a href="/privacy">Privacy Policy</a>
+      </p>
     </div>
   );
 }

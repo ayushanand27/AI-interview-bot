@@ -10,7 +10,11 @@ from app.core.dependencies import require_role
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.common import BaseResponse
-from app.schemas.recruiter import RecruiterSessionDetail, RecruiterSessionSummary
+from app.schemas.recruiter import (
+    HumanReviewUpdateRequest,
+    RecruiterSessionDetail,
+    RecruiterSessionSummary,
+)
 from app.services.recruiter_service import RecruiterService
 
 router = APIRouter(prefix="/recruiter", tags=["Recruiter"])
@@ -67,5 +71,25 @@ async def get_session_detail(
     return BaseResponse(
         success=True,
         message="Session retrieved successfully",
+        data=detail,
+    )
+
+
+@router.patch(
+    "/sessions/{session_id}/human-review",
+    response_model=BaseResponse[RecruiterSessionDetail],
+    summary="Mark or clear a session for human review",
+)
+async def update_human_review(
+    session_id: UUID,
+    body: HumanReviewUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    service = RecruiterService(db)
+    detail = await service.set_human_review_flag(session_id, body.flagged)
+    return BaseResponse(
+        success=True,
+        message="Human review flag updated",
         data=detail,
     )

@@ -6,7 +6,7 @@
 
 Hosted on **AWS EC2 free tier** (t3.micro, Mumbai region). The frontend, API, and proctoring endpoints are served from a single instance via nginx.
 
-Question generation may be temporarily rate-limited depending on OpenAI API quota.
+Question generation, judging, and transcription run on **Groq** (configure `GROQ_API_KEY` in `.env`).
 
 ---
 
@@ -33,16 +33,16 @@ Browser → nginx (:80)
             ├── /health        → backend health check
             └── /proctor/      → proctoring sub-app (face/object detection)
 
-PM2 → uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 2
+PM2 → uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 1
 ```
 
 | Component | Role |
 |---|---|
 | **FastAPI backend** (Python) | REST API, auth, interviews, recruiter portal, reports |
 | **React + TypeScript frontend** | Candidate and recruiter UIs (Vite build) |
-| **SQLite + SQLAlchemy + Alembic** | Database and schema migrations |
+| **PostgreSQL / SQLite + SQLAlchemy + Alembic** | Database (Postgres locally via Docker; SQLite on EC2) |
+| **Groq API** | Question generation, answer evaluation, recruiter assessments, Whisper transcription |
 | **OpenAI API** | Optional legacy fallback (not required) |
-| **Groq API** | Mock-interview question generation; answer evaluation; recruiter JD questions; Whisper transcription |
 | **nginx** | Reverse proxy — serves frontend, proxies `/api/`, `/health`, `/proctor/` |
 | **PM2** | Process manager — keeps uvicorn running with auto-restart |
 | **Proctoring** | MediaPipe (face/pose), YOLOv8n (prohibited-object detection), OpenCV |
@@ -86,7 +86,7 @@ Local development uses the same stack without nginx/PM2: Vite dev server on port
 ### Mock Interview Flow
 - Resume PDF upload
 - JD input: paste text OR upload PDF (both options)
-- AI generates personalized questions (OpenAI GPT-4o)
+- AI generates personalized questions (Groq Llama 3.1)
 - One question at a time (like real interview)
 - Text answer OR audio answer (mic recording)
 - AI judges each answer (Groq Llama 3.1)
@@ -163,7 +163,7 @@ Local development uses the same stack without nginx/PM2: Vite dev server on port
 |---|---|---|
 | Backend | FastAPI + Python | Async, auto docs |
 | Frontend | React + Vite + TypeScript | Fast, typed |
-| Database | SQLite (SQLAlchemy 2.0 async) | Simple deploy; PostgreSQL-ready |
+| Database | PostgreSQL (local dev) / SQLite (EC2) — SQLAlchemy 2.0 async | Production-ready ORM; swap via `DATABASE_URL` |
 | Migrations | Alembic | Schema versioning |
 | Auth | JWT + bcrypt | Secure, stateless |
 | Question Gen | Groq Llama 3.1 | Mock-interview questions |
@@ -188,9 +188,40 @@ Local development uses the same stack without nginx/PM2: Vite dev server on port
 ### Prerequisites
 - Python 3.11+
 - Node.js 18+
-- OpenAI API key (platform.openai.com)
-- Groq API key (console.groq.com - free)
+- **Docker Desktop** (for local PostgreSQL — recommended)
+- Groq API key (console.groq.com — free tier)
 - ffmpeg (recommended for MP4 conversion; WebM playback works without it)
+
+> **Note:** OpenAI is optional. All AI features (questions, judging, transcription) use Groq when `GROQ_API_KEY` is set.
+
+### Database (PostgreSQL — recommended for local dev)
+
+Local development uses **PostgreSQL in Docker** on port **5433** (avoids conflict with a system Postgres on 5432).
+
+**Windows**
+```powershell
+# From project root
+.\scripts\dev_db_postgres.ps1
+```
+
+**macOS / Linux**
+```bash
+docker compose up -d postgres
+# Wait until healthy, then:
+python scripts/bootstrap_db.py
+```
+
+Set in `.env` (single line — no duplicate `DATABASE_URL`):
+```
+DATABASE_URL=postgresql+asyncpg://interview:interview@127.0.0.1:5433/interview_bot
+```
+
+**Troubleshooting**
+- `Docker is required` in Cursor terminal → open a **new** PowerShell window after installing Docker Desktop, or run the script from Windows Terminal.
+- `password authentication failed` on port 5432 → you are hitting the wrong Postgres; use port **5433** as above.
+- Windows **User** environment variable `DATABASE_URL` overrides `.env` — remove it or set it to the same `5433` URL.
+
+**SQLite fallback** (no Docker): use `DATABASE_URL=sqlite+aiosqlite:///./smartskale.db` in `.env` and run `python scripts/bootstrap_db.py`.
 
 ### Install ffmpeg (for MP4 recording conversion)
 
@@ -217,12 +248,19 @@ If ffmpeg is not installed, recordings are still saved and played back as WebM.
 ```bash
 git clone https://github.com/ayushanand27/AI-interview-bot.git
 cd AI-interview-bot
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# Fill in your API keys in .env
-alembic upgrade head
+# Fill in GROQ_API_KEY and DATABASE_URL in .env
+
+# Start Postgres + create tables (see Database section above)
+# Windows: .\scripts\dev_db_postgres.ps1
+# macOS/Linux: docker compose up -d postgres && python scripts/bootstrap_db.py
+
 python app/proctoring/download_model.py
-uvicorn app.main:app --port 8080
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8080
 ```
 
 ### Frontend Setup
@@ -239,13 +277,19 @@ npm run dev
 
 ### Run Full Test Suite
 
-With the backend running on port 8080:
+With the backend running on port 8080 and Postgres (or SQLite) configured:
 
 ```bash
 python scripts/full_test.py
 ```
 
-Covers auth, mock interview, proctoring, recruiter portal, invite flow, PDF reports, and recording upload/playback. Expected: **54/54 PASS**. Results are written to `test_results.txt`.
+Covers auth, mock interview, proctoring, recruiter portal, invite flow, PDF reports, and recording upload/playback. Expected: **56/56 PASS**. Results are written to `test_results.txt`.
+
+Live EC2 smoke test (optional):
+
+```bash
+python scripts/live_deploy_test.py
+```
 
 ---
 
@@ -258,7 +302,7 @@ Covers auth, mock interview, proctoring, recruiter portal, invite flow, PDF repo
 | GROQ_WHISPER_MODEL | Audio transcription | whisper-large-v3 |
 | OPENAI_API_KEY | Optional legacy (not required with Groq) | sk-... |
 | SECRET_KEY | JWT signing | random 32 chars |
-| DATABASE_URL | Database | sqlite+aiosqlite:///./smartskale.db |
+| DATABASE_URL | Database connection | `postgresql+asyncpg://interview:interview@127.0.0.1:5433/interview_bot` (local Docker) or `sqlite+aiosqlite:///./smartskale.db` |
 | ALLOWED_ORIGINS | Frontend URL | http://localhost:5173 |
 | SMTP_EMAIL | Gmail for emails | you@gmail.com |
 | SMTP_PASSWORD | Gmail App Password | 16 char app password |
@@ -317,19 +361,46 @@ iMocha, and Talview in production.
 
 ## Database
 
-SQLite for development. One line change for production:
+The app supports **PostgreSQL** and **SQLite** via a single `DATABASE_URL` — no code changes when switching.
 
-Development (.env)
-```
-DATABASE_URL=sqlite+aiosqlite:///./smartskale.db
+### Local development (PostgreSQL — recommended)
+
+Uses `docker-compose.yml` (Postgres 16 on host port **5433**):
+
+| Item | Value |
+|---|---|
+| User / password | `interview` / `interview` |
+| Database | `interview_bot` |
+| URL | `postgresql+asyncpg://interview:interview@127.0.0.1:5433/interview_bot` |
+
+Bootstrap (creates ORM tables + aligns Alembic):
+
+```bash
+# Windows
+.\scripts\dev_db_postgres.ps1
+
+# macOS / Linux
+docker compose up -d postgres
+python scripts/bootstrap_db.py
 ```
 
-Production (.env)
+### Production (EC2 — SQLite default)
+
+SQLite keeps the free-tier instance simple (no extra DB server):
+
 ```
-DATABASE_URL=postgresql+asyncpg://user:pass@host/db
+DATABASE_URL=sqlite+aiosqlite:////var/www/ai-interview-bot/data/smartskale.db
 ```
 
-No code changes needed. SQLAlchemy ORM handles both.
+### Production (managed PostgreSQL)
+
+When you add RDS, Supabase, or Railway Postgres:
+
+```
+DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/dbname
+```
+
+Deploy runs `python scripts/bootstrap_db.py` (fresh DB: `create_all` + stamp; existing DB: `alembic upgrade head`).
 
 ---
 
@@ -357,7 +428,7 @@ sudo ./deploy/setup.sh
 3. Download proctoring models (`download_model.py`, YOLOv8n weights)
 4. Build the frontend (`npm ci && npm run build` — leave `VITE_API_URL` unset for same-origin nginx)
 5. Copy `deploy/nginx.conf` into `/etc/nginx/sites-available/` and enable the site
-6. Run `alembic upgrade head`
+6. Run `python scripts/bootstrap_db.py` (schema + migrations)
 7. Start the backend with PM2 (`deploy/ecosystem.config.js`)
 
 After setup, **edit `/var/www/ai-interview-bot/.env`** with production values (see [Production `.env` checklist](#production-env-checklist-ec2) below), then:
@@ -379,12 +450,13 @@ chmod +x deploy/deploy.sh
 
 `deploy/deploy.sh` will:
 
-1. `git pull origin main`
-2. `pip install -r requirements.txt` (inside `.venv`)
-3. Rebuild the frontend (`npm ci && npm run build`)
-4. `alembic upgrade head`
-5. `pm2 restart ai-interview-bot-backend`
-6. `sudo nginx -s reload`
+1. Fix app directory ownership (`chown` if needed)
+2. `git pull origin main`
+3. `pip install -r requirements.txt` (inside `.venv`)
+4. Rebuild the frontend (`npm ci && npm run build`)
+5. `python scripts/bootstrap_db.py`
+6. `pm2 restart ai-interview-bot-backend`
+7. `sudo nginx -s reload`
 
 ### EC2 prerequisites
 
@@ -397,9 +469,12 @@ chmod +x deploy/deploy.sh
 | File | Purpose |
 |---|---|
 | `deploy/nginx.conf` | Serves `frontend/dist` on port 80; proxies `/api/`, `/health`, `/proctor/` to `127.0.0.1:8080` |
-| `deploy/ecosystem.config.js` | PM2 — `uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 2`, auto-restart |
+| `deploy/ecosystem.config.js` | PM2 — `uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 1`, auto-restart |
 | `deploy/setup.sh` | One-time EC2 provisioning |
-| `deploy/deploy.sh` | Pull, rebuild, migrate, restart |
+| `deploy/deploy.sh` | Pull, rebuild, bootstrap DB, restart |
+| `docker-compose.yml` | Local Postgres only (not used on EC2) |
+| `scripts/dev_db_postgres.ps1` | Windows: start Docker Postgres + bootstrap |
+| `scripts/bootstrap_db.py` | Create tables / run Alembic (all environments) |
 
 ---
 
@@ -415,7 +490,7 @@ Detailed EC2 checklist and environment variables for the live instance.
   - **80** (HTTP — nginx)
   - **8080** (optional — direct backend access for debugging only)
 - GitHub repo: https://github.com/ayushanand27/AI-interview-bot (`main` branch)
-- API keys: OpenAI, Groq, and a strong `SECRET_KEY`
+- API keys: **Groq** (required), strong `SECRET_KEY`; OpenAI optional
 
 ### First-time setup
 
@@ -456,7 +531,7 @@ Paste these into `/var/www/ai-interview-bot/.env` after setup. Values match `.en
 | `GROQ_API_KEY` | Groq key — questions, judging, transcription |
 | `GROQ_MODEL` | e.g. `llama-3.1-8b-instant` |
 | `GROQ_WHISPER_MODEL` | e.g. `whisper-large-v3` |
-| `OPENAI_API_KEY` | Optional — only if not using Groq |
+| `OPENAI_API_KEY` | Optional — not required when using Groq |
 | `INTERVIEW_QUESTION_COUNT` | Default question count (e.g. `5`) |
 
 **Production (strongly recommended on EC2)**

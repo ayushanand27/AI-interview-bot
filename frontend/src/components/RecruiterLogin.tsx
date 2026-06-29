@@ -144,6 +144,9 @@ export default function RecruiterLogin() {
           </form>
         )}
       </div>
+      <p className="rp-footer">
+        <a href="/privacy">Privacy Policy</a>
+      </p>
     </div>
   );
 }

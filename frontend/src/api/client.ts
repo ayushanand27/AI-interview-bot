@@ -12,6 +12,8 @@ import type {
 
 import type {
 
+  AssessmentSummary,
+
   CreateAssessmentResponse,
 
   ParseJdPdfResponse,
@@ -574,6 +576,72 @@ export const recruiterApi = {
     }
 
     return blobFromVideoResponse(response);
+
+  },
+
+
+
+  listAssessments() {
+
+    return request<ApiEnvelope<AssessmentSummary[]>>(
+
+      "/api/v1/recruiter/assessments",
+
+    );
+
+  },
+
+
+
+  deleteAssessment(token: string) {
+
+    return request<ApiEnvelope<null>>(
+
+      `/api/v1/recruiter/assessments/${token}`,
+
+      { method: "DELETE" },
+
+    );
+
+  },
+
+
+
+  updateAssessmentExpiry(token: string, expiryHours: number) {
+
+    return request<ApiEnvelope<AssessmentSummary>>(
+
+      `/api/v1/recruiter/assessments/${token}`,
+
+      {
+
+        method: "PATCH",
+
+        body: JSON.stringify({ expiry_hours: expiryHours }),
+
+      },
+
+    );
+
+  },
+
+
+
+  setHumanReview(sessionId: string, flagged: boolean) {
+
+    return request<ApiEnvelope<RecruiterSessionDetail>>(
+
+      `/api/v1/recruiter/sessions/${sessionId}/human-review`,
+
+      {
+
+        method: "PATCH",
+
+        body: JSON.stringify({ flagged }),
+
+      },
+
+    );
 
   },
 

@@ -461,3 +461,15 @@ def abandon_active_sessions_for_user(user_id: int) -> int:
             session.status = SessionStatus.ABANDONED
             session_store.save(session)
     return len(abandoned_ids)
+
+
+def set_human_review_flag(session_id: UUID, flagged: bool = True) -> bool:
+    """Set human review flag on a persisted session (sync-safe)."""
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        obj = db.get(DBSess, session_id)
+        if obj is None:
+            return False
+        obj.human_review_flag = flagged
+        db.commit()
+        return True

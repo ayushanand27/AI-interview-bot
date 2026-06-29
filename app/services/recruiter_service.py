@@ -71,6 +71,16 @@ def _duration_minutes(row: DBSession) -> Optional[int]:
     return None
 
 
+def _human_review_flag(row: DBSession) -> bool:
+    if bool(getattr(row, "human_review_flag", False)):
+        return True
+    proctoring = row.proctoring_summary if isinstance(row.proctoring_summary, dict) else {}
+    if proctoring.get("low_identity_confidence"):
+        return True
+    level = proctoring.get("integrity_level")
+    return level in ("moderate_concerns", "serious_concerns")
+
+
 def _session_to_summary(row: DBSession) -> RecruiterSessionSummary:
     score, recommendation = _extract_final_score(row.final_score)
     return RecruiterSessionSummary(
@@ -82,6 +92,7 @@ def _session_to_summary(row: DBSession) -> RecruiterSessionSummary:
         recommendation=recommendation,
         status=row.status,
         recording_available=bool(row.recording_filename),
+        human_review_flag=_human_review_flag(row),
     )
 
 
@@ -136,6 +147,7 @@ def _session_to_detail(row: DBSession) -> RecruiterSessionDetail:
         proctoring_summary=proctoring,
         low_identity_confidence=low_identity_confidence,
         identity_similarity_score=identity_similarity_score,
+        human_review_flag=_human_review_flag(row),
         recording_available=bool(row.recording_filename),
         recording_filename=row.recording_filename,
         transcript=transcript,
@@ -164,6 +176,13 @@ class RecruiterService:
         detail = _session_to_detail(row)
         pdf_bytes = generate_session_report_pdf(detail, row.proctoring_summary)
         return pdf_bytes, report_filename(detail)
+
+    async def set_human_review_flag(self, session_id: UUID, flagged: bool) -> RecruiterSessionDetail:
+        row = await self._get_completed_row(session_id)
+        row.human_review_flag = flagged
+        await self.db.commit()
+        await self.db.refresh(row)
+        return _session_to_detail(row)
 
     async def _get_completed_row(self, session_id: UUID) -> DBSession:
         row = await self.db.get(DBSession, session_id)

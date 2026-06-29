@@ -9,9 +9,11 @@ from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.common import BaseResponse
 from app.schemas.recruiter_assessment import (
+    AssessmentSummary,
     CreateAssessmentRequest,
     CreateAssessmentResponse,
     ParseJdPdfResponse,
+    UpdateAssessmentRequest,
 )
 from app.services.assessment_service import AssessmentService
 from app.services.interview_service import resolve_job_description
@@ -86,4 +88,57 @@ async def parse_jd_pdf(
         success=True,
         message="Job description extracted successfully",
         data=ParseJdPdfResponse(jd_text=jd_text),
+    )
+
+
+@router.get(
+    "/assessments",
+    response_model=BaseResponse[list[AssessmentSummary]],
+    summary="List assessments created by the current recruiter",
+)
+async def list_assessments(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    service = AssessmentService(db)
+    assessments = await service.list_assessments(current_user.id)
+    return BaseResponse(
+        success=True,
+        message=f"Found {len(assessments)} assessment(s)",
+        data=assessments,
+    )
+
+
+@router.delete(
+    "/assessments/{token}",
+    response_model=BaseResponse[None],
+    summary="Delete an unused assessment invite",
+)
+async def delete_assessment(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    service = AssessmentService(db)
+    await service.delete_assessment(current_user.id, token)
+    return BaseResponse(success=True, message="Assessment deleted", data=None)
+
+
+@router.patch(
+    "/assessments/{token}",
+    response_model=BaseResponse[AssessmentSummary],
+    summary="Update assessment settings (e.g. extend expiry)",
+)
+async def update_assessment(
+    token: str,
+    body: UpdateAssessmentRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    service = AssessmentService(db)
+    updated = await service.update_assessment(current_user.id, token, body)
+    return BaseResponse(
+        success=True,
+        message="Assessment updated",
+        data=updated,
     )

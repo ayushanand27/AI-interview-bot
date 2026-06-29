@@ -348,6 +348,7 @@ class InviteService:
                     verification.similarity_score, 4
                 )
                 session_row.proctoring_summary = summary
+                session_row.human_review_flag = True
 
         await self.db.commit()
 

@@ -13,6 +13,7 @@ import ResetPassword from "./components/ResetPassword";
 import InterviewRoom, { type InterviewRoomHandle } from "./components/InterviewRoom";
 import RecruiterDashboard from "./components/RecruiterDashboard";
 import RecruiterLogin from "./components/RecruiterLogin";
+import PrivacyPolicy from "./components/PrivacyPolicy";
 import CandidateInviteFlow from "./components/CandidateInviteFlow";
 import PreInterviewChecklist from "./components/PreInterviewChecklist";
 import SetupForm from "./components/SetupForm";
@@ -120,6 +121,14 @@ function RecruiterDashboardRoute() {
 
 export default function App() {
   const pathname = useAppPathname();
+
+  if (pathname === "/privacy") {
+    return (
+      <div className="app">
+        <PrivacyPolicy />
+      </div>
+    );
+  }
 
   if (pathname === "/verify-email") {
     return <VerifyEmail />;

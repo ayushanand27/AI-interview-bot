@@ -16,6 +16,7 @@ class RecruiterSessionSummary(BaseModel):
     recommendation: Optional[str] = None
     status: str
     recording_available: bool = False
+    human_review_flag: bool = False
 
 
 class TranscriptItem(BaseModel):
@@ -44,6 +45,11 @@ class RecruiterSessionDetail(BaseModel):
     proctoring_summary: Optional[dict[str, Any]] = None
     low_identity_confidence: bool = False
     identity_similarity_score: Optional[float] = None
+    human_review_flag: bool = False
     recording_available: bool = False
     recording_filename: Optional[str] = None
     transcript: list[TranscriptItem]
+
+
+class HumanReviewUpdateRequest(BaseModel):
+    flagged: bool

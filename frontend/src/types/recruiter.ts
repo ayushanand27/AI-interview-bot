@@ -11,6 +11,7 @@ export interface RecruiterSessionSummary {
   recommendation: string | null;
   status: string;
   recording_available: boolean;
+  human_review_flag?: boolean;
 }
 
 export interface TranscriptItem {
@@ -44,6 +45,7 @@ export interface RecruiterSessionDetail {
   } | null;
   low_identity_confidence?: boolean;
   identity_similarity_score?: number | null;
+  human_review_flag?: boolean;
   recording_available: boolean;
   recording_filename: string | null;
   transcript: TranscriptItem[];

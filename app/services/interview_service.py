@@ -421,6 +421,15 @@ class InterviewService:
 
         session_store.save(session)
 
+        needs_review = integrity_level in ("moderate_concerns", "serious_concerns")
+        proctoring = session.proctoring_summary if isinstance(session.proctoring_summary, dict) else {}
+        if proctoring.get("low_identity_confidence"):
+            needs_review = True
+        if needs_review:
+            from app.services.session_persistence import set_human_review_flag
+
+            set_human_review_flag(session.session_id, True)
+
         answered = len(session.answers)
         unanswered = max(session.total_questions - answered, 0)
         if unanswered > 0:

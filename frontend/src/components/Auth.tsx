@@ -278,6 +278,9 @@ export default function Auth({
           </button>
         </form>
       )}
+      <p className="auth-footer">
+        <a href="/privacy">Privacy Policy</a>
+      </p>
     </div>
   );
 }

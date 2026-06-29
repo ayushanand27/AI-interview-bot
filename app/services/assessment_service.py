@@ -6,11 +6,18 @@ import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.exceptions import ConflictException, NotFoundException
 from app.db.interview_invite_model import InterviewInvite
-from app.schemas.recruiter_assessment import CreateAssessmentRequest, CreateAssessmentResponse
+from app.schemas.recruiter_assessment import (
+    AssessmentSummary,
+    CreateAssessmentRequest,
+    CreateAssessmentResponse,
+    UpdateAssessmentRequest,
+)
 from app.services.groq_client import get_groq_client
 
 
@@ -200,4 +207,81 @@ class AssessmentService:
             token=token,
             invite_link=invite_link,
             questions_preview=questions,
+        )
+
+    async def list_assessments(self, recruiter_id: int) -> list[AssessmentSummary]:
+        result = await self.db.execute(
+            select(InterviewInvite)
+            .where(InterviewInvite.recruiter_id == recruiter_id)
+            .order_by(InterviewInvite.created_at.desc())
+        )
+        now = datetime.now(timezone.utc)
+        summaries: list[AssessmentSummary] = []
+        for row in result.scalars().all():
+            jd_lines = row.jd_text.strip().splitlines()
+            role_preview = (jd_lines[0][:80] if jd_lines else "Assessment").strip()
+            questions = list(row.questions_json or [])
+            summaries.append(
+                AssessmentSummary(
+                    token=row.token,
+                    invite_link=f"/interview/invite/{row.token}",
+                    role_preview=role_preview,
+                    difficulty=row.difficulty,
+                    question_count=len(questions),
+                    expiry_at=row.expiry_at,
+                    used_count=row.used_count,
+                    max_uses=row.max_uses,
+                    created_at=row.created_at,
+                    is_expired=row.expiry_at <= now,
+                )
+            )
+        return summaries
+
+    async def delete_assessment(self, recruiter_id: int, token: str) -> None:
+        result = await self.db.execute(
+            select(InterviewInvite).where(InterviewInvite.token == token)
+        )
+        invite = result.scalar_one_or_none()
+        if invite is None or invite.recruiter_id != recruiter_id:
+            raise NotFoundException("Assessment not found")
+        if invite.used_count > 0:
+            raise ConflictException(
+                "Cannot delete an assessment that has already been used by a candidate."
+            )
+        await self.db.delete(invite)
+        await self.db.commit()
+
+    async def update_assessment(
+        self,
+        recruiter_id: int,
+        token: str,
+        data: UpdateAssessmentRequest,
+    ) -> AssessmentSummary:
+        result = await self.db.execute(
+            select(InterviewInvite).where(InterviewInvite.token == token)
+        )
+        invite = result.scalar_one_or_none()
+        if invite is None or invite.recruiter_id != recruiter_id:
+            raise NotFoundException("Assessment not found")
+        if data.expiry_hours is not None:
+            invite.expiry_at = datetime.now(timezone.utc) + timedelta(
+                hours=data.expiry_hours
+            )
+        await self.db.commit()
+        await self.db.refresh(invite)
+        now = datetime.now(timezone.utc)
+        jd_lines = invite.jd_text.strip().splitlines()
+        role_preview = (jd_lines[0][:80] if jd_lines else "Assessment").strip()
+        questions = list(invite.questions_json or [])
+        return AssessmentSummary(
+            token=invite.token,
+            invite_link=f"/interview/invite/{invite.token}",
+            role_preview=role_preview,
+            difficulty=invite.difficulty,
+            question_count=len(questions),
+            expiry_at=invite.expiry_at,
+            used_count=invite.used_count,
+            max_uses=invite.max_uses,
+            created_at=invite.created_at,
+            is_expired=invite.expiry_at <= now,
         )

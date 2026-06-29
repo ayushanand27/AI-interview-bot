@@ -1,5 +1,7 @@
 """Schemas for recruiter JD-based assessment creation."""
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -49,3 +51,30 @@ class CreateAssessmentResponse(BaseModel):
 
 class ParseJdPdfResponse(BaseModel):
     jd_text: str
+
+
+class AssessmentSummary(BaseModel):
+    token: str
+    invite_link: str
+    role_preview: str
+    difficulty: str
+    question_count: int
+    expiry_at: datetime
+    used_count: int
+    max_uses: int
+    created_at: datetime
+    is_expired: bool
+
+
+class UpdateAssessmentRequest(BaseModel):
+    expiry_hours: int | None = None
+
+    @field_validator("expiry_hours")
+    @classmethod
+    def validate_expiry_hours(cls, v: int | None) -> int | None:
+        if v is None:
+            return v
+        if v not in (24, 48, 72, 168):
+            raise ValueError("expiry_hours must be 24, 48, 72, or 168")
+        return v
+
