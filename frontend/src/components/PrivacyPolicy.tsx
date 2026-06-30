@@ -5,14 +5,14 @@ export default function PrivacyPolicy() {
     <div className="recruiter-portal">
       <header>
         <h1>Privacy Policy</h1>
-        <p>SmartSkale AI Interview Platform — last updated June 2026</p>
+        <p>AI Interview Bot — last updated June 2026</p>
       </header>
 
       <div className="rp-card rp-card-wide rp-card-spacing">
         <section className="privacy-section">
           <h2>Overview</h2>
           <p>
-            SmartSkale helps recruiters run AI-assisted technical interviews and
+            AI Interview Bot helps recruiters run AI-assisted technical interviews and
             review candidate performance. This policy describes what data we
             collect, how we use it, and your choices.
           </p>
@@ -85,7 +85,7 @@ export default function PrivacyPolicy() {
           <h2>Contact</h2>
           <p>
             For privacy questions, contact the organization operating this
-            SmartSkale instance or email the address shown on your interview
+            this platform or email the address shown on your interview
             invite.
           </p>
         </section>

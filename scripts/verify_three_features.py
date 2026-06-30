@@ -17,7 +17,7 @@ BASE = "http://127.0.0.1:8080"
 ROOT = Path(__file__).resolve().parents[1]
 RESUME = ROOT / "test_resume.pdf"
 UPLOADS = ROOT / "uploads"
-DB = ROOT / "smartskale.db"
+DB = ROOT / "interview_bot.db"
 OUT = ROOT / "scripts" / "verify_report.json"
 
 

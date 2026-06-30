@@ -1,5 +1,5 @@
 """
-AI Interview Engine - FastAPI application entry point.
+AI Interview Bot - FastAPI application entry point.
 
 Run locally:
     uvicorn app.main:app --reload
@@ -61,7 +61,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="AI Interview Engine",
+    title="AI Interview Bot",
     description=(
         "Backend API for AI-powered technical interviews. "
         "Flow: create session → generate questions → get current question → "
@@ -120,7 +120,7 @@ def health_check() -> dict[str, str]:
 @app.get("/", tags=["Health"])
 def root() -> dict[str, str]:
     return {
-        "message": "AI Interview Engine API",
+        "message": "AI Interview Bot API",
         "docs": "/docs",
         "api_prefix": "/api/v1",
     }

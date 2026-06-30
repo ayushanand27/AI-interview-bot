@@ -15,7 +15,7 @@ import httpx
 BASE = "http://127.0.0.1:8080"
 ROOT = Path(__file__).resolve().parents[1]
 PDF = ROOT / "test_resume.pdf"
-DB_PATH = ROOT / "smartskale.db"
+DB_PATH = ROOT / "interview_bot.db"
 
 
 def jdump(obj, max_len: int = 1200) -> str:

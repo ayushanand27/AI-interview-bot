@@ -12,7 +12,7 @@ import httpx
 
 BASE = "http://127.0.0.1:8080"
 PDF = Path(__file__).resolve().parents[1] / "test_resume.pdf"
-DB_PATH = Path(__file__).resolve().parents[1] / "smartskale.db"
+DB_PATH = Path(__file__).resolve().parents[1] / "interview_bot.db"
 
 
 def truncate(s: str, max_len: int = 400) -> str:
@@ -166,7 +166,7 @@ def main() -> None:
                 conn.close()
                 ok7 = row is not None
                 db_msg = str(row) if row else "No row for session_id"
-            results.append((7, "Session in smartskale.db", "PASS" if ok7 else "FAIL", db_msg))
+            results.append((7, "Session in interview_bot.db", "PASS" if ok7 else "FAIL", db_msg))
 
             # 8 — proctor health
             r8 = client.get(f"{BASE}/proctor/health")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Full end-to-end API test suite for SmartSkale InterviewBot."""
+"""Full end-to-end API test suite for AI Interview Bot."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import requests
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = "http://127.0.0.1:8080"
-DB_PATH = ROOT / "smartskale.db"
+DB_PATH = ROOT / "interview_bot.db"
 RESUME_PDF = ROOT / "test_resume.pdf"
 RESULTS_PATH = ROOT / "test_results.txt"
 
@@ -113,7 +113,7 @@ def save_results() -> None:
     passed = len([r for r in results if r.startswith("PASS")])
     failed = len([r for r in results if r.startswith("FAIL")])
     with RESULTS_PATH.open("w", encoding="utf-8") as f:
-        f.write("SmartSkale InterviewBot - Full Test Results\n")
+        f.write("AI Interview Bot - Full Test Results\n")
         f.write("=" * 50 + "\n\n")
         f.write(f"TOTAL: {passed} PASS, {failed} FAIL\n\n")
         for r in results:

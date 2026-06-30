@@ -322,7 +322,7 @@ export default function RecruiterDashboard({
   return (
     <div className="recruiter-portal">
       <header>
-        <h1>SmartSkale — Recruiter Portal</h1>
+        <h1>AI Interview Bot — Recruiter Portal</h1>
         <p>Create assessments and review completed interviews.</p>
         {onLogout && (
           <button

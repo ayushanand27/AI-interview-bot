@@ -1,4 +1,4 @@
-# SmartSkale InterviewBot
+# AI Interview Bot
 
 ## Live Demo
 
@@ -221,7 +221,7 @@ DATABASE_URL=postgresql+asyncpg://interview:interview@127.0.0.1:5433/interview_b
 - `password authentication failed` on port 5432 → you are hitting the wrong Postgres; use port **5433** as above.
 - Windows **User** environment variable `DATABASE_URL` overrides `.env` — remove it or set it to the same `5433` URL.
 
-**SQLite fallback** (no Docker): use `DATABASE_URL=sqlite+aiosqlite:///./smartskale.db` in `.env` and run `python scripts/bootstrap_db.py`.
+**SQLite fallback** (no Docker): use `DATABASE_URL=sqlite+aiosqlite:///./interview_bot.db` in `.env` and run `python scripts/bootstrap_db.py`.
 
 ### Install ffmpeg (for MP4 recording conversion)
 
@@ -302,7 +302,7 @@ python scripts/live_deploy_test.py
 | GROQ_WHISPER_MODEL | Audio transcription | whisper-large-v3 |
 | OPENAI_API_KEY | Optional legacy (not required with Groq) | sk-... |
 | SECRET_KEY | JWT signing | random 32 chars |
-| DATABASE_URL | Database connection | `postgresql+asyncpg://interview:interview@127.0.0.1:5433/interview_bot` (local Docker) or `sqlite+aiosqlite:///./smartskale.db` |
+| DATABASE_URL | Database connection | `postgresql+asyncpg://interview:interview@127.0.0.1:5433/interview_bot` (local Docker) or `sqlite+aiosqlite:///./interview_bot.db` |
 | ALLOWED_ORIGINS | Frontend URL | http://localhost:5173 |
 | SMTP_EMAIL | Gmail for emails | you@gmail.com |
 | SMTP_PASSWORD | Gmail App Password | 16 char app password |
@@ -312,7 +312,7 @@ python scripts/live_deploy_test.py
 ### Gmail App Password Setup
 1. Enable 2FA on Gmail account
 2. Go to myaccount.google.com/apppasswords
-3. Create app password for "SmartSkale"
+3. Create app password for "AI Interview Bot"
 4. Use the 16-character password in SMTP_PASSWORD
 
 ---
@@ -389,7 +389,7 @@ python scripts/bootstrap_db.py
 SQLite keeps the free-tier instance simple (no extra DB server):
 
 ```
-DATABASE_URL=sqlite+aiosqlite:////var/www/ai-interview-bot/data/smartskale.db
+DATABASE_URL=sqlite+aiosqlite:////var/www/ai-interview-bot/data/interview_bot.db
 ```
 
 ### Production (managed PostgreSQL)
@@ -527,7 +527,7 @@ Paste these into `/var/www/ai-interview-bot/.env` after setup. Values match `.en
 | Variable | Example / notes |
 |---|---|
 | `SECRET_KEY` | `openssl rand -hex 32` |
-| `DATABASE_URL` | `sqlite+aiosqlite:////var/www/ai-interview-bot/data/smartskale.db` (persistent path on EC2) |
+| `DATABASE_URL` | `sqlite+aiosqlite:////var/www/ai-interview-bot/data/interview_bot.db` (persistent path on EC2). **Already deployed?** If your server still uses `data/smartskale.db`, keep that path — do not rename the file. |
 | `GROQ_API_KEY` | Groq key — questions, judging, transcription |
 | `GROQ_MODEL` | e.g. `llama-3.1-8b-instant` |
 | `GROQ_WHISPER_MODEL` | e.g. `whisper-large-v3` |

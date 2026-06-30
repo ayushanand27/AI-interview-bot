@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     """
 
     # ── App ───────────────────────────────────────────────
-    APP_NAME: str = "AI Interview Platform"
+    APP_NAME: str = "AI Interview Bot"
     APP_ENV: str = "development"        # development | production
     DEBUG: bool = False
 

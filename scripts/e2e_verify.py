@@ -16,7 +16,7 @@ from pathlib import Path
 BASE = "http://127.0.0.1:8080"
 ROOT = Path(__file__).resolve().parents[1]
 RESUME = ROOT / "test_resume.pdf"
-DB_PATH = ROOT / "smartskale.db"
+DB_PATH = ROOT / "interview_bot.db"
 
 results: list[dict] = []
 

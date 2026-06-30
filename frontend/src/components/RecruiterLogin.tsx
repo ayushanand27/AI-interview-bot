@@ -63,7 +63,7 @@ export default function RecruiterLogin() {
   return (
     <div className="recruiter-portal">
       <header>
-        <h1>SmartSkale — Recruiter Portal</h1>
+        <h1>AI Interview Bot — Recruiter Portal</h1>
         <p>Sign in to create assessments and review completed interviews.</p>
       </header>
 

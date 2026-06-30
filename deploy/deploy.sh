@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Re-deploy / update SmartSkale InterviewBot on AWS EC2 after code changes.
+# Re-deploy / update AI Interview Bot on AWS EC2 after code changes.
 # Run from the app root: bash deploy/deploy.sh  (or ./deploy/deploy.sh if executable)
 
 set -euo pipefail

@@ -92,12 +92,12 @@ def send_verification_email(to_email: str, name: str, token: str):
     print(f"\n[EMAIL] Verification link for {to_email}:")
     print(f"[EMAIL] {link}\n")
 
-    subject = "Verify your SmartSkale account"
+    subject = f"Verify your {settings.APP_NAME} account"
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">Verify your email</h2>
         <p>Hello {name},</p>
-        <p>Please verify your email to activate your SmartSkale InterviewBot account.</p>
+        <p>Please verify your email to activate your {settings.APP_NAME} account.</p>
         <a href="{link}"
            style="background: #4F46E5; color: white; padding: 12px 24px;
                   text-decoration: none; border-radius: 6px; display: inline-block;">
@@ -124,7 +124,7 @@ def send_invite_welcome_password_email(to_email: str, name: str, token: str) -> 
     subject = "Your interview account is ready — set your password"
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Welcome to SmartSkale</h2>
+        <h2 style="color: #333;">Welcome to {settings.APP_NAME}</h2>
         <p>Hello {name},</p>
         <p>
             Your interview account has been created. Use the link below to set a password
@@ -152,12 +152,12 @@ def send_password_reset_email(to_email: str, name: str, token: str):
     print(f"\n[EMAIL] Password reset link for {to_email}:")
     print(f"[EMAIL] {link}\n")
 
-    subject = "Reset your SmartSkale password"
+    subject = f"Reset your {settings.APP_NAME} password"
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">Reset your password</h2>
         <p>Hello {name},</p>
-        <p>You requested to reset your SmartSkale password.</p>
+        <p>You requested to reset your {settings.APP_NAME} password.</p>
         <a href="{link}"
            style="background: #4F46E5; color: white; padding: 12px 24px;
                   text-decoration: none; border-radius: 6px; display: inline-block;">
@@ -211,7 +211,7 @@ def send_interview_report_email(
         {score_line}
         {integrity_line}
         <p style="color: #666; font-size: 14px;">
-            You can also view your results and recording when you log back into SmartSkale InterviewBot.
+            You can also view your results and recording when you log back into {settings.APP_NAME}.
         </p>
     </div>
     """

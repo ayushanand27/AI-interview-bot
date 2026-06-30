@@ -1,4 +1,4 @@
-SmartSkale InterviewBot - Full Test Results
+AI Interview Bot - Full Test Results
 ==================================================
 
 TOTAL: 51 PASS, 0 FAIL

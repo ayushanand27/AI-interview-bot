@@ -470,7 +470,7 @@ export default function App() {
   return (
     <div className="app">
       <header>
-        <h1>AI Interview Engine</h1>
+        <h1>AI Interview Bot</h1>
         <p>
           {isRecruiter
             ? "Recruiter dashboard — review completed interviews."

@@ -12,7 +12,7 @@ import requests
 
 BASE = "http://127.0.0.1:8080"
 ROOT = Path(__file__).resolve().parents[1]
-DB = ROOT / "smartskale.db"
+DB = ROOT / "interview_bot.db"
 RESUME = ROOT / "test_resume.pdf"
 
 results: list[dict] = []

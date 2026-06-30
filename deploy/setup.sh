@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time AWS EC2 (Ubuntu) setup for SmartSkale InterviewBot.
+# One-time AWS EC2 (Ubuntu) setup for AI Interview Bot.
 # Run on a fresh instance: chmod +x deploy/setup.sh && sudo ./deploy/setup.sh
 #
 # Before running:

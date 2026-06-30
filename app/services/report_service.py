@@ -395,7 +395,7 @@ def generate_candidate_report_pdf(
         display_score = round(sum(q_scores) / len(q_scores), 1) if q_scores else None
 
     # ── Page 1: Summary ─────────────────────────────────────
-    story.append(Paragraph("SmartSkale InterviewBot", styles["title"]))
+    story.append(Paragraph("AI Interview Bot", styles["title"]))
     story.append(Paragraph("Your Personal Interview Report", styles["heading"]))
     story.append(Spacer(1, 0.1 * inch))
     story.append(Paragraph(f"<b>Candidate Name:</b> {_escape(name)}", styles["body"]))

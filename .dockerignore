@@ -8,6 +8,6 @@ node_modules
 data/sessions
 *.db
 .env
-smartskale.db
+interview_bot.db
 terminals
 .cursor

@@ -230,7 +230,7 @@ def _load_session_from_json(session_id: UUID) -> Optional[InterviewSession]:
 def save_session_to_disk(session: InterviewSession) -> Path:
     """Persist session to the database."""
     _save_session_sync(session)
-    return PROJECT_ROOT / "smartskale.db"
+    return PROJECT_ROOT / "interview_bot.db"
 
 
 def load_session_from_disk(session_id: UUID) -> Optional[InterviewSession]:

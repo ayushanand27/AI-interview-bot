@@ -131,7 +131,7 @@ def _build_analyze_payload(
 
 @router.get("/")
 def root():
-    return {"service": "SmartSkale Eye Detection API", "status": "running"}
+    return {"service": "AI Interview Proctoring API", "status": "running"}
 
 
 @router.post("/analyze")
@@ -315,14 +315,14 @@ def health_check():
 
 
 mountable_app = FastAPI(
-    title="SmartSkale Eye Detection API",
+    title="AI Interview Proctoring API",
     description="Proctoring module — Task 5: Eye Movement Detection",
     version="1.0.0",
 )
 mountable_app.include_router(router)
 
 app = FastAPI(
-    title="SmartSkale Eye Detection API",
+    title="AI Interview Proctoring API",
     description="Proctoring module — Task 5: Eye Movement Detection",
     version="1.0.0",
 )

@@ -57,7 +57,7 @@ def main() -> int:
 
     # ── Infrastructure ─────────────────────────────────────────────
     r = requests.get(f"{BASE}/", timeout=30)
-    test("Frontend HTML loads", r.status_code == 200 and "AI Interview Engine" in r.text)
+    test("Frontend HTML loads", r.status_code == 200 and "AI Interview Bot" in r.text)
 
     r = requests.get(f"{BASE}/health", timeout=15)
     test("Backend /health", r.status_code == 200 and r.json().get("status") == "ok")
