@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Re-deploy / update SmartSkale InterviewBot on AWS EC2 after code changes.
-# Run from the app root: chmod +x deploy/deploy.sh && ./deploy/deploy.sh
+# Run from the app root: bash deploy/deploy.sh  (or ./deploy/deploy.sh if executable)
 
 set -euo pipefail
 
@@ -19,8 +19,9 @@ else
   fi
 fi
 
-echo "==> Pulling latest code..."
-git pull origin main
+echo "==> Pulling latest code (discard tracked local drift on server)..."
+git fetch origin main
+git reset --hard origin/main
 
 echo "==> Activating virtual environment..."
 # shellcheck disable=SC1091
