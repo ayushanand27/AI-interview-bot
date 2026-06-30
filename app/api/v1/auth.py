@@ -63,6 +63,7 @@ async def register(
             user=UserResponse.model_validate(result["user"]),
             access_token=result["access_token"],
             refresh_token=result["refresh_token"],
+            verification_url=result.get("verification_url"),
         )
     )
 
@@ -234,4 +235,8 @@ async def resend_verification(
     db: AsyncSession = Depends(get_db),
 ):
     service = AuthService(db)
-    return await service.resend_verification(data.email)
+    result = await service.resend_verification(data.email)
+    return MessageResponse(
+        message=result["message"],
+        verification_url=result.get("verification_url"),
+    )

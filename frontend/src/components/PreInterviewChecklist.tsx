@@ -33,6 +33,46 @@ async function requestDocumentFullscreen(): Promise<void> {
   }
 }
 
+function getMediaErrorMessage(err: unknown): string {
+  if (!window.isSecureContext) {
+    return (
+      "Camera and microphone require HTTPS or localhost. " +
+      "On EC2 without SSL, use http://127.0.0.1:5173 locally to test, " +
+      "or add HTTPS to your server for production interviews."
+    );
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return "Your browser does not support camera access. Try Chrome or Edge.";
+  }
+  if (err instanceof DOMException) {
+    switch (err.name) {
+      case "NotAllowedError":
+      case "PermissionDeniedError":
+        return (
+          "Permission denied. Click the lock or camera icon in your browser's " +
+          "address bar, allow camera and microphone, then click Grant again."
+        );
+      case "NotFoundError":
+      case "DevicesNotFoundError":
+        return "No camera or microphone found. Connect a device and try again.";
+      case "NotReadableError":
+      case "TrackStartError":
+        return (
+          "Camera or microphone is busy. Close other apps using the camera " +
+          "(Zoom, Teams, etc.) and try again."
+        );
+      case "SecurityError":
+        return (
+          "Browser blocked camera access on this connection. " +
+          "Use https:// or test on http://localhost / http://127.0.0.1."
+        );
+      default:
+        return err.message || "Could not access camera or microphone.";
+    }
+  }
+  return "Camera and microphone access are required for the interview.";
+}
+
 export default function PreInterviewChecklist({
   sessionId,
   onReady,
@@ -67,6 +107,7 @@ export default function PreInterviewChecklist({
 
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const streamTransferredRef = useRef(false);
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
 
   async function runEnvironmentScan() {
     setChecking(true);
@@ -85,6 +126,20 @@ export default function PreInterviewChecklist({
   useEffect(() => {
     if (!cameraGranted) return;
     void runEnvironmentScan();
+  }, [cameraGranted]);
+
+  useEffect(() => {
+    const video = previewVideoRef.current;
+    const stream = mediaStreamRef.current;
+    if (video && stream && cameraGranted) {
+      video.srcObject = stream;
+      void video.play().catch(() => {
+        /* autoplay may need user gesture; stream is still valid */
+      });
+    }
+    return () => {
+      if (video) video.srcObject = null;
+    };
   }, [cameraGranted]);
 
   useEffect(() => {
@@ -179,17 +234,31 @@ export default function PreInterviewChecklist({
   async function grantCameraAccess() {
     setRequestingCamera(true);
     setCameraError(null);
+
+    if (!window.isSecureContext) {
+      setCameraGranted(false);
+      setCameraError(getMediaErrorMessage(null));
+      setRequestingCamera(false);
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraGranted(false);
+      setCameraError(getMediaErrorMessage(null));
+      setRequestingCamera(false);
+      return;
+    }
+
     try {
       mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: { facingMode: "user" },
         audio: true,
       });
       mediaStreamRef.current = stream;
       setCameraGranted(true);
-    } catch {
+    } catch (err) {
       setCameraGranted(false);
-      setCameraError("Camera and microphone access are required for the interview");
+      setCameraError(getMediaErrorMessage(err));
     } finally {
       setRequestingCamera(false);
     }
@@ -225,9 +294,24 @@ export default function PreInterviewChecklist({
         <section>
           <h3 className="checklist-step-title">Step 1 — Camera &amp; audio access</h3>
           {cameraGranted ? (
-            <div className="alert success alert-flush">Camera &amp; Audio: Ready</div>
+            <>
+              <div className="alert success alert-flush">Camera &amp; Audio: Ready</div>
+              <video
+                ref={previewVideoRef}
+                className="checklist-preview-video"
+                autoPlay
+                playsInline
+                muted
+              />
+            </>
           ) : (
             <>
+              {!window.isSecureContext && (
+                <div className="alert warning alert-flush">
+                  This page is not on HTTPS. Browsers block camera access on plain HTTP
+                  (except localhost). Test locally or add SSL to your server.
+                </div>
+              )}
               <button
                 type="button"
                 className="primary"

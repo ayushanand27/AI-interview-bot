@@ -177,6 +177,7 @@ export default function App() {
   );
   const [resendStatus, setResendStatus] = useState<string | null>(null);
   const [resendLoading, setResendLoading] = useState(false);
+  const [devVerificationUrl, setDevVerificationUrl] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] =
     useState<CurrentQuestionResponse | null>(null);
@@ -217,6 +218,7 @@ export default function App() {
     refreshToken: string;
     user: UserResponse;
     justRegistered?: boolean;
+    verificationUrl?: string | null;
   }) {
     setAccessTokenState(payload.accessToken);
     setRefreshToken(payload.refreshToken);
@@ -224,6 +226,7 @@ export default function App() {
     setResendStatus(null);
     setError(null);
     setServerError(false);
+    setDevVerificationUrl(payload.verificationUrl ?? null);
 
     const afterPasswordReset =
       sessionStorage.getItem(PASSWORD_RESET_DONE_KEY) === "1";
@@ -248,12 +251,6 @@ export default function App() {
     );
   }
 
-  function dismissRegisterVerificationNotice() {
-    sessionStorage.setItem(DISMISS_REGISTER_VERIFY_KEY, "1");
-    setRegisterVerificationNotice(false);
-    setResendStatus(null);
-  }
-
   async function handleResendVerification() {
     if (!user?.email) return;
     setResendLoading(true);
@@ -261,7 +258,9 @@ export default function App() {
     try {
       const result = await authApi.resendVerification(user.email);
       setResendStatus(result.message);
-      dismissRegisterVerificationNotice();
+      if (result.verification_url) {
+        setDevVerificationUrl(result.verification_url);
+      }
     } catch (err) {
       setResendStatus(
         err instanceof Error ? err.message : "Failed to send verification email",
@@ -284,7 +283,7 @@ export default function App() {
     sessionStorage.removeItem(REGISTER_VERIFY_NOTICE_KEY);
     sessionStorage.removeItem(DISMISS_REGISTER_VERIFY_KEY);
     setRegisterVerificationNotice(false);
-    setResendStatus(null);
+    setDevVerificationUrl(null);
     setError(null);
     setServerError(false);
   }
@@ -452,6 +451,43 @@ export default function App() {
   const needsEmailVerification =
     isLoggedIn && user?.role === "candidate" && user.is_verified === false;
 
+  useEffect(() => {
+    if (!accessToken || user?.role !== "candidate" || user.is_verified !== false) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function syncVerificationStatus() {
+      try {
+        const me = await authApi.me();
+        if (cancelled || !me.data.is_verified) return;
+        setUser(me.data);
+        sessionStorage.removeItem(REGISTER_VERIFY_NOTICE_KEY);
+        sessionStorage.setItem(DISMISS_REGISTER_VERIFY_KEY, "1");
+        setRegisterVerificationNotice(false);
+        setDevVerificationUrl(null);
+        setResendStatus(null);
+      } catch {
+        /* ignore transient errors while polling */
+      }
+    }
+
+    void syncVerificationStatus();
+
+    const onResume = () => void syncVerificationStatus();
+    window.addEventListener("focus", onResume);
+    document.addEventListener("visibilitychange", onResume);
+    const intervalId = window.setInterval(() => void syncVerificationStatus(), 5000);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onResume);
+      document.removeEventListener("visibilitychange", onResume);
+      window.clearInterval(intervalId);
+    };
+  }, [accessToken, user?.role, user?.is_verified]);
+
   if (serverError && !isLoggedIn) {
     return (
       <div className="app">
@@ -493,23 +529,25 @@ export default function App() {
 
       {registerVerificationNotice && (
         <div className="alert warning">
-          Account created! Please check your email to verify your account.{" "}
+          <p>
+            Account created! Check your inbox for a verification link. This page
+            updates automatically after you verify.
+          </p>
           <button
             type="button"
             className="link-button"
             onClick={() => void handleResendVerification()}
             disabled={resendLoading}
+            style={{ marginTop: "0.5rem" }}
           >
             {resendLoading ? "Sending…" : "Resend verification email"}
           </button>
-          <button
-            type="button"
-            className="link-button"
-            onClick={dismissRegisterVerificationNotice}
-            style={{ marginLeft: "0.75rem" }}
-          >
-            Dismiss
-          </button>
+          {devVerificationUrl && (
+            <p className="invite-meta" style={{ marginTop: "0.75rem", wordBreak: "break-all" }}>
+              Local dev link:{" "}
+              <a href={devVerificationUrl}>{devVerificationUrl}</a>
+            </p>
+          )}
           {resendStatus && (
             <span style={{ display: "block", marginTop: "0.5rem" }}>
               {resendStatus}
@@ -546,17 +584,25 @@ export default function App() {
         <div className="card status-panel">
           <h2 className="section-title">Verify your email</h2>
           <p className="invite-meta">
-            Please verify your email before starting an interview. We sent a
-            link to <strong>{user?.email}</strong>.
+            We sent a verification link to <strong>{user?.email}</strong>. Open
+            it in your email, then return here — your account will unlock
+            automatically.
           </p>
           <button
             type="button"
             className="primary"
+            style={{ marginTop: "1rem" }}
             onClick={() => void handleResendVerification()}
             disabled={resendLoading}
           >
             {resendLoading ? "Sending…" : "Resend verification email"}
           </button>
+          {devVerificationUrl && (
+            <p className="invite-meta" style={{ marginTop: "1rem", wordBreak: "break-all" }}>
+              Local dev — click to verify:{" "}
+              <a href={devVerificationUrl}>{devVerificationUrl}</a>
+            </p>
+          )}
           {resendStatus && (
             <p className="invite-meta" style={{ marginTop: "1rem" }}>
               {resendStatus}

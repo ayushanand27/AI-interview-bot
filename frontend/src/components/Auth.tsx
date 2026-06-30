@@ -9,6 +9,7 @@ export interface AuthSuccess {
   refreshToken: string;
   user: UserResponse;
   justRegistered?: boolean;
+  verificationUrl?: string | null;
 }
 
 interface AuthProps {
@@ -74,6 +75,7 @@ export default function Auth({
         refreshToken: res.data.refresh_token,
         user: res.data.user,
         justRegistered: true,
+        verificationUrl: res.data.verification_url,
       });
     } catch (err) {
       onError(err instanceof Error ? err.message : "Registration failed");

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-
-const API_BASE = import.meta.env.VITE_API_URL || "";
+import { authApi } from "../api/client";
 
 type Status = "loading" | "success" | "error";
 
@@ -22,35 +21,31 @@ export default function VerifyEmail() {
 
     async function verify(verificationToken: string) {
       try {
-        const response = await fetch(
-          `${API_BASE}/api/v1/auth/verify-email?token=${encodeURIComponent(verificationToken)}`,
-        );
-        const data = (await response.json()) as {
-          success?: boolean;
-          message?: string;
-          detail?: string;
-        };
+        const result = await authApi.verifyEmail(verificationToken);
 
         if (cancelled) return;
 
-        if (response.ok && data.success) {
+        if (result.success) {
           sessionStorage.setItem("ss_dismiss_register_verify", "1");
           sessionStorage.removeItem("ss_register_verify_notice");
           setStatus("success");
-          setMessage(data.message || "Email verified successfully!");
+          setMessage(result.message || "Email verified successfully!");
+          window.setTimeout(() => {
+            window.location.href = "/";
+          }, 2000);
           return;
         }
 
         setStatus("error");
-        setMessage(
-          data.detail ||
-            data.message ||
-            "Invalid or expired verification link",
-        );
-      } catch {
+        setMessage(result.message || "Invalid or expired verification link");
+      } catch (err) {
         if (!cancelled) {
           setStatus("error");
-          setMessage("Something went wrong. Please try again.");
+          setMessage(
+            err instanceof Error
+              ? err.message
+              : "Something went wrong. Please try again.",
+          );
         }
       }
     }
@@ -77,6 +72,9 @@ export default function VerifyEmail() {
         <div className="card status-panel" style={{ textAlign: "center", padding: "40px", maxWidth: "560px", margin: "0 auto" }}>
           <h2 style={{ color: "#86efac" }}>Email Verified!</h2>
           <p>{message || "Your email has been verified successfully."}</p>
+          <p className="invite-meta" style={{ marginTop: "0.75rem" }}>
+            Redirecting you to the app…
+          </p>
           <button
             type="button"
             onClick={() => {
@@ -85,7 +83,7 @@ export default function VerifyEmail() {
             className="primary"
             style={{ marginTop: "16px" }}
           >
-            Go to Login
+            Continue to app
           </button>
         </div>
       </div>

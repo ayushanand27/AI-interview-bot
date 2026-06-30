@@ -17,6 +17,7 @@ export interface UserResponse {
 
 export interface MessageResponse {
   message: string;
+  verification_url?: string | null;
 }
 
 export interface VerifyEmailResponse {
@@ -29,6 +30,7 @@ export interface RegisterResponse {
   access_token: string;
   refresh_token: string;
   token_type?: string;
+  verification_url?: string | null;
 }
 
 export interface ApiEnvelope<T> {

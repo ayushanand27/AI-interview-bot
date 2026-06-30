@@ -82,6 +82,7 @@ class ResetPasswordRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+    verification_url: str | None = None
 
 
 class VerifyEmailResponse(BaseModel):
@@ -89,10 +90,10 @@ class VerifyEmailResponse(BaseModel):
     message: str
 
 
-# ── Register Response ─────────────────────────────────────
 class RegisterResponse(BaseModel):
     """Returned after successful registration."""
     user: UserResponse
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    verification_url: str | None = None

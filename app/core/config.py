@@ -102,6 +102,14 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.APP_ENV.strip().lower() == "production"
 
+    @property
+    def effective_frontend_url(self) -> str:
+        """Frontend base URL for email links — loopback in local dev."""
+        url = self.FRONTEND_URL.rstrip("/")
+        if not self.is_production:
+            return "http://127.0.0.1:5173"
+        return url
+
     def sql_echo(self) -> bool:
         """Log SQL queries only in non-production when DEBUG is enabled."""
         if self.is_production:

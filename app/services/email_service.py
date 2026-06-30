@@ -86,8 +86,8 @@ def _send_email_with_attachment(
         return False
 
 
-def send_verification_email(to_email: str, name: str, token: str):
-    link = f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={token}"
+def send_verification_email(to_email: str, name: str, token: str) -> str:
+    link = f"{settings.effective_frontend_url}/verify-email?token={token}"
 
     print(f"\n[EMAIL] Verification link for {to_email}:")
     print(f"[EMAIL] {link}\n")
@@ -112,11 +112,12 @@ def send_verification_email(to_email: str, name: str, token: str):
     </div>
     """
     _send_email(to_email, subject, html)
+    return link
 
 
 def send_invite_welcome_password_email(to_email: str, name: str, token: str) -> bool:
     """Send invite candidates a link to set their password after auto-registration."""
-    link = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
+    link = f"{settings.effective_frontend_url}/reset-password?token={token}"
 
     print(f"\n[EMAIL] Invite welcome / set-password link for {to_email}:")
     print(f"[EMAIL] {link}\n")
@@ -147,7 +148,7 @@ def send_invite_welcome_password_email(to_email: str, name: str, token: str) -> 
 
 
 def send_password_reset_email(to_email: str, name: str, token: str):
-    link = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
+    link = f"{settings.effective_frontend_url}/reset-password?token={token}"
 
     print(f"\n[EMAIL] Password reset link for {to_email}:")
     print(f"[EMAIL] {link}\n")

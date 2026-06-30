@@ -122,9 +122,16 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
           videoRef.current.srcObject = stream;
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (!cancelled) {
-          setError("Could not access webcam for selfie capture.");
+          const insecure = !window.isSecureContext;
+          setError(
+            insecure
+              ? "Webcam requires HTTPS or localhost. Open http://127.0.0.1:5173 (not your LAN IP) for local testing."
+              : err instanceof Error
+                ? err.message
+                : "Could not access webcam for selfie capture.",
+          );
         }
       });
 
@@ -218,11 +225,16 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
   function captureSelfie() {
     const video = videoRef.current;
     if (!video) return;
+    const w = video.videoWidth || 640;
+    const h = video.videoHeight || 480;
     const canvas = document.createElement("canvas");
-    canvas.width = 320;
-    canvas.height = 240;
+    canvas.width = Math.min(w, 1280);
+    canvas.height = Math.min(h, Math.round((canvas.width * h) / w));
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    // Mirror capture to match typical front-camera preview.
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
     setSelfiePreview(dataUrl);
@@ -491,8 +503,8 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
             <div className="invite-identity-panel">
               <h3>ID Document</h3>
               <p>
-                Upload a photo of your government ID (Aadhaar Card, PAN Card,
-                Passport, or Driving License)
+                Upload a clear photo of your government ID (Aadhaar, PAN, Passport, or
+                Driving License). Your face must be visible and not too small in the image.
               </p>
               <input
                 ref={idInputRef}
@@ -523,7 +535,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
 
             <div className="invite-identity-panel">
               <h3>Live Selfie</h3>
-              <p>Take a selfie using your webcam</p>
+              <p>Take a selfie in good lighting, facing the camera directly.</p>
               {!selfiePreview ? (
                 <>
                   <video
@@ -545,7 +557,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
               ) : (
                 <>
                   <img
-                    className="invite-preview invite-selfie-video"
+                    className="invite-preview"
                     src={selfiePreview}
                     alt="Selfie preview"
                   />
@@ -571,6 +583,12 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
           >
             {verifying ? "Verifying your identity…" : "Verify My Identity"}
           </button>
+
+          {verifyMessage && identityVerified && (
+            <div className="alert warning" style={{ marginTop: "1rem" }}>
+              {verifyMessage}
+            </div>
+          )}
 
           {verifyMessage && !identityVerified && (
             <div className="alert error" style={{ marginTop: "1rem" }}>

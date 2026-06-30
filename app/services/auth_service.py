@@ -26,6 +26,7 @@ from app.services.email_service import (
     send_password_reset_email,
     send_verification_email,
 )
+from app.core.config import settings
 
 
 class AuthService:
@@ -68,7 +69,9 @@ class AuthService:
         self.db.add(user)
         await self.db.flush()   # flush assigns the auto-generated ID without full commit
 
-        send_verification_email(user.email, user.full_name, verification_token)
+        verification_url = send_verification_email(
+            user.email, user.full_name, verification_token
+        )
 
         # ── Step 4: Generate tokens with new user's ID ────
         access_token = create_access_token(user_id=user.id, role=user.role.value)
@@ -78,6 +81,7 @@ class AuthService:
             "user": user,
             "access_token": access_token,
             "refresh_token": refresh_token,
+            "verification_url": verification_url if not settings.is_production else None,
         }
 
     async def login(self, data: LoginRequest) -> dict:
@@ -211,13 +215,18 @@ class AuthService:
         result = await self.db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
         if not user:
-            return {"message": "Verification email sent"}
+            return {"message": "Verification email sent", "verification_url": None}
 
         if user.is_verified:
-            return {"message": "Already verified"}
+            return {"message": "Already verified", "verification_url": None}
 
         verification_token = str(uuid4())
         user.verification_token = verification_token
         user.verification_token_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
-        send_verification_email(user.email, user.full_name, verification_token)
-        return {"message": "Verification email sent"}
+        verification_url = send_verification_email(
+            user.email, user.full_name, verification_token
+        )
+        return {
+            "message": "Verification email sent",
+            "verification_url": verification_url if not settings.is_production else None,
+        }

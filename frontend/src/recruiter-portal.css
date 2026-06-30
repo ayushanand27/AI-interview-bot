@@ -94,6 +94,15 @@
   font: inherit;
 }
 
+.recruiter-portal select {
+  color-scheme: dark;
+}
+
+.recruiter-portal select option {
+  background-color: #151a22;
+  color: #f5f7fb;
+}
+
 .recruiter-portal input:focus,
 .recruiter-portal select:focus,
 .recruiter-portal textarea:focus {
