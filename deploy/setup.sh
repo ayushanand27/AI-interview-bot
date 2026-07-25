@@ -36,6 +36,8 @@ apt-get install -y \
   curl \
   ffmpeg \
   libgl1 \
+  libgles2 \
+  libegl1 \
   libglib2.0-0 \
   libsm6 \
   libxext6 \
