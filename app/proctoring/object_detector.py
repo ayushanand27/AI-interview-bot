@@ -16,7 +16,6 @@ from __future__ import annotations
 import logging
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -37,7 +36,6 @@ _init_error: str | None = None
 _init_failed_at: float | None = None
 _lock = Lock()
 _last_run_by_session: dict[str, float] = {}
-_predict_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="yolo-phone")
 INIT_RETRY_SECONDS = 30.0
 
 
@@ -154,7 +152,7 @@ class ProhibitedObjectDetector:
         if frame is None or frame.size == 0:
             return []
 
-        def _run() -> list[dict[str, Any]]:
+        try:
             results = self._model.predict(
                 frame,
                 verbose=False,
@@ -164,38 +162,34 @@ class ProhibitedObjectDetector:
                 device="cpu",
                 max_det=5,
             )
-
-            hits: list[dict[str, Any]] = []
-            for result in results:
-                boxes = result.boxes
-                if boxes is None:
-                    continue
-                for box in boxes:
-                    cls_id = int(box.cls[0])
-                    if cls_id not in self._cell_phone_ids:
-                        continue
-                    confidence = float(box.conf[0])
-                    if confidence < CELL_PHONE_CONFIDENCE:
-                        continue
-                    label = result.names.get(cls_id, "cell phone")
-                    hits.append(
-                        {
-                            "label": label,
-                            "confidence": round(confidence, 2),
-                            "message": MSG_PROHIBITED_OBJECT,
-                        }
-                    )
-            return hits
-
-        try:
-            future = _predict_pool.submit(_run)
-            return future.result(timeout=YOLO_PREDICT_TIMEOUT_SECONDS)
-        except FuturesTimeout:
-            logger.warning(
-                "[proctor] YOLO phone detect timed out after %.1fs",
-                YOLO_PREDICT_TIMEOUT_SECONDS,
-            )
-            return []
         except Exception as exc:
+            print(f"[proctor] YOLO phone detect failed: {exc}", flush=True)
             logger.warning("[proctor] YOLO phone detect failed: %s", exc)
             return []
+
+        hits: list[dict[str, Any]] = []
+        for result in results:
+            boxes = result.boxes
+            if boxes is None:
+                continue
+            for box in boxes:
+                cls_id = int(box.cls[0])
+                if cls_id not in self._cell_phone_ids:
+                    continue
+                confidence = float(box.conf[0])
+                if confidence < CELL_PHONE_CONFIDENCE:
+                    continue
+                label = result.names.get(cls_id, "cell phone")
+                hits.append(
+                    {
+                        "label": label,
+                        "confidence": round(confidence, 2),
+                        "message": MSG_PROHIBITED_OBJECT,
+                    }
+                )
+        if hits:
+            print(
+                f"[proctor] cell phone hit(s): {hits}",
+                flush=True,
+            )
+        return hits
