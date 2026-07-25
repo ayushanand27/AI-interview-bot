@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { proctorApi } from "../api/client";
 import {
   extensionBlockMessage,
+  pickPreferredCameraDeviceId,
   scanInterviewEnvironment,
   type DetectedExtension,
   type VirtualCameraResult,
@@ -250,8 +251,11 @@ export default function PreInterviewChecklist({
 
     try {
       mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+      const preferredId = await pickPreferredCameraDeviceId();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
+        video: preferredId
+          ? { deviceId: { ideal: preferredId }, facingMode: "user" }
+          : { facingMode: "user" },
         audio: true,
       });
       mediaStreamRef.current = stream;

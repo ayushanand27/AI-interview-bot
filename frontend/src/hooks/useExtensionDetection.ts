@@ -9,21 +9,8 @@ const KNOWN_RECORDING_EXTENSIONS: Record<string, string> = {
   jkpbjbdagkmhpibjgafbckclnkaaapca: "Awesome Screenshot",
 };
 
-const SUSPICIOUS_CAMERA_KEYWORDS = [
-  "virtual",
-  "obs",
-  "snap",
-  "screen",
-  "capture",
-  "manycam",
-  "droidcam",
-  "epoccam",
-  "camo",
-  "xsplit",
-];
-
 const SCREEN_CAPTURE_LABEL_RE =
-  /screen|display|monitor|window|capture|desktop/i;
+  /screen|display|monitor|window|desktop/i;
 
 export type VirtualCameraConfidence = "none" | "low" | "high";
 
@@ -81,53 +68,38 @@ function mergeExtensions(
   return Array.from(byId.values());
 }
 
+const EXPLICIT_VIRTUAL_CAMERA_RE =
+  /\b(obs|manycam|droidcam|epoccam|xsplit|snap\s*camera|camo|mmhmm|nvidia\s*broadcast|virtual\s*cam(?:era)?)\b/i;
+
 function labelLooksSuspicious(label: string): boolean {
-  const lower = label.toLowerCase();
-  return SUSPICIOUS_CAMERA_KEYWORDS.some((kw) => lower.includes(kw));
+  return EXPLICIT_VIRTUAL_CAMERA_RE.test(label);
 }
 
 function settingsLookVirtual(settings: MediaTrackSettingsEx | undefined): boolean {
   if (!settings) return false;
-  const { width, height, frameRate } = settings;
-  if (settings.displaySurface) return true;
-  const commonVirtualPairs: Array<[number, number]> = [
-    [640, 480],
-    [1280, 720],
-    [1920, 1080],
-  ];
-  if (
-    width &&
-    height &&
-    commonVirtualPairs.some(([w, h]) => width === w && height === h) &&
-    (frameRate === undefined || frameRate <= 15)
-  ) {
-    return true;
-  }
-  return false;
+  // displaySurface means getDisplayMedia / screen share — not a normal webcam.
+  return Boolean(settings.displaySurface);
 }
 
 function scoreVirtualCameraSignal(
   label: string | undefined,
   settings: MediaTrackSettingsEx | undefined,
-  hasPermission: boolean,
 ): number {
   let score = 0;
   const trimmed = label?.trim() ?? "";
 
   if (trimmed && labelLooksSuspicious(trimmed)) {
-    score += 60;
+    score += 80;
   }
   if (settings?.displaySurface) {
     score += 100;
   }
-  if (hasPermission && !trimmed) {
-    score += 45;
+  if (trimmed && SCREEN_CAPTURE_LABEL_RE.test(trimmed) && !labelLooksSuspicious(trimmed)) {
+    // "screen capture" style labels without explicit virtual-cam brands → soft signal only
+    score += 25;
   }
   if (settingsLookVirtual(settings)) {
-    score += 35;
-  }
-  if (trimmed && SCREEN_CAPTURE_LABEL_RE.test(trimmed)) {
-    score += 55;
+    score += 20;
   }
   return score;
 }
@@ -135,27 +107,46 @@ function scoreVirtualCameraSignal(
 function buildVirtualCameraResult(
   labels: string[],
   maxScore: number,
+  options: {
+    activeIsVirtual: boolean;
+    unusedVirtualDevices: string[];
+  },
 ): VirtualCameraResult {
-  const confidence: VirtualCameraConfidence =
-    maxScore >= 50 ? "high" : maxScore > 0 ? "low" : "none";
+  const { activeIsVirtual, unusedVirtualDevices } = options;
+  // Hard block only when the live stream is a virtual / screen-capture camera.
+  // Leftover drivers (e.g. uninstalled OBS still listed) are warn-only.
+  const blockRecommended = activeIsVirtual || maxScore >= 100;
+  const warnOnly =
+    !blockRecommended && (unusedVirtualDevices.length > 0 || maxScore > 0);
+  const confidence: VirtualCameraConfidence = blockRecommended
+    ? "high"
+    : warnOnly
+      ? "low"
+      : "none";
   const detected = confidence !== "none";
-  const blockRecommended = confidence === "high";
-  const warnOnly = confidence === "low";
 
   let message: string | null = null;
   if (blockRecommended) {
-    message = "Virtual camera detected — please use your real webcam";
+    message =
+      "Virtual camera is selected — switch to your real webcam (browser camera icon / site settings), then re-scan. If OBS was removed, restart the browser or reboot Windows so the old driver disappears.";
+  } else if (warnOnly && unusedVirtualDevices.length > 0) {
+    message =
+      "A virtual camera driver is still listed on this PC (often leftover OBS). You can continue if your live preview is the real webcam. To clear the warning: uninstall OBS Virtual Camera, then restart Chrome.";
   } else if (warnOnly) {
     message =
       "Your camera setup looks unusual — if you are using a virtual camera, switch to your real webcam";
   }
+
+  const deviceLabels = Array.from(
+    new Set([...labels, ...unusedVirtualDevices].filter(Boolean)),
+  );
 
   return {
     detected,
     confidence,
     blockRecommended,
     warnOnly,
-    deviceLabels: labels,
+    deviceLabels,
     message,
   };
 }
@@ -317,19 +308,25 @@ export async function detectVirtualCamera(
   activeStream?: MediaStream | null,
 ): Promise<VirtualCameraResult> {
   const suspiciousLabels: string[] = [];
+  const unusedVirtualDevices: string[] = [];
   let maxScore = 0;
-  const hasPermission = Boolean(activeStream);
+  let activeIsVirtual = false;
+  const activeLabels = new Set<string>();
 
   if (activeStream) {
     for (const track of activeStream.getVideoTracks()) {
-      const label = track.label?.trim();
+      const label = track.label?.trim() ?? "";
+      if (label) activeLabels.add(label);
       const settings = track.getSettings?.() as MediaTrackSettingsEx | undefined;
-      const score = scoreVirtualCameraSignal(label, settings, hasPermission);
+      const score = scoreVirtualCameraSignal(label || undefined, settings);
       maxScore = Math.max(maxScore, score);
-      if (label && score > 0 && !suspiciousLabels.includes(label)) {
-        suspiciousLabels.push(label);
-      } else if (!label && score > 0) {
-        suspiciousLabels.push("(unlabeled camera)");
+      if (score >= 80 || settings?.displaySurface) {
+        activeIsVirtual = true;
+        if (label && !suspiciousLabels.includes(label)) {
+          suspiciousLabels.push(label);
+        } else if (!label) {
+          suspiciousLabels.push("(unlabeled camera)");
+        }
       }
     }
   }
@@ -340,10 +337,14 @@ export async function detectVirtualCamera(
       for (const device of devices) {
         if (device.kind !== "videoinput") continue;
         const label = device.label?.trim();
-        const score = scoreVirtualCameraSignal(label, undefined, hasPermission);
-        maxScore = Math.max(maxScore, score);
-        if (label && score > 0 && !suspiciousLabels.includes(label)) {
-          suspiciousLabels.push(label);
+        if (!label) continue;
+        if (!labelLooksSuspicious(label)) continue;
+        // Device exists but is not the one currently streaming → soft warning only.
+        if (activeLabels.has(label)) {
+          activeIsVirtual = true;
+          if (!suspiciousLabels.includes(label)) suspiciousLabels.push(label);
+        } else if (!unusedVirtualDevices.includes(label)) {
+          unusedVirtualDevices.push(label);
         }
       }
     } catch {
@@ -351,7 +352,26 @@ export async function detectVirtualCamera(
     }
   }
 
-  return buildVirtualCameraResult(suspiciousLabels, maxScore);
+  return buildVirtualCameraResult(suspiciousLabels, maxScore, {
+    activeIsVirtual,
+    unusedVirtualDevices,
+  });
+}
+
+/** Prefer a physical webcam deviceId (skip OBS / virtual drivers when possible). */
+export async function pickPreferredCameraDeviceId(): Promise<string | undefined> {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) {
+    return undefined;
+  }
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter((d) => d.kind === "videoinput" && d.deviceId);
+    if (cams.length === 0) return undefined;
+    const real = cams.find((d) => !labelLooksSuspicious(d.label || ""));
+    return (real ?? cams[0]).deviceId;
+  } catch {
+    return undefined;
+  }
 }
 
 export function detectScreenSharingActive(

@@ -14,6 +14,7 @@ import type {
   CurrentQuestionResponse,
   EndInterviewResponse,
 } from "../types/interview";
+import { pickPreferredCameraDeviceId } from "../hooks/useExtensionDetection";
 import "../invite-flow.css";
 
 type InviteStep =
@@ -110,9 +111,16 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
     if (step !== "identity") return;
 
     let cancelled = false;
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: "user" }, audio: false })
-      .then((stream) => {
+    void (async () => {
+      try {
+        const preferredId = await pickPreferredCameraDeviceId();
+        if (cancelled) return;
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: preferredId
+            ? { deviceId: { ideal: preferredId }, facingMode: "user" }
+            : { facingMode: "user" },
+          audio: false,
+        });
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -121,8 +129,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         if (!cancelled) {
           const insecure = !window.isSecureContext;
           setError(
@@ -133,7 +140,8 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
                 : "Could not access webcam for selfie capture.",
           );
         }
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
