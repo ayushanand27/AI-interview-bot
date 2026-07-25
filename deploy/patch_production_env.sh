@@ -6,7 +6,7 @@
 #   bash deploy/patch_production_env.sh \
 #     --smtp-email you@gmail.com \
 #     --smtp-password 'your16charapppassword' \
-#     --frontend-url http://13.207.191.193
+#     --frontend-url https://ai-interview-bot.duckdns.org
 #
 # After domain + HTTPS:
 #   bash deploy/patch_production_env.sh --frontend-url https://yourdomain.com

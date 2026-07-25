@@ -10,7 +10,7 @@ from pathlib import Path
 
 import requests
 
-BASE = "http://13.207.191.193"
+BASE = os.environ.get("LIVE_BASE_URL", "https://ai-interview-bot.duckdns.org")
 ROOT = Path(__file__).resolve().parents[1]
 RESUME_PDF = ROOT / "test_resume.pdf"
 TIMEOUT = 120

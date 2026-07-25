@@ -8,14 +8,16 @@ frontend/.env.production
 .venv/
 venv/
 
-# Database file
+# Database / models (local artifacts)
 *.db
 *.sqlite3
-
-# Uploads / models
-uploads/
+smartskale.db
+interview_bot.db
 yolov8n.pt
 *.pt
+
+# Uploads
+uploads/
 
 # Python cache
 __pycache__/
@@ -36,7 +38,14 @@ frontend/tsconfig.tsbuildinfo
 .DS_Store
 Thumbs.db
 
-# Deploy logs / local secrets
+# Test / deploy artifacts (do not commit)
+test_results.txt
+test_candidate_report.pdf
+test_recruiter_report.pdf
+scripts/api_test_results.json
+scripts/e2e_results.json
+scripts/verify_report.json
+scripts/verify_report_sample.pdf
 deploy/*.log
 deploy/.secrets
 *.pem
