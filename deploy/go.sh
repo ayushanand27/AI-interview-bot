@@ -11,7 +11,7 @@
 #   bash deploy/go.sh \
 #     --smtp-email you@gmail.com \
 #     --smtp-password 'xxxx xxxx xxxx xxxx' \
-#     --frontend-url http://13.207.191.193
+#     --frontend-url https://ai-interview-bot.duckdns.org
 #
 # After domain HTTPS is configured:
 #   bash deploy/go.sh --frontend-url https://yourdomain.com
