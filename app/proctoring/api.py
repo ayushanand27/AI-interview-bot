@@ -147,6 +147,13 @@ def root():
     return {"service": "AI Interview Proctoring API", "status": "running"}
 
 
+@router.get("/object-detector")
+def object_detector_status():
+    from app.proctoring.object_detector import detector_status
+
+    return detector_status()
+
+
 @router.post("/analyze")
 @limiter.limit(PROCTOR_ANALYZE_LIMIT)
 def analyze_frame(request: Request, req: FrameRequest):
@@ -205,17 +212,9 @@ def analyze_frame(request: Request, req: FrameRequest):
                     phone_recorded = True
                     phone_alert = hit["message"]
         except ObjectDetectionUnavailableError as exc:
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "[proctor] Object detector unavailable: %s", exc
-            )
+            print(f"[proctor] Object detector unavailable: {exc}", flush=True)
         except Exception as exc:
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "[proctor] Object detection failed: %s", exc
-            )
+            print(f"[proctor] Object detection failed: {exc}", flush=True)
 
     return _build_analyze_payload(
         req.session_id,

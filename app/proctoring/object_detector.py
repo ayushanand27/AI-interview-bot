@@ -29,14 +29,16 @@ logger = logging.getLogger(__name__)
 CELL_PHONE_CONFIDENCE = 0.28
 OBJECT_DETECT_INTERVAL_SECONDS = 2.0
 YOLO_IMGSZ = 320
-YOLO_PREDICT_TIMEOUT_SECONDS = 8.0
+YOLO_PREDICT_TIMEOUT_SECONDS = 20.0
 MSG_PROHIBITED_OBJECT = "Cell phone detected near candidate — possible cheating aid"
 
 _detector = None
 _init_error: str | None = None
+_init_failed_at: float | None = None
 _lock = Lock()
 _last_run_by_session: dict[str, float] = {}
 _predict_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="yolo-phone")
+INIT_RETRY_SECONDS = 30.0
 
 
 class ObjectDetectionUnavailableError(Exception):
@@ -54,13 +56,23 @@ def _model_path() -> str:
 
 def get_object_detector():
     """Return a shared YOLO detector, initializing on first successful call."""
-    global _detector, _init_error
+    global _detector, _init_error, _init_failed_at
 
     with _lock:
-        if _init_error:
-            raise ObjectDetectionUnavailableError(_init_error)
         if _detector is not None:
             return _detector
+
+        # Allow retry after a cold failure (common on tiny VMs during first load).
+        if _init_error and _init_failed_at is not None:
+            if time.time() - _init_failed_at < INIT_RETRY_SECONDS:
+                raise ObjectDetectionUnavailableError(_init_error)
+            print(
+                f"[proctor] Retrying object detector after prior failure: {_init_error}",
+                flush=True,
+            )
+            _init_error = None
+            _init_failed_at = None
+
         try:
             # Keep inference on CPU and limit torch thread blow-up on tiny VMs.
             os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
@@ -71,10 +83,15 @@ def get_object_detector():
 
             model = YOLO(_model_path())
             _detector = ProhibitedObjectDetector(model)
+            _init_error = None
+            _init_failed_at = None
+            print(f"[proctor] YOLOv8n object detector loaded ({_model_path()})", flush=True)
             logger.info("[proctor] YOLOv8n object detector loaded (%s)", _model_path())
             return _detector
         except Exception as exc:
             _init_error = f"Failed to initialize object detector: {exc}"
+            _init_failed_at = time.time()
+            print(f"[proctor] {_init_error}", flush=True)
             logger.exception("[proctor] %s", _init_error)
             raise ObjectDetectionUnavailableError(_init_error) from exc
 
@@ -96,8 +113,18 @@ def clear_object_detection_schedule(session_id: str | None) -> None:
         _last_run_by_session.pop(session_id, None)
 
 
+def detector_status() -> dict[str, Any]:
+    return {
+        "loaded": _detector is not None,
+        "init_error": _init_error,
+        "init_failed_at": _init_failed_at,
+        "confidence": CELL_PHONE_CONFIDENCE,
+        "imgsz": YOLO_IMGSZ,
+    }
+
+
 def warmup_object_detector() -> bool:
-    """Best-effort model load so the first interview analyze is not cold."""
+    """Optional warm load — avoided at startup on small VMs to prevent OOM."""
     try:
         detector = get_object_detector()
         blank = np.zeros((YOLO_IMGSZ, YOLO_IMGSZ, 3), dtype=np.uint8)
