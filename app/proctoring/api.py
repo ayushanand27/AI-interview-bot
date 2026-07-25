@@ -70,6 +70,7 @@ def _analyze_response(
     violation_type: Optional[str],
     total_violations: int,
     score_penalty_percent: float,
+    alert_message: Optional[str] = None,
 ) -> dict[str, Any]:
     return {
         "session_id": session_id,
@@ -81,6 +82,8 @@ def _analyze_response(
         "violation_type": violation_type,
         "total_violations": total_violations,
         "score_penalty_percent": score_penalty_percent,
+        # Immediate UI flash for non-eye hits (e.g. cell phone) while eye_status stays ok.
+        "alert_message": alert_message,
         # Legacy fields for older clients
         "warning_count": total_violations,
         "terminated": False,
@@ -105,14 +108,23 @@ def _build_analyze_payload(
     confidence: float,
     message: str,
     warning_mgr,
+    *,
+    alert_message: Optional[str] = None,
+    force_violation_type: Optional[str] = None,
 ) -> dict[str, Any]:
-    violation_type = None
-    if eye_status not in ("ok", "calibrating", "unavailable", "error"):
+    violation_type = force_violation_type
+    if violation_type is None and eye_status not in (
+        "ok",
+        "calibrating",
+        "unavailable",
+        "error",
+    ):
         violation_type = warning_mgr.resolve_violation_type(eye_status, gaze_direction)
 
     current_status = (
         "ok"
         if eye_status in ("ok", "calibrating", "unavailable", "error")
+        and not force_violation_type
         else "violation"
     )
     report = warning_mgr.get_integrity_report()
@@ -126,6 +138,7 @@ def _build_analyze_payload(
         violation_type=violation_type,
         total_violations=report["total_violations"],
         score_penalty_percent=report["score_penalty_percent"],
+        alert_message=alert_message,
     )
 
 
@@ -177,17 +190,26 @@ def analyze_frame(request: Request, req: FrameRequest):
         confidence=result["confidence"],
     )
 
+    phone_alert: Optional[str] = None
+    phone_recorded = False
     if should_run_object_detection(req.session_id):
         try:
             detector = get_object_detector()
             phone_hits = detector.detect_cell_phones(frame)
             for hit in phone_hits:
-                warning_mgr.record_client_violation(
+                recorded = warning_mgr.record_client_violation(
                     "prohibited_object_detected",
                     hit["message"],
                 )
-        except ObjectDetectionUnavailableError:
-            pass
+                if recorded is not None:
+                    phone_recorded = True
+                    phone_alert = hit["message"]
+        except ObjectDetectionUnavailableError as exc:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "[proctor] Object detector unavailable: %s", exc
+            )
         except Exception as exc:
             import logging
 
@@ -202,6 +224,8 @@ def analyze_frame(request: Request, req: FrameRequest):
         result["confidence"],
         result["message"],
         warning_mgr,
+        alert_message=phone_alert,
+        force_violation_type="prohibited_object_detected" if phone_recorded else None,
     )
 
 

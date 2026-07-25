@@ -23,6 +23,9 @@ module.exports = {
       min_uptime: "10s",
       env: {
         APP_ENV: "production",
+        CUDA_VISIBLE_DEVICES: "",
+        OMP_NUM_THREADS: "1",
+        MKL_NUM_THREADS: "1",
       },
     },
   ],

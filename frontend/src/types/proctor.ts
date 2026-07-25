@@ -4,6 +4,8 @@ export interface ProctorAnalyzeResponse {
   gaze_direction: string;
   confidence: number;
   message: string;
+  /** Immediate flash text (e.g. cell phone) even when eye_status is ok */
+  alert_message?: string | null;
   current_status: "ok" | "violation" | string;
   violation_type?: string | null;
   total_violations: number;

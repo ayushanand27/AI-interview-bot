@@ -343,20 +343,34 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     return `${m}:${s.toString().padStart(2, "0")}`;
   }
 
+  const showViolationFlash = useCallback((message: string) => {
+    setFlashMessage(message);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => {
+      setFlashMessage(null);
+    }, VIOLATION_FLASH_MS);
+  }, []);
+
   const handleProctorResponse = useCallback((res: ProctorAnalyzeResponse) => {
     setPenaltyPercent(res.score_penalty_percent ?? 0);
+
+    const alert = res.alert_message?.trim();
+    if (alert) {
+      showViolationFlash(alert);
+    }
 
     const status = res.eye_status ?? "unknown";
     const isOk = PROCTOR_OK_STATUSES.has(status);
 
-    if (!isOk) {
+    if (!isOk || res.violation_type === "prohibited_object_detected") {
       if (proctorDismissTimerRef.current) {
         clearTimeout(proctorDismissTimerRef.current);
         proctorDismissTimerRef.current = undefined;
       }
       const bannerText =
+        alert ||
         res.message?.trim() ||
-        `Proctoring alert: ${status.replace(/_/g, " ")}`;
+        `Proctoring alert: ${(res.violation_type || status).replace(/_/g, " ")}`;
       proctorBannerActiveRef.current = true;
       setProctorBanner(bannerText);
       return;
@@ -369,15 +383,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
         proctorDismissTimerRef.current = undefined;
       }, PROCTOR_BANNER_DISMISS_MS);
     }
-  }, []);
-
-  const showViolationFlash = useCallback((message: string) => {
-    setFlashMessage(message);
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-    flashTimerRef.current = setTimeout(() => {
-      setFlashMessage(null);
-    }, VIOLATION_FLASH_MS);
-  }, []);
+  }, [showViolationFlash]);
 
   const handleLoudAudio = useCallback(() => {
     showViolationFlash(LOUD_AUDIO_MESSAGE);
@@ -425,7 +431,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     if (!ctx) return;
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
     const base64 = dataUrl.split(",")[1];
     if (!base64) return;
 

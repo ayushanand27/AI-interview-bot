@@ -54,6 +54,20 @@ async def lifespan(_app: FastAPI):
 
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
+    def _warmup_phone_detector() -> None:
+        try:
+            from app.proctoring.object_detector import warmup_object_detector
+
+            ok = warmup_object_detector()
+            logger.info("Phone object detector warmup: %s", "ok" if ok else "skipped")
+        except Exception as exc:
+            logger.warning("Phone object detector warmup failed: %s", exc)
+
+    # Load YOLO off the request path so the first phone check is not a cold start.
+    import threading
+
+    threading.Thread(target=_warmup_phone_detector, name="yolo-warmup", daemon=True).start()
+
     yield
 
     await engine.dispose()

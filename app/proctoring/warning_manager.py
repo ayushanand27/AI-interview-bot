@@ -64,6 +64,8 @@ class WarningManager:
         self._current_violation_type: Optional[str] = None
         self._current_message: Optional[str] = None
         self._last_violation_recorded_at: Optional[float] = None
+        # Per-type cooldown so loud_audio does not suppress phone detection.
+        self._last_recorded_by_type: dict[str, float] = {}
         self._multiple_faces_violation_count = 0
         self._looking_down_violation_count = 0
 
@@ -140,10 +142,14 @@ class WarningManager:
     ) -> Optional[Violation]:
         """Record a client-reported integrity violation (audio, tab switch, etc.)."""
         now = time.time()
-        if (
-            self._last_violation_recorded_at is not None
-            and (now - self._last_violation_recorded_at) < self.COOLDOWN_SECONDS
-        ):
+        # Phone / object hits get a shorter per-type cooldown so they surface quickly.
+        cooldown = (
+            8.0
+            if violation_type == "prohibited_object_detected"
+            else self.COOLDOWN_SECONDS
+        )
+        last_same = self._last_recorded_by_type.get(violation_type)
+        if last_same is not None and (now - last_same) < cooldown:
             return None
 
         severity, penalty = self._severity_and_penalty(violation_type, 0.0)
@@ -156,6 +162,7 @@ class WarningManager:
         )
         self.violations.append(violation)
         self._last_violation_recorded_at = now
+        self._last_recorded_by_type[violation_type] = now
         return violation
 
     def record_loud_audio_violation(
