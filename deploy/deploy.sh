@@ -43,6 +43,19 @@ echo "==> Restarting backend..."
 pm2 restart ai-interview-bot-backend
 
 echo "==> Reloading nginx..."
-sudo nginx -s reload
+if [[ -f /etc/nginx/sites-available/ai-interview-bot ]]; then
+  # Keep existing site (may already have HTTPS from certbot). Only reload.
+  sudo nginx -t
+  sudo nginx -s reload
+else
+  echo "Installing baseline nginx site (HTTP)..."
+  sudo cp "${APP_DIR}/deploy/nginx.conf" /etc/nginx/sites-available/ai-interview-bot
+  sudo ln -sf /etc/nginx/sites-available/ai-interview-bot /etc/nginx/sites-enabled/ai-interview-bot
+  sudo rm -f /etc/nginx/sites-enabled/default
+  sudo nginx -t
+  sudo nginx -s reload
+fi
 
 echo "Deploy complete."
+echo "Tip: one-command updates → bash deploy/go.sh"
+echo "Webcam needs HTTPS → bash deploy/setup_https.sh yourdomain.com you@gmail.com"

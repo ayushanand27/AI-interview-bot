@@ -36,5 +36,7 @@ frontend/tsconfig.tsbuildinfo
 .DS_Store
 Thumbs.db
 
-# Deploy logs
+# Deploy logs / local secrets
 deploy/*.log
+deploy/.secrets
+*.pem
