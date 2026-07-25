@@ -23,11 +23,11 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-CELL_PHONE_CONFIDENCE = 0.28
+CELL_PHONE_CONFIDENCE = 0.25
 OBJECT_DETECT_INTERVAL_SECONDS = 2.0
-YOLO_IMGSZ = 320
+YOLO_IMGSZ = 640
 WORKER_START_TIMEOUT_SECONDS = 60.0
-WORKER_DETECT_TIMEOUT_SECONDS = 30.0
+WORKER_DETECT_TIMEOUT_SECONDS = 45.0
 MSG_PROHIBITED_OBJECT = "Cell phone detected near candidate — possible cheating aid"
 
 _lock = Lock()

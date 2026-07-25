@@ -21,8 +21,8 @@ os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 
-CELL_PHONE_CONFIDENCE = 0.28
-YOLO_IMGSZ = 320
+CELL_PHONE_CONFIDENCE = 0.25
+YOLO_IMGSZ = 640
 MSG = "Cell phone detected near candidate — possible cheating aid"
 
 
