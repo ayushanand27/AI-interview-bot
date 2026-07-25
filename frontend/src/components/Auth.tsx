@@ -29,6 +29,7 @@ export default function Auth({
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotMessage, setForgotMessage] = useState<string | null>(null);
+  const [forgotResetUrl, setForgotResetUrl] = useState<string | null>(null);
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -92,9 +93,19 @@ export default function Auth({
     onLoadingChange(true);
     onError(null);
     setForgotMessage(null);
+    setForgotResetUrl(null);
     try {
-      await authApi.forgotPassword(email);
-      setForgotMessage("If this email exists, check your inbox.");
+      const result = await authApi.forgotPassword(email);
+      if (result.reset_url) {
+        setForgotMessage(
+          "SMTP email may not deliver right now. Use this local reset link:",
+        );
+        setForgotResetUrl(result.reset_url);
+      } else {
+        setForgotMessage(
+          "If this email exists, check your inbox (and spam folder).",
+        );
+      }
     } catch (err) {
       onError(err instanceof Error ? err.message : "Request failed");
     } finally {
@@ -113,6 +124,7 @@ export default function Auth({
             onError(null);
             setShowForgotPassword(false);
             setForgotMessage(null);
+            setForgotResetUrl(null);
           }}
           disabled={loading}
         >
@@ -126,6 +138,7 @@ export default function Auth({
             onError(null);
             setShowForgotPassword(false);
             setForgotMessage(null);
+            setForgotResetUrl(null);
           }}
           disabled={loading}
           style={{ marginLeft: "0.5rem" }}
@@ -154,7 +167,14 @@ export default function Auth({
             </div>
 
             {forgotMessage && (
-              <div className="alert info">{forgotMessage}</div>
+              <div className="alert info">
+                <p>{forgotMessage}</p>
+                {forgotResetUrl && (
+                  <p style={{ marginTop: "0.5rem", wordBreak: "break-all" }}>
+                    <a href={forgotResetUrl}>{forgotResetUrl}</a>
+                  </p>
+                )}
+              </div>
             )}
 
             <button type="submit" className="primary" disabled={loading}>

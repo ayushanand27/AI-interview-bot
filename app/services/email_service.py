@@ -147,7 +147,7 @@ def send_invite_welcome_password_email(to_email: str, name: str, token: str) -> 
     return _send_email(to_email, subject, html)
 
 
-def send_password_reset_email(to_email: str, name: str, token: str):
+def send_password_reset_email(to_email: str, name: str, token: str) -> str:
     link = f"{settings.effective_frontend_url}/reset-password?token={token}"
 
     print(f"\n[EMAIL] Password reset link for {to_email}:")
@@ -172,7 +172,12 @@ def send_password_reset_email(to_email: str, name: str, token: str):
         </p>
     </div>
     """
-    _send_email(to_email, subject, html)
+    sent = _send_email(to_email, subject, html)
+    if not sent:
+        logger.warning(
+            "[EMAIL] Password reset SMTP send failed — use console/UI link in local dev."
+        )
+    return link
 
 
 def _format_integrity_level(integrity_level: str | None) -> str:

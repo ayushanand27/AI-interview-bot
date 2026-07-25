@@ -176,15 +176,20 @@ class AuthService:
     async def forgot_password(self, email: str) -> dict:
         result = await self.db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
+        reset_url: str | None = None
         if user:
             reset_token = str(uuid4())
             user.reset_token = reset_token
             user.reset_token_expiry = datetime.now(timezone.utc) + timedelta(hours=1)
             await self.db.flush()
-            send_password_reset_email(user.email, user.full_name, reset_token)
+            reset_url = send_password_reset_email(
+                user.email, user.full_name, reset_token
+            )
 
         return {
-            "message": "If this email exists, you will receive a reset link shortly."
+            "message": "If this email exists, you will receive a reset link shortly.",
+            # Local/dev only — production must not expose reset links in API responses.
+            "reset_url": reset_url if not settings.is_production else None,
         }
 
     async def reset_password(self, token: str, new_password: str) -> dict:

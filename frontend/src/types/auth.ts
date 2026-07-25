@@ -18,6 +18,7 @@ export interface UserResponse {
 export interface MessageResponse {
   message: string;
   verification_url?: string | null;
+  reset_url?: string | null;
 }
 
 export interface VerifyEmailResponse {

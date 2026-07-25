@@ -201,7 +201,11 @@ async def forgot_password(
     db: AsyncSession = Depends(get_db),
 ):
     service = AuthService(db)
-    return await service.forgot_password(data.email)
+    result = await service.forgot_password(data.email)
+    return MessageResponse(
+        message=result["message"],
+        reset_url=result.get("reset_url"),
+    )
 
 
 # ── POST /auth/reset-password ─────────────────────────────

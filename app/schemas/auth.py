@@ -83,6 +83,7 @@ class ResetPasswordRequest(BaseModel):
 class MessageResponse(BaseModel):
     message: str
     verification_url: str | None = None
+    reset_url: str | None = None
 
 
 class VerifyEmailResponse(BaseModel):
