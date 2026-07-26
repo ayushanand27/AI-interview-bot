@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { interviewApi, proctorApi } from "../api/client";
 
@@ -592,6 +593,29 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     void video.play().catch(() => {});
   }, [mediaStream]);
 
+  // Never use browser native PiP — it leaves a black "Playing in picture-in-picture"
+  // placeholder over the original video (often covering End Interview).
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const kickNativePip = () => {
+      if (document.pictureInPictureElement === video) {
+        void document.exitPictureInPicture().catch(() => {});
+      }
+      void video.play().catch(() => {});
+    };
+
+    video.addEventListener("enterpictureinpicture", kickNativePip);
+    document.addEventListener("enterpictureinpicture", kickNativePip);
+    kickNativePip();
+
+    return () => {
+      video.removeEventListener("enterpictureinpicture", kickNativePip);
+      document.removeEventListener("enterpictureinpicture", kickNativePip);
+    };
+  }, [mediaStream]);
+
   function handlePipPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
     const el = pipContainerRef.current;
@@ -759,6 +783,56 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     }
   }
 
+  const pipPreview =
+    typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={pipContainerRef}
+            className={`proctor-webcam-container${isPipDragging ? " is-dragging" : ""}`}
+            style={
+              pipPos
+                ? {
+                    left: pipPos.left,
+                    top: pipPos.top,
+                    right: "auto",
+                    bottom: "auto",
+                  }
+                : undefined
+            }
+            onPointerDown={handlePipPointerDown}
+            onPointerMove={handlePipPointerMove}
+            onPointerUp={handlePipPointerUp}
+            onPointerCancel={handlePipPointerUp}
+            title="Drag to reposition camera preview"
+            role="group"
+            aria-label="Draggable webcam preview"
+          >
+            {isSessionRecording && (
+              <div
+                className="session-rec-indicator"
+                role="status"
+                aria-live="polite"
+              >
+                <span className="session-rec-dot" aria-hidden />
+                REC
+              </div>
+            )}
+            <video
+              ref={videoRef}
+              className="proctor-preview"
+              muted
+              playsInline
+              autoPlay
+              disablePictureInPicture
+              disableRemotePlayback
+              controlsList="nodownload nofullscreen noremoteplayback"
+              aria-label="Webcam preview for proctoring"
+            />
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
     <>
       {proctorBanner && (
@@ -776,37 +850,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
         </div>
       )}
 
-      <div
-        ref={pipContainerRef}
-        className={`proctor-webcam-container${isPipDragging ? " is-dragging" : ""}`}
-        style={
-          pipPos
-            ? { left: pipPos.left, top: pipPos.top, right: "auto", bottom: "auto" }
-            : undefined
-        }
-        onPointerDown={handlePipPointerDown}
-        onPointerMove={handlePipPointerMove}
-        onPointerUp={handlePipPointerUp}
-        onPointerCancel={handlePipPointerUp}
-        title="Drag to reposition camera preview"
-        role="group"
-        aria-label="Draggable webcam preview"
-      >
-        {isSessionRecording && (
-          <div className="session-rec-indicator" role="status" aria-live="polite">
-            <span className="session-rec-dot" aria-hidden />
-            REC
-          </div>
-        )}
-        <video
-          ref={videoRef}
-          className="proctor-preview"
-          muted
-          playsInline
-          autoPlay
-          aria-label="Webcam preview for proctoring"
-        />
-      </div>
+      {pipPreview}
 
       <div className="card interview-room">
         <div className="integrity-bar">

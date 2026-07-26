@@ -591,10 +591,12 @@ header p {
 }
 
 .proctor-webcam-container {
-  /* Viewport PiP — must not live under .card (backdrop-filter traps fixed). */
+  /* Custom in-page PiP only (ported to document.body). Never use browser native PiP. */
   position: fixed;
   top: 72px;
   right: 16px;
+  bottom: auto;
+  left: auto;
   width: 200px;
   height: 150px;
   border-radius: 12px;
@@ -606,6 +608,7 @@ header p {
   cursor: grab;
   touch-action: none;
   user-select: none;
+  pointer-events: auto;
 }
 
 .proctor-webcam-container.is-dragging {
@@ -615,6 +618,12 @@ header p {
 
 .proctor-webcam-container .proctor-preview {
   pointer-events: none;
+}
+
+/* Hide Chrome's native PiP placeholder if it ever appears. */
+.proctor-preview:picture-in-picture,
+.proctor-webcam-container:has(video:picture-in-picture) {
+  display: none !important;
 }
 
 .session-rec-indicator {
@@ -657,6 +666,11 @@ header p {
   height: 100%;
   object-fit: cover;
   transform: scaleX(-1);
+  background: #111;
+}
+
+.proctor-preview::-webkit-media-controls {
+  display: none !important;
 }
 
 .recording-indicator {
