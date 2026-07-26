@@ -591,9 +591,10 @@ header p {
 }
 
 .proctor-webcam-container {
+  /* Viewport PiP — must not live under .card (backdrop-filter traps fixed). */
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  top: 72px;
+  right: 16px;
   width: 200px;
   height: 150px;
   border-radius: 12px;
@@ -601,7 +602,19 @@ header p {
   box-shadow: var(--shadow-md);
   z-index: 1000;
   overflow: hidden;
-  background: #000;
+  background: #111;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.proctor-webcam-container.is-dragging {
+  cursor: grabbing;
+  box-shadow: var(--shadow-lg);
+}
+
+.proctor-webcam-container .proctor-preview {
+  pointer-events: none;
 }
 
 .session-rec-indicator {
@@ -959,6 +972,13 @@ header p {
 
   .auth-toggle button {
     flex: 1;
+  }
+
+  .proctor-webcam-container {
+    top: 64px;
+    right: 12px;
+    width: 140px;
+    height: 105px;
   }
 }
 

@@ -27,6 +27,45 @@ const QUESTION_TIMER_SEC =
 
 const PROCTOR_OK_STATUSES = new Set(["ok", "calibrating"]);
 
+/** Keep PiP clear of banners (top) and primary action buttons (bottom). */
+const PIP_SAFE_TOP = 72;
+const PIP_SAFE_BOTTOM = 104;
+const PIP_SAFE_EDGE = 16;
+const PIP_DEFAULT_W = 200;
+const PIP_DEFAULT_H = 150;
+
+function clampPipPosition(
+  left: number,
+  top: number,
+  width = PIP_DEFAULT_W,
+  height = PIP_DEFAULT_H,
+): { left: number; top: number } {
+  const maxLeft = Math.max(
+    PIP_SAFE_EDGE,
+    window.innerWidth - width - PIP_SAFE_EDGE,
+  );
+  const maxTop = Math.max(
+    PIP_SAFE_TOP,
+    window.innerHeight - height - PIP_SAFE_BOTTOM,
+  );
+  return {
+    left: Math.min(Math.max(PIP_SAFE_EDGE, left), maxLeft),
+    top: Math.min(Math.max(PIP_SAFE_TOP, top), maxTop),
+  };
+}
+
+function defaultPipPosition(
+  width = PIP_DEFAULT_W,
+  height = PIP_DEFAULT_H,
+): { left: number; top: number } {
+  return clampPipPosition(
+    window.innerWidth - width - PIP_SAFE_EDGE,
+    PIP_SAFE_TOP,
+    width,
+    height,
+  );
+}
+
 function audioOnlyStream(source: MediaStream | null): MediaStream | null {
   if (!source) return null;
   const tracks = source.getAudioTracks().filter((t) => t.readyState === "live");
@@ -95,7 +134,19 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
   const questionTimerExpiredRef = useRef(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const pipContainerRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [pipPos, setPipPos] = useState<{ left: number; top: number } | null>(
+    null,
+  );
+  const [isPipDragging, setIsPipDragging] = useState(false);
+  const pipDragRef = useRef<{
+    pointerId: number;
+    offsetX: number;
+    offsetY: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const sessionRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -514,6 +565,74 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     startSessionRecording,
   ]);
 
+  // Viewport-fixed PiP (must live outside .card — backdrop-filter traps position:fixed).
+  useEffect(() => {
+    const measure = () => {
+      const el = pipContainerRef.current;
+      const width = el?.offsetWidth || PIP_DEFAULT_W;
+      const height = el?.offsetHeight || PIP_DEFAULT_H;
+      setPipPos((prev) =>
+        prev
+          ? clampPipPosition(prev.left, prev.top, width, height)
+          : defaultPipPosition(width, height),
+      );
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  // Keep the live preview attached even if the overlay remounts.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !mediaStream) return;
+    if (video.srcObject !== mediaStream) {
+      video.srcObject = mediaStream;
+    }
+    void video.play().catch(() => {});
+  }, [mediaStream]);
+
+  function handlePipPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return;
+    const el = pipContainerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    pipDragRef.current = {
+      pointerId: e.pointerId,
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+      width: rect.width,
+      height: rect.height,
+    };
+    el.setPointerCapture(e.pointerId);
+    setIsPipDragging(true);
+  }
+
+  function handlePipPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const drag = pipDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    setPipPos(
+      clampPipPosition(
+        e.clientX - drag.offsetX,
+        e.clientY - drag.offsetY,
+        drag.width,
+        drag.height,
+      ),
+    );
+  }
+
+  function handlePipPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    const drag = pipDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    pipDragRef.current = null;
+    setIsPipDragging(false);
+    try {
+      pipContainerRef.current?.releasePointerCapture(e.pointerId);
+    } catch {
+      // already released
+    }
+  }
+
   useEffect(() => {
     async function checkVirtualCamera() {
       const result = await detectVirtualCamera(streamRef.current);
@@ -657,24 +776,39 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
         </div>
       )}
 
-      <div className="card interview-room">
-        <div className="proctor-webcam-container">
-          {isSessionRecording && (
-            <div className="session-rec-indicator" role="status" aria-live="polite">
-              <span className="session-rec-dot" aria-hidden />
-              REC
-            </div>
-          )}
-          <video
-            ref={videoRef}
-            className="proctor-preview"
-            muted
-            playsInline
-            autoPlay
-            aria-label="Webcam preview for proctoring"
-          />
-        </div>
+      <div
+        ref={pipContainerRef}
+        className={`proctor-webcam-container${isPipDragging ? " is-dragging" : ""}`}
+        style={
+          pipPos
+            ? { left: pipPos.left, top: pipPos.top, right: "auto", bottom: "auto" }
+            : undefined
+        }
+        onPointerDown={handlePipPointerDown}
+        onPointerMove={handlePipPointerMove}
+        onPointerUp={handlePipPointerUp}
+        onPointerCancel={handlePipPointerUp}
+        title="Drag to reposition camera preview"
+        role="group"
+        aria-label="Draggable webcam preview"
+      >
+        {isSessionRecording && (
+          <div className="session-rec-indicator" role="status" aria-live="polite">
+            <span className="session-rec-dot" aria-hidden />
+            REC
+          </div>
+        )}
+        <video
+          ref={videoRef}
+          className="proctor-preview"
+          muted
+          playsInline
+          autoPlay
+          aria-label="Webcam preview for proctoring"
+        />
+      </div>
 
+      <div className="card interview-room">
         <div className="integrity-bar">
           <span className={integrity.className}>{integrity.label}</span>
           {penaltyPercent > 0 && (
