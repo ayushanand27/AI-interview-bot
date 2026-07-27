@@ -43,6 +43,11 @@ from app.utils.exceptions import (
 )
 from app.services.resume_parser import extract_text_from_document
 from app.utils.file_validation import validate_document_upload
+from app.services.question_utils import (
+    question_marks,
+    question_text as extract_question_text,
+    question_time_seconds,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -121,7 +126,13 @@ class InterviewService:
             j = session.answer_judgments[i] if i < len(session.answer_judgments) else None
             if j is not None:
                 judged_items.append(
-                    {"index": i + 1, "question": q, "answer": a, "judgment": j}
+                    {
+                        "index": i + 1,
+                        "question": extract_question_text(q),
+                        "answer": a,
+                        "judgment": j,
+                        "marks": question_marks(q),
+                    }
                 )
         return judged_items
 
@@ -249,17 +260,20 @@ class InterviewService:
             session_store.save(session)
 
         index = session.current_question_index
-        question_text = session.questions[index]
+        raw_question = session.questions[index]
+        question_prompt = extract_question_text(raw_question)
 
         return CurrentQuestionResponse(
             session_id=session.session_id,
             status=session.status,
             question_index=index,
             total_questions=session.total_questions,
-            question=question_text,
+            question=question_prompt,
             is_complete=False,
             message="Answer this question, then submit your response.",
             proctor_warning_count=proctor_warnings,
+            time_seconds=question_time_seconds(raw_question),
+            marks=question_marks(raw_question),
         )
 
     def submit_answer(
@@ -305,9 +319,9 @@ class InterviewService:
 
         # Call judge for this answer and store judgment
         try:
-            question_text = session.questions[index]
+            question_prompt = extract_question_text(session.questions[index])
             judgment = judge_answer(
-                question=question_text,
+                question=question_prompt,
                 answer=answer.strip(),
                 job_role=session.role_title,
             )
@@ -456,7 +470,7 @@ class InterviewService:
             total_questions=session.total_questions,
             answered_count=answered,
             unanswered_count=unanswered,
-            questions=session.questions,
+            questions=[extract_question_text(q) for q in session.questions],
             answers=session.answers,
             answer_judgments=session.answer_judgments,
             final_score=session.final_score,

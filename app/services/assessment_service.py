@@ -13,12 +13,26 @@ from app.core.config import settings
 from app.core.exceptions import ConflictException, NotFoundException
 from app.db.interview_invite_model import InterviewInvite
 from app.schemas.recruiter_assessment import (
+    AssessmentQuestion,
     AssessmentSummary,
     CreateAssessmentRequest,
     CreateAssessmentResponse,
+    GenerateQuestionsRequest,
+    GenerateQuestionsResponse,
     UpdateAssessmentRequest,
 )
 from app.services.groq_client import get_groq_client
+from app.services.question_utils import (
+    default_time_seconds,
+    normalize_questions,
+    question_text,
+)
+
+
+def _as_aware_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def _strip_markdown_code_block(text: str) -> str:
@@ -32,14 +46,7 @@ def _strip_markdown_code_block(text: str) -> str:
 
 
 def _extract_question_text(item: object) -> str:
-    if isinstance(item, str):
-        return item.strip()
-    if isinstance(item, dict):
-        for key in ("question", "text", "content", "prompt"):
-            value = item.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-    return str(item).strip()
+    return question_text(item)
 
 
 def _questions_from_payload(payload: object) -> list[str]:
@@ -170,20 +177,85 @@ def generate_questions_from_jd(
     return _parse_questions_from_llm_text(content, question_count, jd_text, difficulty)
 
 
+def _to_assessment_questions(raw: list) -> list[AssessmentQuestion]:
+    normalized = normalize_questions(raw)
+    return [
+        AssessmentQuestion(
+            text=q["text"],
+            time_seconds=int(q["time_seconds"]),
+            marks=float(q["marks"]),
+        )
+        for q in normalized
+    ]
+
+
+def _questions_payload(questions: list[AssessmentQuestion]) -> list[dict]:
+    return [
+        {
+            "text": q.text,
+            "time_seconds": q.time_seconds,
+            "marks": q.marks,
+        }
+        for q in questions
+    ]
+
+
+def _summary_from_invite(invite: InterviewInvite, now: datetime) -> AssessmentSummary:
+    jd_lines = invite.jd_text.strip().splitlines()
+    role_preview = (jd_lines[0][:80] if jd_lines else "Assessment").strip()
+    questions = normalize_questions(list(invite.questions_json or []))
+    expiry = _as_aware_utc(invite.expiry_at)
+    created = _as_aware_utc(invite.created_at)
+    return AssessmentSummary(
+        token=invite.token,
+        invite_link=f"/interview/invite/{invite.token}",
+        role_preview=role_preview,
+        difficulty=invite.difficulty,
+        question_count=len(questions),
+        expiry_at=expiry,
+        used_count=invite.used_count,
+        max_uses=invite.max_uses,
+        created_at=created,
+        is_expired=expiry <= now,
+    )
+
+
 class AssessmentService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
+
+    @staticmethod
+    def generate_questions_preview(
+        data: GenerateQuestionsRequest,
+    ) -> GenerateQuestionsResponse:
+        raw = generate_questions_from_jd(
+            data.jd_text,
+            data.question_count,
+            data.difficulty,
+        )
+        default_time = default_time_seconds()
+        questions = [
+            AssessmentQuestion(text=text, time_seconds=default_time, marks=10)
+            for text in raw
+            if text.strip()
+        ]
+        return GenerateQuestionsResponse(questions=questions, jd_text=data.jd_text)
 
     async def create_assessment(
         self,
         recruiter_id: int,
         data: CreateAssessmentRequest,
     ) -> CreateAssessmentResponse:
-        questions = generate_questions_from_jd(
-            data.jd_text,
-            data.question_count,
-            data.difficulty,
-        )
+        if data.questions:
+            questions = data.questions
+        else:
+            raw = generate_questions_from_jd(
+                data.jd_text,
+                data.question_count,
+                data.difficulty,
+            )
+            questions = _to_assessment_questions(raw)
+
         token = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
         expiry_at = now + timedelta(hours=data.expiry_hours)
@@ -192,7 +264,7 @@ class AssessmentService:
             token=token,
             recruiter_id=recruiter_id,
             jd_text=data.jd_text,
-            questions_json=questions,
+            questions_json=_questions_payload(questions),
             difficulty=data.difficulty,
             expiry_at=expiry_at,
             max_uses=100,
@@ -216,26 +288,7 @@ class AssessmentService:
             .order_by(InterviewInvite.created_at.desc())
         )
         now = datetime.now(timezone.utc)
-        summaries: list[AssessmentSummary] = []
-        for row in result.scalars().all():
-            jd_lines = row.jd_text.strip().splitlines()
-            role_preview = (jd_lines[0][:80] if jd_lines else "Assessment").strip()
-            questions = list(row.questions_json or [])
-            summaries.append(
-                AssessmentSummary(
-                    token=row.token,
-                    invite_link=f"/interview/invite/{row.token}",
-                    role_preview=role_preview,
-                    difficulty=row.difficulty,
-                    question_count=len(questions),
-                    expiry_at=row.expiry_at,
-                    used_count=row.used_count,
-                    max_uses=row.max_uses,
-                    created_at=row.created_at,
-                    is_expired=row.expiry_at <= now,
-                )
-            )
-        return summaries
+        return [_summary_from_invite(row, now) for row in result.scalars().all()]
 
     async def delete_assessment(self, recruiter_id: int, token: str) -> None:
         result = await self.db.execute(
@@ -270,18 +323,4 @@ class AssessmentService:
         await self.db.commit()
         await self.db.refresh(invite)
         now = datetime.now(timezone.utc)
-        jd_lines = invite.jd_text.strip().splitlines()
-        role_preview = (jd_lines[0][:80] if jd_lines else "Assessment").strip()
-        questions = list(invite.questions_json or [])
-        return AssessmentSummary(
-            token=invite.token,
-            invite_link=f"/interview/invite/{invite.token}",
-            role_preview=role_preview,
-            difficulty=invite.difficulty,
-            question_count=len(questions),
-            expiry_at=invite.expiry_at,
-            used_count=invite.used_count,
-            max_uses=invite.max_uses,
-            created_at=invite.created_at,
-            is_expired=invite.expiry_at <= now,
-        )
+        return _summary_from_invite(invite, now)

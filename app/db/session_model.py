@@ -55,3 +55,5 @@ class Session(Base):
         default=False,
         server_default="false",
     )
+    # Set when the session was started via a recruiter invite link.
+    invite_token: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)

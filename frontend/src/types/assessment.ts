@@ -1,7 +1,18 @@
+export interface AssessmentQuestion {
+  text: string;
+  time_seconds: number;
+  marks: number;
+}
+
 export interface CreateAssessmentResponse {
   token: string;
   invite_link: string;
-  questions_preview: string[];
+  questions_preview: AssessmentQuestion[];
+}
+
+export interface GenerateQuestionsResponse {
+  questions: AssessmentQuestion[];
+  jd_text?: string;
 }
 
 export interface AssessmentSummary {

@@ -91,6 +91,14 @@ class CurrentQuestionResponse(BaseModel):
         0,
         description="Current proctoring strike count for this interview session.",
     )
+    time_seconds: Optional[int] = Field(
+        None,
+        description="Per-question timer in seconds (from assessment config when set).",
+    )
+    marks: Optional[float] = Field(
+        None,
+        description="Per-question scoring weight / max marks when configured.",
+    )
 
 
 class AnswerSubmitRequest(BaseModel):

@@ -16,6 +16,7 @@ from pathlib import Path
 
 from app.models.session import InterviewSession
 from app.schemas.recruiter import RecruiterSessionDetail, TranscriptItem
+from app.services.question_utils import question_text as extract_question_text
 
 
 def _styles():
@@ -451,7 +452,7 @@ def generate_candidate_report_pdf(
 
         story.append(Spacer(1, 0.1 * inch))
         story.append(Paragraph(f"Question {i + 1}", styles["heading"]))
-        story.append(Paragraph(_escape(question), styles["body"]))
+        story.append(Paragraph(_escape(extract_question_text(question)), styles["body"]))
         story.append(Paragraph("<b>Your Answer</b>", styles["body"]))
         story.append(
             Paragraph(_escape(answer if answer else "(not answered)"), styles["body"])

@@ -31,6 +31,8 @@ export interface CurrentQuestionResponse {
   is_complete: boolean;
   message: string;
   proctor_warning_count?: number;
+  time_seconds?: number | null;
+  marks?: number | null;
 }
 
 export interface AudioTranscribeResponse {

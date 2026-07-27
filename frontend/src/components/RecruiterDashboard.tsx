@@ -4,8 +4,13 @@ import type {
   RecruiterSessionDetail,
   RecruiterSessionSummary,
 } from "../types/recruiter";
-import type { AssessmentSummary } from "../types/assessment";
+import type { AssessmentQuestion, AssessmentSummary } from "../types/assessment";
 import "../recruiter-portal.css";
+
+const DEFAULT_TIME_SECONDS =
+  Number(import.meta.env.VITE_QUESTION_TIMER_SECONDS) || 180;
+const MIN_QUESTIONS = 2;
+const MAX_QUESTIONS = 20;
 
 const VIOLATION_TYPE_LABELS: Record<string, string> = {
   no_face: "Face not detected",
@@ -78,14 +83,17 @@ export default function RecruiterDashboard({
   const [difficulty, setDifficulty] = useState("Medium");
   const [expiryHours, setExpiryHours] = useState(48);
   const [assessmentLoading, setAssessmentLoading] = useState(false);
-  const [questionsPreview, setQuestionsPreview] = useState<string[]>([]);
-  const [pendingInviteLink, setPendingInviteLink] = useState<string | null>(null);
+  const [editableQuestions, setEditableQuestions] = useState<AssessmentQuestion[]>(
+    [],
+  );
+  const [draftJdText, setDraftJdText] = useState("");
   const [approvedInviteLink, setApprovedInviteLink] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
 
   const [assessments, setAssessments] = useState<AssessmentSummary[]>([]);
   const [assessmentsLoading, setAssessmentsLoading] = useState(false);
   const [deletingToken, setDeletingToken] = useState<string | null>(null);
+  const [extendingToken, setExtendingToken] = useState<string | null>(null);
   const [reviewUpdating, setReviewUpdating] = useState(false);
 
   function loadAssessments() {
@@ -246,16 +254,17 @@ export default function RecruiterDashboard({
     setApprovedInviteLink(null);
     setCopyMessage(null);
     try {
-      const res = await recruiterApi.createAssessment({
+      const res = await recruiterApi.generateQuestions({
         jd_text: jdMode === "paste" ? jdText.trim() : "",
         jd_pdf: jdMode === "pdf" ? jdPdfFile : null,
         question_count: questionCount,
         difficulty,
-        expiry_hours: expiryHours,
       });
-      setQuestionsPreview(res.data.questions_preview);
-      setPendingInviteLink(res.data.invite_link);
-      loadAssessments();
+      setEditableQuestions(res.data.questions ?? []);
+      setDraftJdText(
+        res.data.jd_text?.trim() ||
+          (jdMode === "paste" ? jdText.trim() : ""),
+      );
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to generate questions");
     } finally {
@@ -263,10 +272,73 @@ export default function RecruiterDashboard({
     }
   }
 
-  function handleApprove() {
-    if (!pendingInviteLink) return;
-    setApprovedInviteLink(pendingInviteLink);
+  function updateQuestion(
+    index: number,
+    patch: Partial<AssessmentQuestion>,
+  ) {
+    setEditableQuestions((prev) =>
+      prev.map((q, i) => (i === index ? { ...q, ...patch } : q)),
+    );
+  }
+
+  function removeQuestion(index: number) {
+    if (editableQuestions.length <= MIN_QUESTIONS) {
+      onError(`Keep at least ${MIN_QUESTIONS} questions.`);
+      return;
+    }
+    setEditableQuestions((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function addQuestion() {
+    if (editableQuestions.length >= MAX_QUESTIONS) {
+      onError(`At most ${MAX_QUESTIONS} questions are allowed.`);
+      return;
+    }
+    setEditableQuestions((prev) => [
+      ...prev,
+      {
+        text: "",
+        time_seconds: DEFAULT_TIME_SECONDS,
+        marks: 10,
+      },
+    ]);
+  }
+
+  async function handleCreateAssessment() {
+    const cleaned = editableQuestions
+      .map((q) => ({
+        text: q.text.trim(),
+        time_seconds: Number(q.time_seconds) || DEFAULT_TIME_SECONDS,
+        marks: Number(q.marks) || 10,
+      }))
+      .filter((q) => q.text.length >= 3);
+
+    if (cleaned.length < MIN_QUESTIONS) {
+      onError(`Add at least ${MIN_QUESTIONS} questions with text.`);
+      return;
+    }
+
+    setAssessmentLoading(true);
+    onError(null);
     setCopyMessage(null);
+    try {
+      const res = await recruiterApi.createAssessment({
+        jd_text: draftJdText || (jdMode === "paste" ? jdText.trim() : ""),
+        jd_pdf:
+          !draftJdText && jdMode === "pdf" ? jdPdfFile : null,
+        question_count: cleaned.length,
+        difficulty,
+        expiry_hours: expiryHours,
+        questions: cleaned,
+      });
+      setApprovedInviteLink(res.data.invite_link);
+      setEditableQuestions(res.data.questions_preview ?? cleaned);
+      loadAssessments();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed to create assessment");
+    } finally {
+      setAssessmentLoading(false);
+    }
   }
 
   async function handleCopyLink() {
@@ -292,6 +364,35 @@ export default function RecruiterDashboard({
       onError(err instanceof Error ? err.message : "Failed to delete assessment");
     } finally {
       setDeletingToken(null);
+    }
+  }
+
+  async function handleExtendAssessment(token: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    const hoursRaw = window.prompt(
+      "Extend expiry by how many hours from now?\nValid: 24, 48, 72, or 168",
+      "48",
+    );
+    if (hoursRaw == null) return;
+    const hours = Number(hoursRaw.trim());
+    if (![24, 48, 72, 168].includes(hours)) {
+      onError("Expiry must be 24, 48, 72, or 168 hours.");
+      return;
+    }
+    setExtendingToken(token);
+    onError(null);
+    try {
+      const res = await recruiterApi.updateAssessmentExpiry(token, hours);
+      if (res.data) {
+        setAssessments((prev) =>
+          prev.map((a) => (a.token === token ? res.data : a)),
+        );
+        setCopyMessage("Invite expiry updated.");
+      }
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed to extend expiry");
+    } finally {
+      setExtendingToken(null);
     }
   }
 
@@ -357,6 +458,7 @@ export default function RecruiterDashboard({
               setShowAssessmentForm((v) => !v);
               setApprovedInviteLink(null);
               setCopyMessage(null);
+              setEditableQuestions([]);
             }}
           >
             {showAssessmentForm ? "Cancel" : "New assessment"}
@@ -481,18 +583,94 @@ export default function RecruiterDashboard({
               disabled={assessmentLoading}
               onClick={() => void handleGenerateQuestions()}
             >
-              {assessmentLoading ? "Generating…" : "Generate questions"}
+              {assessmentLoading && editableQuestions.length === 0
+                ? "Generating…"
+                : "Generate questions"}
             </button>
 
-            {questionsPreview.length > 0 && (
+            {editableQuestions.length > 0 && (
               <div className="rp-preview-block">
-                <h3 className="rp-preview-title">Preview</h3>
-                <ol className="rp-questions-preview">
-                  {questionsPreview.map((q, i) => (
-                    <li key={i}>{q}</li>
+                <div className="rp-preview-header">
+                  <h3 className="rp-preview-title">Edit questions</h3>
+                  <p className="rp-muted-small">
+                    Adjust wording, time (seconds), and marks before sharing.
+                  </p>
+                </div>
+                <ol className="rp-questions-editor">
+                  {editableQuestions.map((q, i) => (
+                    <li key={i} className="rp-question-edit-row">
+                      <div className="rp-question-edit-top">
+                        <span className="rp-question-num">Q{i + 1}</span>
+                        <button
+                          type="button"
+                          className="rp-secondary rp-btn-compact"
+                          disabled={
+                            assessmentLoading ||
+                            editableQuestions.length <= MIN_QUESTIONS
+                          }
+                          onClick={() => removeQuestion(i)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <textarea
+                        value={q.text}
+                        onChange={(e) =>
+                          updateQuestion(i, { text: e.target.value })
+                        }
+                        rows={3}
+                        disabled={assessmentLoading}
+                        placeholder="Question text"
+                      />
+                      <div className="rp-question-meta-row">
+                        <label>
+                          Time (sec)
+                          <input
+                            type="number"
+                            min={30}
+                            max={3600}
+                            step={30}
+                            value={q.time_seconds}
+                            onChange={(e) =>
+                              updateQuestion(i, {
+                                time_seconds: Number(e.target.value) || DEFAULT_TIME_SECONDS,
+                              })
+                            }
+                            disabled={assessmentLoading}
+                          />
+                        </label>
+                        <label>
+                          Marks
+                          <input
+                            type="number"
+                            min={0.5}
+                            max={100}
+                            step={0.5}
+                            value={q.marks}
+                            onChange={(e) =>
+                              updateQuestion(i, {
+                                marks: Number(e.target.value) || 10,
+                              })
+                            }
+                            disabled={assessmentLoading}
+                          />
+                        </label>
+                      </div>
+                    </li>
                   ))}
                 </ol>
                 <div className="rp-actions">
+                  <button
+                    type="button"
+                    className="rp-secondary"
+                    disabled={
+                      assessmentLoading ||
+                      editableQuestions.length >= MAX_QUESTIONS
+                    }
+                    onClick={addQuestion}
+                  >
+                    Add question
+                  </button>
                   <button
                     type="button"
                     className="rp-secondary"
@@ -504,10 +682,10 @@ export default function RecruiterDashboard({
                   <button
                     type="button"
                     className="rp-primary rp-btn-inline"
-                    disabled={!pendingInviteLink}
-                    onClick={handleApprove}
+                    disabled={assessmentLoading}
+                    onClick={() => void handleCreateAssessment()}
                   >
-                    Approve &amp; get link
+                    {assessmentLoading ? "Creating…" : "Create & get link"}
                   </button>
                 </div>
               </div>
@@ -583,6 +761,16 @@ export default function RecruiterDashboard({
                               }}
                             >
                               Copy
+                            </button>
+                            <button
+                              type="button"
+                              className="rp-secondary rp-btn-compact"
+                              disabled={extendingToken === a.token}
+                              onClick={(e) =>
+                                void handleExtendAssessment(a.token, e)
+                              }
+                            >
+                              {extendingToken === a.token ? "…" : "Extend"}
                             </button>
                             <button
                               type="button"

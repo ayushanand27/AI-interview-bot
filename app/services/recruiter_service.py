@@ -6,12 +6,16 @@ from pathlib import Path
 from typing import Any, Optional
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import cast, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.types import String
 
 from app.core.exceptions import NotFoundException
+from app.db.candidate_verification_model import CandidateVerification
+from app.db.interview_invite_model import InterviewInvite
 from app.db.session_model import Session as DBSession
 from app.schemas.recruiter import RecruiterSessionDetail, RecruiterSessionSummary, TranscriptItem
+from app.services.question_utils import question_text
 from app.services.report_service import generate_session_report_pdf, report_filename
 
 COMPLETED_STATUSES = ("completed", "ended")
@@ -110,7 +114,7 @@ def _session_to_detail(row: DBSession) -> RecruiterSessionDetail:
         transcript.append(
             TranscriptItem(
                 index=i + 1,
-                question=question,
+                question=question_text(question),
                 answer=answer,
                 judgment=judgment,
             )
@@ -158,34 +162,93 @@ class RecruiterService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    async def list_completed_sessions(self) -> list[RecruiterSessionSummary]:
+    async def list_completed_sessions(
+        self, recruiter_id: int
+    ) -> list[RecruiterSessionSummary]:
+        """List completed sessions taken via this recruiter's invite links only."""
+        owned_tokens = select(InterviewInvite.token).where(
+            InterviewInvite.recruiter_id == recruiter_id
+        )
+        verification_session_ids = select(CandidateVerification.session_id).where(
+            CandidateVerification.token.in_(owned_tokens),
+            CandidateVerification.session_id.is_not(None),
+        )
         result = await self.db.execute(
             select(DBSession)
-            .where(DBSession.status.in_(COMPLETED_STATUSES))
+            .where(
+                DBSession.status.in_(COMPLETED_STATUSES),
+                or_(
+                    DBSession.invite_token.in_(owned_tokens),
+                    cast(DBSession.session_id, String).in_(verification_session_ids),
+                ),
+            )
             .order_by(DBSession.updated_at.desc())
         )
-        rows = result.scalars().all()
-        return [_session_to_summary(row) for row in rows]
+        return [_session_to_summary(row) for row in result.scalars().all()]
 
-    async def get_session_detail(self, session_id: UUID) -> RecruiterSessionDetail:
-        row = await self._get_completed_row(session_id)
+    async def get_session_detail(
+        self, recruiter_id: int, session_id: UUID
+    ) -> RecruiterSessionDetail:
+        row = await self._get_owned_completed_row(recruiter_id, session_id)
         return _session_to_detail(row)
 
-    async def get_session_report(self, session_id: UUID) -> tuple[bytes, str]:
-        row = await self._get_completed_row(session_id)
+    async def get_session_report(
+        self, recruiter_id: int, session_id: UUID
+    ) -> tuple[bytes, str]:
+        row = await self._get_owned_completed_row(recruiter_id, session_id)
         detail = _session_to_detail(row)
         pdf_bytes = generate_session_report_pdf(detail, row.proctoring_summary)
         return pdf_bytes, report_filename(detail)
 
-    async def set_human_review_flag(self, session_id: UUID, flagged: bool) -> RecruiterSessionDetail:
-        row = await self._get_completed_row(session_id)
+    async def set_human_review_flag(
+        self, recruiter_id: int, session_id: UUID, flagged: bool
+    ) -> RecruiterSessionDetail:
+        row = await self._get_owned_completed_row(recruiter_id, session_id)
         row.human_review_flag = flagged
         await self.db.commit()
         await self.db.refresh(row)
         return _session_to_detail(row)
 
-    async def _get_completed_row(self, session_id: UUID) -> DBSession:
+    async def recruiter_owns_session(
+        self, recruiter_id: int, session_id: UUID
+    ) -> bool:
+        """Return True if the session was started via this recruiter's invite."""
+        row = await self.db.get(DBSession, session_id)
+        if row is None:
+            return False
+        return await self._is_owned_by_recruiter(recruiter_id, row)
+
+    async def _get_owned_completed_row(
+        self, recruiter_id: int, session_id: UUID
+    ) -> DBSession:
         row = await self.db.get(DBSession, session_id)
         if row is None or row.status not in COMPLETED_STATUSES:
             raise NotFoundException("Completed interview session not found")
+        if not await self._is_owned_by_recruiter(recruiter_id, row):
+            # 404 avoids leaking that another tenant's session exists.
+            raise NotFoundException("Completed interview session not found")
         return row
+
+    async def _is_owned_by_recruiter(self, recruiter_id: int, row: DBSession) -> bool:
+        token = getattr(row, "invite_token", None)
+        if token:
+            invite = await self.db.execute(
+                select(InterviewInvite).where(InterviewInvite.token == token)
+            )
+            invite_row = invite.scalar_one_or_none()
+            if invite_row is not None:
+                return invite_row.recruiter_id == recruiter_id
+
+        verification = await self.db.execute(
+            select(CandidateVerification, InterviewInvite)
+            .join(
+                InterviewInvite,
+                InterviewInvite.token == CandidateVerification.token,
+            )
+            .where(CandidateVerification.session_id == str(row.session_id))
+        )
+        pair = verification.first()
+        if pair is None:
+            return False
+        _, invite_row = pair
+        return invite_row.recruiter_id == recruiter_id

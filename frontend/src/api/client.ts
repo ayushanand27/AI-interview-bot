@@ -12,9 +12,13 @@ import type {
 
 import type {
 
+  AssessmentQuestion,
+
   AssessmentSummary,
 
   CreateAssessmentResponse,
+
+  GenerateQuestionsResponse,
 
   ParseJdPdfResponse,
 
@@ -647,12 +651,44 @@ export const recruiterApi = {
 
 
 
+  async generateQuestions(payload: {
+    jd_text?: string;
+    jd_pdf?: File | null;
+    question_count: number;
+    difficulty: string;
+  }) {
+    const form = new FormData();
+    form.append("jd_text", payload.jd_text ?? "");
+    form.append("question_count", String(payload.question_count));
+    form.append("difficulty", payload.difficulty);
+    if (payload.jd_pdf) {
+      form.append("jd_pdf", payload.jd_pdf);
+    }
+
+    const response = await fetch(
+      `${API_BASE}/api/v1/recruiter/generate-questions`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+        body: form,
+      },
+    );
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(parseErrorMessage(body, response.status));
+    }
+    return response.json() as Promise<ApiEnvelope<GenerateQuestionsResponse>>;
+  },
+
+
+
   async createAssessment(payload: {
     jd_text?: string;
     jd_pdf?: File | null;
     question_count: number;
     difficulty: string;
     expiry_hours: number;
+    questions?: AssessmentQuestion[];
   }) {
     const form = new FormData();
     form.append("jd_text", payload.jd_text ?? "");
@@ -661,6 +697,9 @@ export const recruiterApi = {
     form.append("expiry_hours", String(payload.expiry_hours));
     if (payload.jd_pdf) {
       form.append("jd_pdf", payload.jd_pdf);
+    }
+    if (payload.questions && payload.questions.length > 0) {
+      form.append("questions", JSON.stringify(payload.questions));
     }
 
     const response = await fetch(

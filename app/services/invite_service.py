@@ -41,6 +41,7 @@ from app.schemas.invite import (
 )
 from app.services.identity_verification import verify_faces_from_base64
 from app.services.email_service import send_invite_welcome_password_email
+from app.services.question_utils import normalize_questions
 
 
 def _difficulty_to_experience(difficulty: str) -> str:
@@ -107,7 +108,7 @@ class InviteService:
         assert invite is not None
 
         company = await self._get_recruiter_company(invite.recruiter_id)
-        questions = list(invite.questions_json or [])
+        questions = normalize_questions(list(invite.questions_json or []))
         return InviteValidResponse(
             role_title=_role_title_from_jd(invite.jd_text),
             company=company,
@@ -151,7 +152,7 @@ class InviteService:
         email: str,
         phone: str,
     ) -> InviteRegisterResponse:
-        questions = [str(q).strip() for q in (invite.questions_json or []) if str(q).strip()]
+        questions = normalize_questions(list(invite.questions_json or []))
         if not questions:
             raise BadRequestException("This invite has no interview questions configured.")
 
@@ -181,6 +182,7 @@ class InviteService:
             proctoring_summary=None,
             recording_filename=None,
             recording_mp4_filename=None,
+            invite_token=token,
         )
         self.db.add(db_session)
 

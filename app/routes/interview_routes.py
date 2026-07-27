@@ -335,18 +335,27 @@ async def upload_session_recording(
     "/sessions/{session_id}/recording",
     summary="Download interview session recording",
     description=(
-        "Recruiters may access any session recording. Candidates may only access "
-        "recordings for sessions they own."
+        "Recruiters may access recordings for sessions started via their invite links. "
+        "Candidates may only access recordings for sessions they own."
     ),
 )
 @limiter.limit(INTERVIEW_LIMIT)
-def get_session_recording(
+async def get_session_recording(
     request: Request,
     session_id: SessionId,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     is_recruiter = current_user.role == UserRole.RECRUITER
-    if not is_recruiter:
+    if is_recruiter:
+        from app.services.recruiter_service import RecruiterService
+
+        owns = await RecruiterService(db).recruiter_owns_session(
+            current_user.id, session_id
+        )
+        if not owns:
+            raise HTTPException(status_code=404, detail="Recording not available")
+    else:
         interview_service.verify_session_access(session_id, current_user.id)
 
     try:

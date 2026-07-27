@@ -27,10 +27,10 @@ router = APIRouter(prefix="/recruiter", tags=["Recruiter"])
 )
 async def list_sessions(
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
 ):
     service = RecruiterService(db)
-    sessions = await service.list_completed_sessions()
+    sessions = await service.list_completed_sessions(current_user.id)
     return BaseResponse(
         success=True,
         message=f"Found {len(sessions)} completed session(s)",
@@ -45,10 +45,10 @@ async def list_sessions(
 async def download_session_report(
     session_id: UUID,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
 ):
     service = RecruiterService(db)
-    pdf_bytes, filename = await service.get_session_report(session_id)
+    pdf_bytes, filename = await service.get_session_report(current_user.id, session_id)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -64,10 +64,10 @@ async def download_session_report(
 async def get_session_detail(
     session_id: UUID,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
 ):
     service = RecruiterService(db)
-    detail = await service.get_session_detail(session_id)
+    detail = await service.get_session_detail(current_user.id, session_id)
     return BaseResponse(
         success=True,
         message="Session retrieved successfully",
@@ -84,10 +84,12 @@ async def update_human_review(
     session_id: UUID,
     body: HumanReviewUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
 ):
     service = RecruiterService(db)
-    detail = await service.set_human_review_flag(session_id, body.flagged)
+    detail = await service.set_human_review_flag(
+        current_user.id, session_id, body.flagged
+    )
     return BaseResponse(
         success=True,
         message="Human review flag updated",

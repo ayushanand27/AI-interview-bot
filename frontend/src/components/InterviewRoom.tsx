@@ -129,7 +129,11 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
   const [isSessionRecording, setIsSessionRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [transcribing, setTranscribing] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(QUESTION_TIMER_SEC);
+  const [secondsLeft, setSecondsLeft] = useState(
+    question.time_seconds && question.time_seconds > 0
+      ? question.time_seconds
+      : QUESTION_TIMER_SEC,
+  );
 
   const answerRef = useRef("");
   const lastActivityRef = useRef(Date.now());
@@ -185,10 +189,14 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     setAnswer("");
     setAudioWarning(null);
     setTranscribeNotice(null);
-    setSecondsLeft(QUESTION_TIMER_SEC);
+    const timerSec =
+      question.time_seconds && question.time_seconds > 0
+        ? question.time_seconds
+        : QUESTION_TIMER_SEC;
+    setSecondsLeft(timerSec);
     questionTimerExpiredRef.current = false;
     lastActivityRef.current = Date.now();
-  }, [question.question_index]);
+  }, [question.question_index, question.time_seconds]);
 
   const processRecordedAudio = useCallback(
     async (blob: Blob) => {

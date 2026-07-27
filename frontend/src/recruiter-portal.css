@@ -248,6 +248,70 @@
   font-size: 0.925rem;
 }
 
+.recruiter-portal .rp-preview-header {
+  margin-bottom: 0.5rem;
+}
+
+.recruiter-portal .rp-questions-editor {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recruiter-portal .rp-question-edit-row {
+  border: 1px solid var(--rp-border);
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.recruiter-portal .rp-question-edit-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.45rem;
+}
+
+.recruiter-portal .rp-question-num {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--rp-muted, #94a3b8);
+  letter-spacing: 0.04em;
+}
+
+.recruiter-portal .rp-question-edit-row textarea {
+  width: 100%;
+  min-height: 4.5rem;
+  margin: 0;
+}
+
+.recruiter-portal .rp-question-meta-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+}
+
+.recruiter-portal .rp-question-meta-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+}
+
+.recruiter-portal .rp-question-meta-row input {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .recruiter-portal .rp-question-meta-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .recruiter-portal .rp-invite-box {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--rp-border);

@@ -1,5 +1,7 @@
 """Recruiter assessment creation routes (JD-based invites)."""
 
+import json
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,9 +11,12 @@ from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.common import BaseResponse
 from app.schemas.recruiter_assessment import (
+    AssessmentQuestion,
     AssessmentSummary,
     CreateAssessmentRequest,
     CreateAssessmentResponse,
+    GenerateQuestionsRequest,
+    GenerateQuestionsResponse,
     ParseJdPdfResponse,
     UpdateAssessmentRequest,
 )
@@ -21,6 +26,64 @@ from app.services.resume_parser import extract_text_from_document
 from app.utils.file_validation import validate_document_upload
 
 router = APIRouter(prefix="/recruiter", tags=["Recruiter Assessment"])
+
+
+def _parse_questions_form(questions_json: str | None) -> list[AssessmentQuestion] | None:
+    if questions_json is None or not str(questions_json).strip():
+        return None
+    try:
+        payload = json.loads(questions_json)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=422, detail="questions must be valid JSON") from exc
+    if not isinstance(payload, list):
+        raise HTTPException(status_code=422, detail="questions must be a JSON array")
+    try:
+        return [AssessmentQuestion.model_validate(item) for item in payload]
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
+
+@router.post(
+    "/generate-questions",
+    response_model=BaseResponse[GenerateQuestionsResponse],
+    summary="Generate draft interview questions from a JD (no invite created)",
+)
+async def generate_questions(
+    question_count: int = Form(...),
+    difficulty: str = Form(...),
+    jd_text: str = Form(""),
+    jd_pdf: UploadFile | None = File(None),
+    _current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    jd_pdf_bytes: bytes | None = None
+    if jd_pdf is not None and jd_pdf.filename:
+        jd_pdf_bytes = await jd_pdf.read()
+
+    try:
+        combined_jd = resolve_job_description(
+            jd_text,
+            jd_pdf_bytes,
+            pdf_filename=jd_pdf.filename if jd_pdf else None,
+            pdf_content_type=jd_pdf.content_type if jd_pdf else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        data = GenerateQuestionsRequest(
+            jd_text=combined_jd,
+            question_count=question_count,
+            difficulty=difficulty,
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
+    result = AssessmentService.generate_questions_preview(data)
+    return BaseResponse(
+        success=True,
+        message=f"Generated {len(result.questions)} question(s)",
+        data=result,
+    )
 
 
 @router.post(
@@ -34,6 +97,7 @@ async def create_assessment(
     expiry_hours: int = Form(...),
     jd_text: str = Form(""),
     jd_pdf: UploadFile | None = File(None),
+    questions: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
 ):
@@ -51,12 +115,17 @@ async def create_assessment(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    custom_questions = _parse_questions_form(questions)
+
     try:
         data = CreateAssessmentRequest(
             jd_text=combined_jd,
-            question_count=question_count,
+            question_count=question_count
+            if custom_questions is None
+            else len(custom_questions),
             difficulty=difficulty,
             expiry_hours=expiry_hours,
+            questions=custom_questions,
         )
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=exc.errors()) from exc
