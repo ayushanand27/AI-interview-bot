@@ -63,8 +63,8 @@ export default function RecruiterLogin() {
   return (
     <div className="recruiter-portal">
       <header>
-        <h1>AI Interview Bot — Recruiter Portal</h1>
-        <p>Sign in to create assessments and review completed interviews.</p>
+        <h1>AI Interview Bot</h1>
+        <p>Sign in to create assessments and review interviews.</p>
       </header>
 
       <div className="rp-card status-panel">
@@ -117,7 +117,7 @@ export default function RecruiterLogin() {
           </form>
         ) : (
           <form onSubmit={handleRegister}>
-            <label htmlFor="recruiter-company">Company Name</label>
+            <label htmlFor="recruiter-company">Company</label>
             <input id="recruiter-company" name="company_name" required />
             <label htmlFor="recruiter-register-email">Email</label>
             <input
@@ -136,10 +136,10 @@ export default function RecruiterLogin() {
               minLength={8}
               autoComplete="new-password"
             />
-            <label htmlFor="recruiter-phone">Phone</label>
+            <label htmlFor="recruiter-phone">Phone (optional)</label>
             <input id="recruiter-phone" name="phone" type="tel" />
             <button type="submit" className="rp-primary" disabled={loading}>
-              {loading ? "Creating account…" : "Create recruiter account"}
+              {loading ? "Creating…" : "Create account"}
             </button>
           </form>
         )}

@@ -21,7 +21,7 @@ VIOLATION_TYPE_LABELS = {
     "looking_sideways": "Looking away (sideways)",
     "looking_down": "Looking down",
     "loud_audio": "Loud environment",
-    "tab_switch": "Tab switch",
+    "tab_switch": "Switched away from interview window",
     "virtual_camera": "Virtual camera",
     "virtual_camera_suspected": "Unusual camera setup",
     "recording_extension": "Screen recording extension",

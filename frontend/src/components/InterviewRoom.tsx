@@ -16,7 +16,8 @@ import { confirmAnswerSubmit, getAnswerWarnings, MAX_ANSWER_LENGTH } from "../ut
 import { startAmbientAudioMonitor } from "../utils/audioMonitor";
 
 const LOUD_AUDIO_MESSAGE = "Please maintain a quiet environment";
-const TAB_SWITCH_MESSAGE = "Tab switch detected - this has been logged";
+const TAB_SWITCH_MESSAGE =
+  "Switched away from interview window - this has been logged";
 const PROCTOR_INTERVAL_MS = 3000;
 const VIRTUAL_CAMERA_CHECK_MS = 30000;
 const ENVIRONMENT_CHECK_MS = 20000;

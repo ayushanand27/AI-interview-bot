@@ -13,7 +13,7 @@ const VIOLATION_TYPE_LABELS: Record<string, string> = {
   looking_sideways: "Looking away (sideways)",
   looking_down: "Looking down",
   loud_audio: "Loud environment",
-  tab_switch: "Tab switch",
+  tab_switch: "Switched away from interview window",
   virtual_camera: "Virtual camera",
   virtual_camera_suspected: "Unusual camera setup",
   recording_extension: "Screen recording extension",
@@ -319,15 +319,24 @@ export default function RecruiterDashboard({
     }
   }
 
+  const overallScore =
+    detail?.final_score?.final_score ??
+    detail?.final_score?.candidate_score ??
+    detail?.adjusted_score ??
+    detail?.original_score ??
+    null;
+
   return (
     <div className="recruiter-portal">
-      <header>
-        <h1>AI Interview Bot — Recruiter Portal</h1>
-        <p>Create assessments and review completed interviews.</p>
+      <header className="rp-header">
+        <div className="rp-header-text">
+          <h1>AI Interview Bot</h1>
+          <p>Recruiter portal — assessments and interview review</p>
+        </div>
         {onLogout && (
           <button
             type="button"
-            className="rp-secondary rp-logout"
+            className="rp-secondary rp-btn-compact"
             onClick={onLogout}
           >
             Log out
@@ -335,9 +344,12 @@ export default function RecruiterDashboard({
         )}
       </header>
 
-      <div className="rp-card rp-card-wide rp-card-spacing">
+      <section className="rp-card rp-card-wide rp-section">
         <div className="rp-toolbar">
-          <h2 className="rp-section-title">Assessments</h2>
+          <div>
+            <h2 className="rp-section-title">Assessments</h2>
+            <p className="rp-section-desc">Create invite links from a job description.</p>
+          </div>
           <button
             type="button"
             className="rp-primary rp-btn-inline"
@@ -347,13 +359,12 @@ export default function RecruiterDashboard({
               setCopyMessage(null);
             }}
           >
-            {showAssessmentForm ? "Hide form" : "Create New Assessment"}
+            {showAssessmentForm ? "Cancel" : "New assessment"}
           </button>
         </div>
 
         {showAssessmentForm && (
-          <>
-            <label>Job description</label>
+          <div className="rp-form-panel">
             <div className="rp-tabs rp-tabs-spaced">
               <button
                 type="button"
@@ -363,7 +374,7 @@ export default function RecruiterDashboard({
                   onError(null);
                 }}
               >
-                Paste JD Text
+                Paste text
               </button>
               <button
                 type="button"
@@ -373,14 +384,12 @@ export default function RecruiterDashboard({
                   onError(null);
                 }}
               >
-                Upload JD File
+                Upload file
               </button>
             </div>
 
             <div className="rp-jd-url-block">
-              <label htmlFor="jd-url" className="rp-jd-url-label">
-                Or paste a job URL
-              </label>
+              <label htmlFor="jd-url">Job posting URL (optional)</label>
               <div className="rp-jd-url-row">
                 <input
                   id="jd-url"
@@ -392,11 +401,11 @@ export default function RecruiterDashboard({
                 />
                 <button
                   type="button"
-                  className="rp-secondary"
+                  className="rp-secondary rp-btn-compact"
                   onClick={() => void handleFetchJd()}
                   disabled={fetchingJd || assessmentLoading || !jdUrl.trim()}
                 >
-                  {fetchingJd ? "Fetching…" : "Fetch JD"}
+                  {fetchingJd ? "…" : "Fetch"}
                 </button>
               </div>
             </div>
@@ -419,14 +428,14 @@ export default function RecruiterDashboard({
                   }}
                 />
                 {jdPdfFile && (
-                  <p className="rp-file-name">Selected: {jdPdfFile.name}</p>
+                  <p className="rp-file-name">{jdPdfFile.name}</p>
                 )}
               </div>
             )}
 
             <div className="rp-field-row">
               <div>
-                <label htmlFor="question-count">Number of questions</label>
+                <label htmlFor="question-count">Questions</label>
                 <select
                   id="question-count"
                   value={questionCount}
@@ -452,7 +461,7 @@ export default function RecruiterDashboard({
                 </select>
               </div>
               <div>
-                <label htmlFor="expiry">Link expiry</label>
+                <label htmlFor="expiry">Expires</label>
                 <select
                   id="expiry"
                   value={expiryHours}
@@ -472,12 +481,12 @@ export default function RecruiterDashboard({
               disabled={assessmentLoading}
               onClick={() => void handleGenerateQuestions()}
             >
-              {assessmentLoading ? "Generating…" : "Generate Questions"}
+              {assessmentLoading ? "Generating…" : "Generate questions"}
             </button>
 
             {questionsPreview.length > 0 && (
               <div className="rp-preview-block">
-                <h3 className="rp-preview-title">Question preview</h3>
+                <h3 className="rp-preview-title">Preview</h3>
                 <ol className="rp-questions-preview">
                   {questionsPreview.map((q, i) => (
                     <li key={i}>{q}</li>
@@ -498,7 +507,7 @@ export default function RecruiterDashboard({
                     disabled={!pendingInviteLink}
                     onClick={handleApprove}
                   >
-                    Approve &amp; Get Link
+                    Approve &amp; get link
                   </button>
                 </div>
               </div>
@@ -506,13 +515,15 @@ export default function RecruiterDashboard({
 
             {approvedInviteLink && (
               <div className="rp-invite-box">
-                <p className="rp-invite-hint">
-                  Share this invite link with candidates:
-                </p>
+                <p className="rp-invite-hint">Candidate invite link</p>
                 <p className="rp-invite-link">{fullInviteUrl(approvedInviteLink)}</p>
                 <div className="rp-actions">
-                  <button type="button" className="rp-secondary" onClick={() => void handleCopyLink()}>
-                    Copy to clipboard
+                  <button
+                    type="button"
+                    className="rp-secondary"
+                    onClick={() => void handleCopyLink()}
+                  >
+                    Copy link
                   </button>
                 </div>
                 {copyMessage && (
@@ -520,12 +531,14 @@ export default function RecruiterDashboard({
                 )}
               </div>
             )}
-          </>
+          </div>
         )}
 
         {assessments.length > 0 && (
-          <div className="rp-preview-block">
-            <h3 className="rp-preview-title">Saved assessments</h3>
+          <div className={showAssessmentForm ? "rp-list-block" : undefined}>
+            {showAssessmentForm && (
+              <h3 className="rp-preview-title">Saved invites</h3>
+            )}
             {assessmentsLoading ? (
               <p className="rp-muted-small">Loading…</p>
             ) : (
@@ -533,17 +546,16 @@ export default function RecruiterDashboard({
                 <table className="recruiter-table">
                   <thead>
                     <tr>
-                      <th>Role preview</th>
-                      <th>Questions</th>
+                      <th>Role</th>
+                      <th>Qs</th>
                       <th>Uses</th>
                       <th>Expires</th>
-                      <th>Link</th>
-                      <th />
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {assessments.map((a) => (
-                      <tr key={a.token}>
+                      <tr key={a.token} className="rp-row-static">
                         <td>
                           {a.role_preview}
                           {a.is_expired && (
@@ -551,42 +563,45 @@ export default function RecruiterDashboard({
                           )}
                         </td>
                         <td>
-                          {a.question_count} ({a.difficulty})
+                          {a.question_count}
+                          <span className="rp-cell-muted"> {a.difficulty}</span>
                         </td>
                         <td>
                           {a.used_count}/{a.max_uses}
                         </td>
                         <td>{formatDate(a.expiry_at)}</td>
                         <td>
-                          <button
-                            type="button"
-                            className="rp-secondary rp-btn-compact"
-                            onClick={() => {
-                              void navigator.clipboard.writeText(
-                                fullInviteUrl(a.invite_link),
-                              );
-                              setCopyMessage("Invite link copied.");
-                            }}
-                          >
-                            Copy
-                          </button>
-                        </td>
-                        <td>
-                          <button
-                            type="button"
-                            className="rp-secondary rp-btn-compact"
-                            disabled={
-                              deletingToken === a.token || a.used_count > 0
-                            }
-                            title={
-                              a.used_count > 0
-                                ? "Cannot delete after a candidate has started"
-                                : "Delete unused invite"
-                            }
-                            onClick={(e) => void handleDeleteAssessment(a.token, e)}
-                          >
-                            {deletingToken === a.token ? "…" : "Delete"}
-                          </button>
+                          <div className="rp-row-actions">
+                            <button
+                              type="button"
+                              className="rp-secondary rp-btn-compact"
+                              onClick={() => {
+                                void navigator.clipboard.writeText(
+                                  fullInviteUrl(a.invite_link),
+                                );
+                                setCopyMessage("Invite link copied.");
+                              }}
+                            >
+                              Copy
+                            </button>
+                            <button
+                              type="button"
+                              className="rp-secondary rp-btn-compact"
+                              disabled={
+                                deletingToken === a.token || a.used_count > 0
+                              }
+                              title={
+                                a.used_count > 0
+                                  ? "Cannot delete after a candidate has started"
+                                  : "Delete unused invite"
+                              }
+                              onClick={(e) =>
+                                void handleDeleteAssessment(a.token, e)
+                              }
+                            >
+                              {deletingToken === a.token ? "…" : "Delete"}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -599,17 +614,20 @@ export default function RecruiterDashboard({
             )}
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="rp-card rp-card-wide recruiter-dashboard">
-        <h2 className="rp-section-title-spaced">Completed interviews</h2>
+      <section className="rp-card rp-card-wide rp-section">
+        <h2 className="rp-section-title">Completed interviews</h2>
+        <p className="rp-section-desc">
+          Select a row to open the transcript and proctoring summary.
+        </p>
 
         {loading && sessions.length === 0 ? (
-          <p className="loading">Loading interviews…</p>
+          <p className="rp-muted-small rp-loading-inline">Loading interviews…</p>
         ) : sessions.length === 0 ? (
           <p className="rp-empty">
-            No completed interviews yet. Candidates must finish and end a session
-            before it appears here.
+            No completed interviews yet. Candidates must finish a session before
+            it appears here.
           </p>
         ) : (
           <div className="recruiter-table-wrap">
@@ -620,9 +638,8 @@ export default function RecruiterDashboard({
                   <th>Role</th>
                   <th>Date</th>
                   <th>Score</th>
-                  <th>Review</th>
-                  <th>Recording</th>
-                  <th>Report</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -654,32 +671,26 @@ export default function RecruiterDashboard({
                       )}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      {row.recording_available ? (
+                      <div className="rp-row-actions">
+                        {row.recording_available && (
+                          <button
+                            type="button"
+                            className="rp-secondary rp-btn-compact"
+                            disabled={watchingId === row.session_id}
+                            onClick={(e) => handleWatchRecording(row, e)}
+                          >
+                            {watchingId === row.session_id ? "…" : "Watch"}
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="rp-secondary rp-btn-compact"
-                          disabled={watchingId === row.session_id}
-                          onClick={(e) => handleWatchRecording(row, e)}
+                          disabled={downloadingId === row.session_id}
+                          onClick={(e) => handleDownloadReport(row, e)}
                         >
-                          {watchingId === row.session_id
-                            ? "Loading…"
-                            : "Watch Recording"}
+                          {downloadingId === row.session_id ? "…" : "PDF"}
                         </button>
-                      ) : (
-                        <span className="rp-muted-small">No</span>
-                      )}
-                    </td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        className="rp-secondary rp-btn-compact"
-                        disabled={downloadingId === row.session_id}
-                        onClick={(e) => handleDownloadReport(row, e)}
-                      >
-                        {downloadingId === row.session_id
-                          ? "Downloading…"
-                          : "Download Report"}
-                      </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -687,38 +698,47 @@ export default function RecruiterDashboard({
             </table>
           </div>
         )}
-      </div>
+      </section>
 
       {selectedId && (
-        <div className="rp-card rp-card-wide rp-card-spacing-top">
+        <section className="rp-card rp-card-wide rp-section">
           {detailLoading || !detail ? (
-            <p className="loading">Loading transcript…</p>
+            <p className="rp-muted-small rp-loading-inline">Loading transcript…</p>
           ) : (
             <>
               <div className="rp-detail-header">
-                <h2 className="rp-section-title-tight">
-                  {detail.candidate_name} — {detail.role_title}
-                </h2>
+                <div>
+                  <h2 className="rp-section-title">
+                    {detail.candidate_name}
+                  </h2>
+                  <p className="rp-detail-meta">
+                    {detail.role_title}
+                    {" · "}
+                    {formatDate(detail.date)}
+                    {detail.duration_minutes != null
+                      ? ` · ${detail.duration_minutes} min`
+                      : ""}
+                    {" · "}
+                    {detail.answered_count}/{detail.total_questions} answered
+                    {" · "}
+                    {detail.status}
+                  </p>
+                </div>
                 <div className="rp-detail-actions">
-                  {detail.human_review_flag ? (
-                    <button
-                      type="button"
-                      className="rp-secondary"
-                      disabled={reviewUpdating}
-                      onClick={() => void handleToggleHumanReview(false)}
-                    >
-                      {reviewUpdating ? "Updating…" : "Clear review flag"}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="rp-secondary"
-                      disabled={reviewUpdating}
-                      onClick={() => void handleToggleHumanReview(true)}
-                    >
-                      {reviewUpdating ? "Updating…" : "Flag for review"}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="rp-secondary rp-btn-compact"
+                    disabled={reviewUpdating}
+                    onClick={() =>
+                      void handleToggleHumanReview(!detail.human_review_flag)
+                    }
+                  >
+                    {reviewUpdating
+                      ? "…"
+                      : detail.human_review_flag
+                        ? "Clear flag"
+                        : "Flag review"}
+                  </button>
                   <button
                     type="button"
                     className="rp-primary rp-btn-inline"
@@ -732,14 +752,12 @@ export default function RecruiterDashboard({
                       }
                     }}
                   >
-                    {downloadingId === detail.session_id
-                      ? "Downloading…"
-                      : "Download Report"}
+                    {downloadingId === detail.session_id ? "…" : "Download PDF"}
                   </button>
                   {detail.recording_available && (
                     <button
                       type="button"
-                      className="rp-secondary"
+                      className="rp-secondary rp-btn-compact"
                       disabled={watchingId === detail.session_id}
                       onClick={(e) => {
                         const row = sessions.find(
@@ -750,154 +768,138 @@ export default function RecruiterDashboard({
                         }
                       }}
                     >
-                      {watchingId === detail.session_id
-                        ? "Loading…"
-                        : "Watch Recording"}
+                      {watchingId === detail.session_id ? "…" : "Watch"}
                     </button>
                   )}
                 </div>
               </div>
-              <p className="rp-detail-meta">
-                {formatDate(detail.date)}
-                {detail.duration_minutes != null
-                  ? ` · ${detail.duration_minutes} min`
-                  : ""}{" "}
-                · {detail.answered_count} of {detail.total_questions} answered ·{" "}
-                {detail.status}
-                {detail.recording_available ? " · Recording available" : ""}
-              </p>
 
               {detail.human_review_flag && (
                 <div className="alert warning rp-summary-spaced">
-                  This session is flagged for human review.
+                  Flagged for human review.
                 </div>
               )}
 
               {detail.low_identity_confidence && (
                 <div className="alert warning rp-summary-spaced">
-                  Identity verification flagged for review
+                  Identity verification needs review
                   {detail.identity_similarity_score != null && (
                     <>
                       {" "}
-                      (face match score:{" "}
-                      {detail.identity_similarity_score.toFixed(2)})
+                      (face match: {detail.identity_similarity_score.toFixed(2)})
                     </>
                   )}
-                  . ID photo and selfie similarity was below the confidence threshold.
+                  .
                 </div>
               )}
 
-              {(detail.original_score != null || detail.adjusted_score != null) && (
-                <div className="summary-overall rp-summary-spaced">
-                  <h3>Scores</h3>
-                  {detail.original_score != null && (
-                    <p>Original score: <strong>{detail.original_score}</strong> / 100</p>
-                  )}
-                  {detail.integrity_penalty_percent > 0 && (
-                    <p>Integrity penalty: <strong>-{detail.integrity_penalty_percent}%</strong></p>
-                  )}
-                  {detail.adjusted_score != null && (
-                    <p>Adjusted score: <strong>{detail.adjusted_score}</strong> / 100</p>
-                  )}
-                  {detail.integrity_level && (
-                    <p>Integrity level: <strong>{detail.integrity_level}</strong></p>
-                  )}
+              {(overallScore != null ||
+                detail.integrity_penalty_percent > 0 ||
+                detail.final_score?.recommendation) && (
+                <div className="rp-score-panel">
+                  <div className="rp-score-main">
+                    <span className="rp-score-label">Score</span>
+                    <span className="rp-score-value">
+                      {overallScore ?? "—"}
+                      <span className="rp-score-max"> / 100</span>
+                    </span>
+                  </div>
+                  <div className="rp-score-meta">
+                    {detail.original_score != null &&
+                      detail.adjusted_score != null &&
+                      detail.original_score !== detail.adjusted_score && (
+                        <span>
+                          Original {detail.original_score}
+                          {detail.integrity_penalty_percent > 0 && (
+                            <> · −{detail.integrity_penalty_percent}% integrity</>
+                          )}
+                        </span>
+                      )}
+                    {detail.integrity_level && (
+                      <span>Integrity: {detail.integrity_level}</span>
+                    )}
+                    {detail.final_score?.recommendation && (
+                      <span>
+                        Rec: <strong>{detail.final_score.recommendation}</strong>
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
 
               {detail.proctoring_summary?.violations &&
                 detail.proctoring_summary.violations.length > 0 && (
-                  <section className="summary-violations rp-summary-spaced">
-                    <h3>Proctoring violations</h3>
+                  <section className="rp-violations-panel">
+                    <h3 className="rp-preview-title">Proctoring</h3>
                     <ul className="summary-violations-list">
                       {detail.proctoring_summary.violations.map((v, idx) => (
                         <li key={`${v.time}-${idx}`}>
                           {new Date(v.time * 1000).toLocaleTimeString()} ·{" "}
-                          {formatViolationType(v.type)} ({v.severity}) · -
+                          {formatViolationType(v.type)} ({v.severity}) · −
                           {v.penalty_percent}%
-                          {v.message ? ` — ${v.message}` : ""}
                         </li>
                       ))}
                     </ul>
                   </section>
                 )}
 
-              {detail.final_score && (
-                <div className="summary-overall rp-summary-spaced">
-                  <h3>Overall score</h3>
-                  <p className="summary-score">
-                    <strong>
-                      {detail.final_score.final_score ??
-                        detail.final_score.candidate_score ??
-                        "—"}
-                    </strong>
-                    <span className="summary-score-max"> / 100</span>
-                  </p>
-                  {detail.final_score.recommendation && (
-                    <p className="summary-recommendation">
-                      Recommendation:{" "}
-                      <strong>{detail.final_score.recommendation}</strong>
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {detail.transcript.map((item) => {
-                const j = item.judgment;
-                return (
-                  <div key={item.index} className="summary-item">
-                    <h3>Question {item.index}</h3>
-                    <p>{item.question}</p>
-                    <h3 className="rp-answer-title">Answer</h3>
-                    <p className="answer-text">
-                      {item.answer ?? "(not answered)"}
-                    </p>
-                    {j && !j.error && (
-                      <div className="summary-feedback">
-                        <h3>Judge feedback</h3>
-                        {j.weighted_total != null && (
-                          <p className="summary-question-score">
-                            Score: <strong>{j.weighted_total}</strong> / 100
-                          </p>
-                        )}
-                        {(j.overall_reasoning ?? j.reasoning) && (
-                          <p className="summary-reasoning">
-                            {j.overall_reasoning ?? j.reasoning}
-                          </p>
-                        )}
-                        {j.strengths && j.strengths.length > 0 && (
-                          <div className="summary-feedback-block">
-                            <h4>Strengths</h4>
-                            <ul>
-                              {j.strengths.map((s, idx) => (
-                                <li key={idx}>{s}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {j.improvements && j.improvements.length > 0 && (
-                          <div className="summary-feedback-block">
-                            <h4>Improvements</h4>
-                            <ul>
-                              {j.improvements.map((s, idx) => (
-                                <li key={idx}>{s}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {j?.error === "judging_failed" && (
-                      <div className="alert info alert-stack">
-                        Judge feedback unavailable for this answer.
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              <div className="rp-transcript">
+                {detail.transcript.map((item) => {
+                  const j = item.judgment;
+                  return (
+                    <div key={item.index} className="summary-item">
+                      <h3>Q{item.index}</h3>
+                      <p>{item.question}</p>
+                      <h3 className="rp-answer-title">Answer</h3>
+                      <p className="answer-text">
+                        {item.answer ?? "(not answered)"}
+                      </p>
+                      {j && !j.error && (
+                        <div className="summary-feedback">
+                          {j.weighted_total != null && (
+                            <p className="summary-question-score">
+                              Score: <strong>{j.weighted_total}</strong> / 100
+                            </p>
+                          )}
+                          {(j.overall_reasoning ?? j.reasoning) && (
+                            <p className="summary-reasoning">
+                              {j.overall_reasoning ?? j.reasoning}
+                            </p>
+                          )}
+                          {j.strengths && j.strengths.length > 0 && (
+                            <div className="summary-feedback-block">
+                              <h4>Strengths</h4>
+                              <ul>
+                                {j.strengths.map((s, idx) => (
+                                  <li key={idx}>{s}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {j.improvements && j.improvements.length > 0 && (
+                            <div className="summary-feedback-block">
+                              <h4>Improvements</h4>
+                              <ul>
+                                {j.improvements.map((s, idx) => (
+                                  <li key={idx}>{s}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {j?.error === "judging_failed" && (
+                        <div className="alert info alert-stack">
+                          Judge feedback unavailable for this answer.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </>
           )}
-        </div>
+        </section>
       )}
       <p className="rp-footer">
         <a href="/privacy">Privacy Policy</a>
