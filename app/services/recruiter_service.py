@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Optional
 from uuid import UUID
 
-from sqlalchemy import cast, or_, select
+from sqlalchemy import cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.types import String
 
@@ -19,6 +19,20 @@ from app.services.question_utils import question_text
 from app.services.report_service import generate_session_report_pdf, report_filename
 
 COMPLETED_STATUSES = ("completed", "ended")
+
+
+def _uuid_key(value: object) -> str:
+    """Normalize UUID/hex forms for comparison (with or without hyphens)."""
+    return str(value or "").replace("-", "").lower()
+
+
+def _session_id_sql_key():
+    """SQL expression: sessions.session_id as lowercase hex without hyphens."""
+    return func.replace(func.lower(cast(DBSession.session_id, String)), "-", "")
+
+
+def _verification_session_sql_key():
+    return func.replace(func.lower(CandidateVerification.session_id), "-", "")
 
 
 def _candidate_display_name(resume_filename: Optional[str]) -> str:
@@ -169,7 +183,7 @@ class RecruiterService:
         owned_tokens = select(InterviewInvite.token).where(
             InterviewInvite.recruiter_id == recruiter_id
         )
-        verification_session_ids = select(CandidateVerification.session_id).where(
+        verification_session_keys = select(_verification_session_sql_key()).where(
             CandidateVerification.token.in_(owned_tokens),
             CandidateVerification.session_id.is_not(None),
         )
@@ -179,7 +193,7 @@ class RecruiterService:
                 DBSession.status.in_(COMPLETED_STATUSES),
                 or_(
                     DBSession.invite_token.in_(owned_tokens),
-                    cast(DBSession.session_id, String).in_(verification_session_ids),
+                    _session_id_sql_key().in_(verification_session_keys),
                 ),
             )
             .order_by(DBSession.updated_at.desc())
@@ -239,16 +253,16 @@ class RecruiterService:
             if invite_row is not None:
                 return invite_row.recruiter_id == recruiter_id
 
+        session_key = _uuid_key(row.session_id)
         verification = await self.db.execute(
             select(CandidateVerification, InterviewInvite)
             .join(
                 InterviewInvite,
                 InterviewInvite.token == CandidateVerification.token,
             )
-            .where(CandidateVerification.session_id == str(row.session_id))
+            .where(
+                _verification_session_sql_key() == session_key,
+                InterviewInvite.recruiter_id == recruiter_id,
+            )
         )
-        pair = verification.first()
-        if pair is None:
-            return False
-        _, invite_row = pair
-        return invite_row.recruiter_id == recruiter_id
+        return verification.first() is not None

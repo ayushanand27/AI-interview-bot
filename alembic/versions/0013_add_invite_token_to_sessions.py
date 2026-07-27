@@ -26,13 +26,15 @@ def upgrade() -> None:
             sa.Column("invite_token", sa.String(length=36), nullable=True),
         )
         # Backfill from candidate_verifications (invite flow linkage).
+        # SQLite Uuid text may omit hyphens; verification.session_id usually has them.
         op.execute(
             """
             UPDATE sessions
             SET invite_token = (
                 SELECT candidate_verifications.token
                 FROM candidate_verifications
-                WHERE candidate_verifications.session_id = CAST(sessions.session_id AS TEXT)
+                WHERE REPLACE(LOWER(candidate_verifications.session_id), '-', '')
+                    = REPLACE(LOWER(CAST(sessions.session_id AS TEXT)), '-', '')
                 LIMIT 1
             )
             WHERE invite_token IS NULL
