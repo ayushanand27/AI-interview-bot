@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { interviewApi, recruiterApi } from "../api/client";
 import type {
+  RecruiterAnalyticsResponse,
   RecruiterSessionDetail,
+  RecruiterSessionFilters,
   RecruiterSessionSummary,
 } from "../types/recruiter";
 import type {
@@ -130,6 +132,37 @@ function reviewBadgeClass(status: string | null | undefined): string {
   }
 }
 
+function formatPercent(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  return `${value.toFixed(1)}%`;
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+const SCORE_BAND_OPTIONS = ["Strong Hire", "Hire", "Maybe", "No Hire", "Unscored"];
+const INTEGRITY_OPTIONS = [
+  "clean",
+  "minor_concerns",
+  "moderate_concerns",
+  "serious_concerns",
+  "unknown",
+];
+const REVIEW_STATUS_OPTIONS = [
+  "pending",
+  "needs_review",
+  "in_review",
+  "cleared",
+  "escalated",
+  "rejected",
+];
+
 function fullInviteUrl(relativeLink: string): string {
   return `${window.location.origin}${relativeLink}`;
 }
@@ -183,6 +216,109 @@ export default function RecruiterDashboard({
   const [extendingToken, setExtendingToken] = useState<string | null>(null);
   const [reviewUpdating, setReviewUpdating] = useState(false);
   const [reviewNotesDraft, setReviewNotesDraft] = useState("");
+  const [analytics, setAnalytics] = useState<RecruiterAnalyticsResponse | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [exportingSessions, setExportingSessions] = useState(false);
+  const [exportingAssessments, setExportingAssessments] = useState(false);
+  const [filters, setFilters] = useState<RecruiterSessionFilters>({});
+  const [filterRole, setFilterRole] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [filterInviteToken, setFilterInviteToken] = useState("");
+  const [filterScoreBand, setFilterScoreBand] = useState("");
+  const [filterIntegrity, setFilterIntegrity] = useState("");
+  const [filterReviewStatus, setFilterReviewStatus] = useState("");
+
+  function buildFilters(): RecruiterSessionFilters {
+    const next: RecruiterSessionFilters = {};
+    if (filterRole.trim()) next.role_title = filterRole.trim();
+    if (filterDateFrom) next.date_from = new Date(filterDateFrom).toISOString();
+    if (filterDateTo) {
+      const end = new Date(filterDateTo);
+      end.setHours(23, 59, 59, 999);
+      next.date_to = end.toISOString();
+    }
+    if (filterInviteToken.trim()) next.invite_token = filterInviteToken.trim();
+    if (filterScoreBand) next.score_band = filterScoreBand;
+    if (filterIntegrity) next.integrity_level = filterIntegrity;
+    if (filterReviewStatus) next.review_status = filterReviewStatus;
+    return next;
+  }
+
+  function loadSessions(activeFilters?: RecruiterSessionFilters) {
+    const query = activeFilters ?? filters;
+    onLoadingChange(true);
+    onError(null);
+    recruiterApi
+      .listSessions(query)
+      .then((res) => setSessions(res.data ?? []))
+      .catch((err) => {
+        onError(err instanceof Error ? err.message : "Failed to load sessions");
+      })
+      .finally(() => onLoadingChange(false));
+  }
+
+  function loadAnalytics(activeFilters?: RecruiterSessionFilters) {
+    const query = activeFilters ?? filters;
+    setAnalyticsLoading(true);
+    recruiterApi
+      .getAnalytics(query)
+      .then((res) => setAnalytics(res.data ?? null))
+      .catch(() => {
+        /* analytics is supplementary */
+      })
+      .finally(() => setAnalyticsLoading(false));
+  }
+
+  function refreshDashboard(activeFilters?: RecruiterSessionFilters) {
+    const query = activeFilters ?? filters;
+    loadSessions(query);
+    loadAnalytics(query);
+  }
+
+  function applyFilters() {
+    const next = buildFilters();
+    setFilters(next);
+    refreshDashboard(next);
+  }
+
+  function clearFilters() {
+    setFilterRole("");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+    setFilterInviteToken("");
+    setFilterScoreBand("");
+    setFilterIntegrity("");
+    setFilterReviewStatus("");
+    setFilters({});
+    refreshDashboard({});
+  }
+
+  async function handleExportSessions() {
+    setExportingSessions(true);
+    onError(null);
+    try {
+      const blob = await recruiterApi.exportSessionsCsv(filters);
+      downloadBlob(blob, `recruiter-sessions-${Date.now()}.csv`);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed to export sessions");
+    } finally {
+      setExportingSessions(false);
+    }
+  }
+
+  async function handleExportAssessments() {
+    setExportingAssessments(true);
+    onError(null);
+    try {
+      const blob = await recruiterApi.exportAssessmentsCsv();
+      downloadBlob(blob, `recruiter-assessments-${Date.now()}.csv`);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Failed to export assessments");
+    } finally {
+      setExportingAssessments(false);
+    }
+  }
 
   function loadAssessments() {
     setAssessmentsLoading(true);
@@ -197,35 +333,9 @@ export default function RecruiterDashboard({
 
   useEffect(() => {
     loadAssessments();
+    refreshDashboard({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    onLoadingChange(true);
-    onError(null);
-
-    recruiterApi
-      .listSessions()
-      .then((res) => {
-        if (!cancelled) {
-          setSessions(res.data ?? []);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          onError(err instanceof Error ? err.message : "Failed to load sessions");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          onLoadingChange(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [onError, onLoadingChange]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -1205,7 +1315,265 @@ export default function RecruiterDashboard({
       </section>
 
       <section className="rp-card rp-card-wide rp-section">
-        <h2 className="rp-section-title">Completed interviews</h2>
+        <div className="rp-toolbar">
+          <div>
+            <h2 className="rp-section-title">Analytics overview</h2>
+            <p className="rp-section-desc">
+              Invite funnel, score trends, integrity distribution, and assessment performance.
+            </p>
+          </div>
+          <div className="rp-actions">
+            <button
+              type="button"
+              className="rp-secondary rp-btn-compact"
+              disabled={exportingSessions}
+              onClick={() => void handleExportSessions()}
+            >
+              {exportingSessions ? "…" : "Export sessions CSV"}
+            </button>
+            <button
+              type="button"
+              className="rp-secondary rp-btn-compact"
+              disabled={exportingAssessments}
+              onClick={() => void handleExportAssessments()}
+            >
+              {exportingAssessments ? "…" : "Export assessments CSV"}
+            </button>
+          </div>
+        </div>
+
+        {analyticsLoading && !analytics ? (
+          <p className="rp-muted-small rp-loading-inline">Loading analytics…</p>
+        ) : analytics ? (
+          <>
+            <div className="rp-analytics-grid">
+              <div className="rp-stat-card">
+                <span className="rp-stat-label">Completed sessions</span>
+                <strong className="rp-stat-value">{analytics.completed_session_count}</strong>
+              </div>
+              <div className="rp-stat-card">
+                <span className="rp-stat-label">Completion rate</span>
+                <strong className="rp-stat-value">
+                  {formatPercent(analytics.completion_rate_percent)}
+                </strong>
+              </div>
+              <div className="rp-stat-card">
+                <span className="rp-stat-label">Average score</span>
+                <strong className="rp-stat-value">
+                  {analytics.average_score === null
+                    ? "—"
+                    : analytics.average_score.toFixed(1)}
+                </strong>
+              </div>
+              <div className="rp-stat-card">
+                <span className="rp-stat-label">Integrity flag rate</span>
+                <strong className="rp-stat-value">
+                  {formatPercent(analytics.integrity_flag_rate_percent)}
+                </strong>
+              </div>
+              <div className="rp-stat-card">
+                <span className="rp-stat-label">Review flagged</span>
+                <strong className="rp-stat-value">{analytics.review_flagged_count}</strong>
+              </div>
+              <div className="rp-stat-card">
+                <span className="rp-stat-label">Active assessments</span>
+                <strong className="rp-stat-value">{analytics.invite_count}</strong>
+              </div>
+            </div>
+
+            <div className="rp-analytics-panels">
+              <div className="rp-analytics-panel">
+                <h3 className="rp-preview-title">Invite funnel</h3>
+                <div className="rp-funnel-list">
+                  {(
+                    [
+                      ["Created", analytics.funnel.created],
+                      ["Opened", analytics.funnel.opened],
+                      ["Registered", analytics.funnel.registered],
+                      ["Verified", analytics.funnel.verified],
+                      ["Started", analytics.funnel.started],
+                      ["Completed", analytics.funnel.completed],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div key={label} className="rp-funnel-row">
+                      <span>{label}</span>
+                      <strong>{value}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rp-analytics-panel">
+                <h3 className="rp-preview-title">Score distribution</h3>
+                <div className="rp-distribution-list">
+                  {Object.entries(analytics.score_distribution).map(([band, count]) => (
+                    <div key={band} className="rp-distribution-row">
+                      <span>{band}</span>
+                      <strong>{count}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rp-analytics-panel">
+                <h3 className="rp-preview-title">Integrity distribution</h3>
+                <div className="rp-distribution-list">
+                  {Object.entries(analytics.integrity_distribution).map(([level, count]) => (
+                    <div key={level} className="rp-distribution-row">
+                      <span>{level.replace(/_/g, " ")}</span>
+                      <strong>{count}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {analytics.assessments.length > 0 && (
+              <div className="rp-analytics-assessments">
+                <h3 className="rp-preview-title">Assessment performance</h3>
+                <div className="recruiter-table-wrap">
+                  <table className="recruiter-table">
+                    <thead>
+                      <tr>
+                        <th>Role</th>
+                        <th>Used</th>
+                        <th>Started</th>
+                        <th>Completed</th>
+                        <th>Avg score</th>
+                        <th>Flags</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analytics.assessments.map((item) => (
+                        <tr key={item.token}>
+                          <td>{item.role_preview}</td>
+                          <td>{item.used_count}</td>
+                          <td>{item.started_count}</td>
+                          <td>{item.completed_count}</td>
+                          <td>
+                            {item.average_score === null
+                              ? "—"
+                              : item.average_score.toFixed(1)}
+                          </td>
+                          <td>{item.integrity_flag_count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="rp-empty">Analytics will appear once assessments and interviews exist.</p>
+        )}
+      </section>
+
+      <section className="rp-card rp-card-wide rp-section">
+        <div className="rp-toolbar">
+          <div>
+            <h2 className="rp-section-title">Completed interviews</h2>
+            <p className="rp-section-desc">
+              Filter by role, date, assessment, score band, integrity, or review status.
+            </p>
+          </div>
+          <div className="rp-actions">
+            <button
+              type="button"
+              className="rp-secondary rp-btn-compact"
+              onClick={clearFilters}
+            >
+              Clear filters
+            </button>
+            <button
+              type="button"
+              className="rp-primary rp-btn-compact"
+              onClick={applyFilters}
+            >
+              Apply filters
+            </button>
+          </div>
+        </div>
+
+        <div className="rp-filter-grid">
+          <label>
+            Role contains
+            <input
+              type="text"
+              value={filterRole}
+              onChange={(e) => setFilterRole(e.target.value)}
+              placeholder="Backend Engineer"
+            />
+          </label>
+          <label>
+            From date
+            <input
+              type="date"
+              value={filterDateFrom}
+              onChange={(e) => setFilterDateFrom(e.target.value)}
+            />
+          </label>
+          <label>
+            To date
+            <input
+              type="date"
+              value={filterDateTo}
+              onChange={(e) => setFilterDateTo(e.target.value)}
+            />
+          </label>
+          <label>
+            Assessment token
+            <input
+              type="text"
+              value={filterInviteToken}
+              onChange={(e) => setFilterInviteToken(e.target.value)}
+              placeholder="Invite UUID"
+            />
+          </label>
+          <label>
+            Score band
+            <select
+              value={filterScoreBand}
+              onChange={(e) => setFilterScoreBand(e.target.value)}
+            >
+              <option value="">Any</option>
+              {SCORE_BAND_OPTIONS.map((band) => (
+                <option key={band} value={band}>
+                  {band}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Integrity level
+            <select
+              value={filterIntegrity}
+              onChange={(e) => setFilterIntegrity(e.target.value)}
+            >
+              <option value="">Any</option>
+              {INTEGRITY_OPTIONS.map((level) => (
+                <option key={level} value={level}>
+                  {level.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Review status
+            <select
+              value={filterReviewStatus}
+              onChange={(e) => setFilterReviewStatus(e.target.value)}
+            >
+              <option value="">Any</option>
+              {REVIEW_STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>
+                  {formatReviewStatus(status)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
         <p className="rp-section-desc">
           Select a row to open the transcript and proctoring summary.
         </p>

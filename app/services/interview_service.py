@@ -262,6 +262,15 @@ class InterviewService:
         if session.status == SessionStatus.QUESTIONS_READY:
             session.status = SessionStatus.IN_PROGRESS
             session_store.save(session)
+            invite_token = getattr(session, "invite_token", None)
+            if invite_token:
+                from app.services.invite_funnel import record_invite_funnel_event
+
+                record_invite_funnel_event(
+                    invite_token=str(invite_token),
+                    event_type="started",
+                    session_id=session.session_id,
+                )
 
         index = session.current_question_index
         raw_question = session.questions[index]
@@ -449,6 +458,17 @@ class InterviewService:
                 adjusted_final_score = original_score
 
         session_store.save(session)
+
+        invite_token = getattr(session, "invite_token", None)
+        if invite_token:
+            from app.services.invite_funnel import record_invite_funnel_event
+
+            record_invite_funnel_event(
+                invite_token=str(invite_token),
+                event_type="completed",
+                session_id=session.session_id,
+                candidate_email=candidate_email,
+            )
 
         needs_review = integrity_level in ("moderate_concerns", "serious_concerns")
         proctoring = session.proctoring_summary if isinstance(session.proctoring_summary, dict) else {}

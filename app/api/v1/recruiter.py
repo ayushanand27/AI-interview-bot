@@ -1,8 +1,10 @@
 """Recruiter dashboard routes."""
 
+from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,13 +14,36 @@ from app.models.user import User, UserRole
 from app.schemas.common import BaseResponse
 from app.schemas.recruiter import (
     HumanReviewUpdateRequest,
+    RecruiterAnalyticsResponse,
     RecruiterReviewUpdateRequest,
     RecruiterSessionDetail,
+    RecruiterSessionFilters,
     RecruiterSessionSummary,
 )
+from app.services.recruiter_analytics_service import RecruiterAnalyticsService
 from app.services.recruiter_service import RecruiterService
 
 router = APIRouter(prefix="/recruiter", tags=["Recruiter"])
+
+
+def _parse_filters(
+    role_title: Optional[str] = None,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+    invite_token: Optional[str] = None,
+    score_band: Optional[str] = None,
+    integrity_level: Optional[str] = None,
+    review_status: Optional[str] = None,
+) -> RecruiterSessionFilters:
+    return RecruiterSessionFilters(
+        role_title=role_title,
+        date_from=date_from,
+        date_to=date_to,
+        invite_token=invite_token,
+        score_band=score_band,
+        integrity_level=integrity_level,
+        review_status=review_status,
+    )
 
 
 @router.get(
@@ -27,15 +52,130 @@ router = APIRouter(prefix="/recruiter", tags=["Recruiter"])
     summary="List completed interview sessions",
 )
 async def list_sessions(
+    role_title: Optional[str] = Query(None),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    invite_token: Optional[str] = Query(None),
+    score_band: Optional[str] = Query(None),
+    integrity_level: Optional[str] = Query(None),
+    review_status: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
 ):
-    service = RecruiterService(db)
-    sessions = await service.list_completed_sessions(current_user.id)
+    filters = _parse_filters(
+        role_title=role_title,
+        date_from=date_from,
+        date_to=date_to,
+        invite_token=invite_token,
+        score_band=score_band,
+        integrity_level=integrity_level,
+        review_status=review_status,
+    )
+    has_filters = any(
+        [
+            role_title,
+            date_from,
+            date_to,
+            invite_token,
+            score_band,
+            integrity_level,
+            review_status,
+        ]
+    )
+    if has_filters:
+        analytics = RecruiterAnalyticsService(db)
+        sessions = await analytics.list_filtered_sessions(current_user.id, filters)
+    else:
+        service = RecruiterService(db)
+        sessions = await service.list_completed_sessions(current_user.id)
     return BaseResponse(
         success=True,
         message=f"Found {len(sessions)} completed session(s)",
         data=sessions,
+    )
+
+
+@router.get(
+    "/analytics",
+    response_model=BaseResponse[RecruiterAnalyticsResponse],
+    summary="Recruiter analytics dashboard metrics",
+)
+async def get_analytics(
+    role_title: Optional[str] = Query(None),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    invite_token: Optional[str] = Query(None),
+    score_band: Optional[str] = Query(None),
+    integrity_level: Optional[str] = Query(None),
+    review_status: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    filters = _parse_filters(
+        role_title=role_title,
+        date_from=date_from,
+        date_to=date_to,
+        invite_token=invite_token,
+        score_band=score_band,
+        integrity_level=integrity_level,
+        review_status=review_status,
+    )
+    service = RecruiterAnalyticsService(db)
+    analytics = await service.get_analytics(current_user.id, filters)
+    return BaseResponse(
+        success=True,
+        message="Analytics generated",
+        data=analytics,
+    )
+
+
+@router.get(
+    "/sessions/export",
+    summary="Export completed sessions as CSV",
+)
+async def export_sessions_csv(
+    role_title: Optional[str] = Query(None),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    invite_token: Optional[str] = Query(None),
+    score_band: Optional[str] = Query(None),
+    integrity_level: Optional[str] = Query(None),
+    review_status: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    filters = _parse_filters(
+        role_title=role_title,
+        date_from=date_from,
+        date_to=date_to,
+        invite_token=invite_token,
+        score_band=score_band,
+        integrity_level=integrity_level,
+        review_status=review_status,
+    )
+    service = RecruiterAnalyticsService(db)
+    csv_text, filename = await service.export_sessions_csv(current_user.id, filters)
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get(
+    "/assessments/export",
+    summary="Export assessment performance as CSV",
+)
+async def export_assessments_csv(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    service = RecruiterAnalyticsService(db)
+    csv_text, filename = await service.export_assessments_csv(current_user.id)
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -118,6 +258,6 @@ async def update_review_state(
     )
     return BaseResponse(
         success=True,
-        message="Review disposition updated",
+        message="Review state updated",
         data=detail,
     )

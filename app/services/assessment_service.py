@@ -469,6 +469,14 @@ class AssessmentService:
         self.db.add(invite)
         await self.db.commit()
 
+        from app.services.invite_funnel import record_invite_funnel_event
+
+        record_invite_funnel_event(
+            invite_token=token,
+            event_type="created",
+            metadata={"difficulty": data.difficulty, "question_count": len(questions)},
+        )
+
         invite_link = f"/interview/invite/{token}"
         return CreateAssessmentResponse(
             token=token,

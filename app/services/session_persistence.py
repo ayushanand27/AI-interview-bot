@@ -174,6 +174,7 @@ def _row_to_interview_session(obj: DBSess) -> InterviewSession:
         answer_judgments=list(obj.answer_judgments or []),
         final_score=obj.final_score,
         proctoring_summary=obj.proctoring_summary,
+        invite_token=getattr(obj, "invite_token", None),
         current_question_index=int(obj.current_question_index or 0),
         created_at=obj.created_at,
     )
@@ -195,6 +196,7 @@ def _interview_session_to_row(session: InterviewSession, now: datetime) -> DBSes
         answer_judgments=session.answer_judgments,
         final_score=session.final_score,
         proctoring_summary=session.proctoring_summary,
+        invite_token=getattr(session, "invite_token", None),
         current_question_index=session.current_question_index,
         total_questions=session.total_questions,
         created_at=session.created_at,
@@ -216,6 +218,10 @@ def _apply_session_fields(obj: DBSess, session: InterviewSession, now: datetime)
     obj.answer_judgments = session.answer_judgments
     obj.final_score = session.final_score
     obj.proctoring_summary = session.proctoring_summary
+    # Preserve invite linkage; never blank an existing token on partial domain updates.
+    session_invite = getattr(session, "invite_token", None)
+    if session_invite:
+        obj.invite_token = session_invite
     obj.current_question_index = session.current_question_index
     obj.total_questions = session.total_questions
     obj.updated_at = now

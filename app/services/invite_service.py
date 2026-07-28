@@ -114,6 +114,9 @@ class InviteService:
 
         company = await self._get_recruiter_company(invite.recruiter_id)
         questions = normalize_questions(list(invite.questions_json or []))
+        from app.services.invite_funnel import record_invite_funnel_event
+
+        record_invite_funnel_event(invite_token=token, event_type="opened")
         return InviteValidResponse(
             role_title=_role_title_from_jd(invite.jd_text),
             company=company,
@@ -204,6 +207,15 @@ class InviteService:
 
         invite.used_count = int(invite.used_count) + 1
         await self.db.commit()
+
+        from app.services.invite_funnel import record_invite_funnel_event
+
+        record_invite_funnel_event(
+            invite_token=token,
+            event_type="registered",
+            session_id=session_id,
+            candidate_email=email,
+        )
 
         access_token = create_access_token(user_id=user.id, role=user.role.value)
         refresh_token = create_refresh_token(user_id=user.id)
@@ -473,6 +485,18 @@ class InviteService:
                     review_state.updated_at = datetime.now(timezone.utc)
 
         await self.db.commit()
+
+        from app.services.invite_funnel import record_invite_funnel_event
+
+        record_invite_funnel_event(
+            invite_token=token,
+            event_type="verified",
+            session_id=data.session_id,
+            metadata={
+                "verified": verification.verified,
+                "low_identity_confidence": verification.low_identity_confidence,
+            },
+        )
 
         return InviteVerifyIdentityResponse(
             verified=verification.verified,

@@ -38,7 +38,11 @@ import { InviteFlowError } from "../types/invite";
 
 import type {
 
+  RecruiterAnalyticsResponse,
+
   RecruiterSessionDetail,
+
+  RecruiterSessionFilters,
 
   RecruiterSessionSummary,
 
@@ -505,14 +509,59 @@ export const authApi = {
 
 export const recruiterApi = {
 
-  listSessions() {
+  buildSessionFilterQuery(filters?: RecruiterSessionFilters): string {
+    if (!filters) return "";
+    const params = new URLSearchParams();
+    if (filters.role_title?.trim()) params.set("role_title", filters.role_title.trim());
+    if (filters.date_from) params.set("date_from", filters.date_from);
+    if (filters.date_to) params.set("date_to", filters.date_to);
+    if (filters.invite_token?.trim()) params.set("invite_token", filters.invite_token.trim());
+    if (filters.score_band?.trim()) params.set("score_band", filters.score_band.trim());
+    if (filters.integrity_level?.trim()) {
+      params.set("integrity_level", filters.integrity_level.trim());
+    }
+    if (filters.review_status?.trim()) params.set("review_status", filters.review_status.trim());
+    const qs = params.toString();
+    return qs ? `?${qs}` : "";
+  },
 
+  listSessions(filters?: RecruiterSessionFilters) {
+    const qs = recruiterApi.buildSessionFilterQuery(filters);
     return request<ApiEnvelope<RecruiterSessionSummary[]>>(
-
-      "/api/v1/recruiter/sessions",
-
+      `/api/v1/recruiter/sessions${qs}`,
     );
+  },
 
+  getAnalytics(filters?: RecruiterSessionFilters) {
+    const qs = recruiterApi.buildSessionFilterQuery(filters);
+    return request<ApiEnvelope<RecruiterAnalyticsResponse>>(
+      `/api/v1/recruiter/analytics${qs}`,
+    );
+  },
+
+  async exportSessionsCsv(filters?: RecruiterSessionFilters): Promise<Blob> {
+    const qs = recruiterApi.buildSessionFilterQuery(filters);
+    const response = await fetch(
+      `${API_BASE}/api/v1/recruiter/sessions/export${qs}`,
+      { headers: authHeaders() },
+    );
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(parseErrorMessage(body, response.status));
+    }
+    return response.blob();
+  },
+
+  async exportAssessmentsCsv(): Promise<Blob> {
+    const response = await fetch(
+      `${API_BASE}/api/v1/recruiter/assessments/export`,
+      { headers: authHeaders() },
+    );
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(parseErrorMessage(body, response.status));
+    }
+    return response.blob();
   },
 
 

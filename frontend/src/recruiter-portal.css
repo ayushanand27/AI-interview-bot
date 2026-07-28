@@ -746,6 +746,82 @@
   margin: 0.85rem 0 1rem;
 }
 
+.recruiter-portal .rp-analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.recruiter-portal .rp-stat-card {
+  border: 1px solid var(--rp-border);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.recruiter-portal .rp-stat-label {
+  display: block;
+  color: var(--rp-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+}
+
+.recruiter-portal .rp-stat-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.recruiter-portal .rp-analytics-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.recruiter-portal .rp-analytics-panel,
+.recruiter-portal .rp-analytics-assessments {
+  border: 1px solid var(--rp-border);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.recruiter-portal .rp-funnel-list,
+.recruiter-portal .rp-distribution-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.recruiter-portal .rp-funnel-row,
+.recruiter-portal .rp-distribution-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.recruiter-portal .rp-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.recruiter-portal .rp-filter-grid label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--rp-muted);
+}
+
+.recruiter-portal .rp-filter-grid input,
+.recruiter-portal .rp-filter-grid select {
+  margin-bottom: 0;
+}
+
 .recruiter-portal .rp-type-mix-label {
   display: block;
   font-size: 0.85rem;

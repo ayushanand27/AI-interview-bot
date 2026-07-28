@@ -22,6 +22,7 @@ class InterviewSession:
     resume_text: Optional[str] = None
     job_description: Optional[str] = None
     proctoring_summary: Optional[dict[str, Any]] = None
+    invite_token: Optional[str] = None
     status: SessionStatus = SessionStatus.CREATED
     questions: list[str] = field(default_factory=list)
     answers: list[str] = field(default_factory=list)

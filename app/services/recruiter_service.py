@@ -248,6 +248,7 @@ def _build_proctor_event_timeline(row: DBSession) -> list[RecruiterProctorEvent]
 
 
 def _session_to_summary(row: DBSession) -> RecruiterSessionSummary:
+    # invite_token is populated for Phase 4 filters/export; older clients ignore it.
     score, recommendation = _extract_final_score(row.final_score)
     review_state = _review_state_payload(row)
     proctoring = _build_proctoring_summary(row) or {}
@@ -267,6 +268,7 @@ def _session_to_summary(row: DBSession) -> RecruiterSessionSummary:
         integrity_level=proctoring.get("integrity_level"),
         integrity_event_count=int(proctoring.get("total_violations", 0) or 0),
         low_identity_confidence=bool(proctoring.get("low_identity_confidence")),
+        invite_token=getattr(row, "invite_token", None),
     )
 
 

@@ -298,6 +298,25 @@ def main() -> int:
     count = len(sessions) if isinstance(sessions, list) else 0
     test("Recruiter sessions list", r.status_code == 200, f"count={count}")
 
+    r = requests.get(f"{BASE}/api/v1/recruiter/analytics", headers=rec_headers, timeout=30)
+    analytics = r.json().get("data", r.json()) if r.status_code == 200 else {}
+    test(
+        "Recruiter analytics dashboard",
+        r.status_code == 200 and isinstance(analytics, dict) and "funnel" in analytics,
+        f"completed={analytics.get('completed_session_count', 'n/a')}",
+    )
+
+    r = requests.get(
+        f"{BASE}/api/v1/recruiter/sessions/export",
+        headers=rec_headers,
+        timeout=30,
+    )
+    test(
+        "Recruiter sessions CSV export",
+        r.status_code == 200 and "session_id" in r.text[:200],
+        f"bytes={len(r.content)}",
+    )
+
     # ── Summary ────────────────────────────────────────────────────
     print("\n" + "=" * 50)
     passed = sum(1 for r in results if r.startswith("PASS"))

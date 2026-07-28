@@ -57,6 +57,53 @@ class RecruiterSessionSummary(BaseModel):
     integrity_level: Optional[str] = None
     integrity_event_count: int = 0
     low_identity_confidence: bool = False
+    invite_token: Optional[str] = None
+
+
+class RecruiterSessionFilters(BaseModel):
+    role_title: Optional[str] = None
+    date_from: Optional[datetime] = None
+    date_to: Optional[datetime] = None
+    invite_token: Optional[str] = None
+    score_band: Optional[str] = None
+    integrity_level: Optional[str] = None
+    review_status: Optional[str] = None
+
+
+class InviteFunnelMetrics(BaseModel):
+    created: int = 0
+    opened: int = 0
+    registered: int = 0
+    verified: int = 0
+    started: int = 0
+    completed: int = 0
+
+
+class AssessmentPerformanceMetric(BaseModel):
+    token: str
+    role_preview: str
+    difficulty: str
+    question_count: int
+    used_count: int
+    started_count: int
+    completed_count: int
+    average_score: Optional[float] = None
+    integrity_flag_count: int = 0
+    created_at: datetime
+
+
+class RecruiterAnalyticsResponse(BaseModel):
+    generated_at: datetime
+    invite_count: int = 0
+    completed_session_count: int = 0
+    completion_rate_percent: float = 0.0
+    average_score: Optional[float] = None
+    integrity_flag_rate_percent: float = 0.0
+    review_flagged_count: int = 0
+    funnel: InviteFunnelMetrics = Field(default_factory=InviteFunnelMetrics)
+    score_distribution: dict[str, int] = Field(default_factory=dict)
+    integrity_distribution: dict[str, int] = Field(default_factory=dict)
+    assessments: list[AssessmentPerformanceMetric] = Field(default_factory=list)
 
 
 class TranscriptItem(BaseModel):

@@ -15,6 +15,7 @@ import app.db.session_model  # noqa: E402, F401 — register Session metadata
 import app.db.interview_invite_model  # noqa: E402, F401
 import app.db.candidate_verification_model  # noqa: E402, F401
 import app.db.evidence_model  # noqa: E402, F401
+import app.db.invite_funnel_model  # noqa: E402, F401
 
 config = context.config
 

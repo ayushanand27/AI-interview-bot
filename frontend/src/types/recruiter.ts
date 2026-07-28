@@ -47,6 +47,53 @@ export interface RecruiterSessionSummary {
   integrity_level?: string | null;
   integrity_event_count: number;
   low_identity_confidence: boolean;
+  invite_token?: string | null;
+}
+
+export interface RecruiterSessionFilters {
+  role_title?: string;
+  date_from?: string;
+  date_to?: string;
+  invite_token?: string;
+  score_band?: string;
+  integrity_level?: string;
+  review_status?: string;
+}
+
+export interface InviteFunnelMetrics {
+  created: number;
+  opened: number;
+  registered: number;
+  verified: number;
+  started: number;
+  completed: number;
+}
+
+export interface AssessmentPerformanceMetric {
+  token: string;
+  role_preview: string;
+  difficulty: string;
+  question_count: number;
+  used_count: number;
+  started_count: number;
+  completed_count: number;
+  average_score: number | null;
+  integrity_flag_count: number;
+  created_at: string;
+}
+
+export interface RecruiterAnalyticsResponse {
+  generated_at: string;
+  invite_count: number;
+  completed_session_count: number;
+  completion_rate_percent: number;
+  average_score: number | null;
+  integrity_flag_rate_percent: number;
+  review_flagged_count: number;
+  funnel: InviteFunnelMetrics;
+  score_distribution: Record<string, number>;
+  integrity_distribution: Record<string, number>;
+  assessments: AssessmentPerformanceMetric[];
 }
 
 export interface TranscriptItem {
