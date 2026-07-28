@@ -200,6 +200,9 @@ export default function PreInterviewChecklist({
         screen_sharing_active: screenSharingActive,
         screen_sharing_capability:
           screenSharingCapability && !screenSharingActive,
+        fullscreen_active: isFullscreen,
+        selected_camera_label:
+          mediaStreamRef.current?.getVideoTracks()[0]?.label || null,
       })
       .then((res) => {
         if (cancelled) return;
@@ -230,6 +233,7 @@ export default function PreInterviewChecklist({
     virtualCamera.warnOnly,
     screenSharingActive,
     screenSharingCapability,
+    isFullscreen,
   ]);
 
   async function grantCameraAccess() {

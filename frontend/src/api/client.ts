@@ -1256,6 +1256,10 @@ export const inviteApi = {
 
       selfie_base64: string;
 
+      selfie_frames_base64?: string[];
+
+      liveness_actions?: string[];
+
       session_id: string;
 
     },

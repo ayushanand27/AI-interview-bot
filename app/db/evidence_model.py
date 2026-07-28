@@ -82,7 +82,13 @@ class IdentityVerificationAttempt(Base):
         server_default="false",
     )
     similarity_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    liveness_mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    liveness_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ocr_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ocr_document_number: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    ocr_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    evidence_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     id_artifact_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("session_artifacts.id"),

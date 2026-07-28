@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Any, List, Optional
 
 SEVERITY_PENALTIES = {
     "minor": 2.0,
@@ -46,6 +46,7 @@ class Violation:
     timestamp: float = field(default_factory=time.time)
     penalty_percent: float = 0.0
     message: str = ""
+    evidence_metadata: dict[str, Any] | None = None
 
 
 class WarningManager:
@@ -139,6 +140,8 @@ class WarningManager:
         self,
         violation_type: str,
         message: str,
+        *,
+        evidence_metadata: dict[str, Any] | None = None,
     ) -> Optional[Violation]:
         """Record a client-reported integrity violation (audio, tab switch, etc.)."""
         now = time.time()
@@ -159,6 +162,7 @@ class WarningManager:
             timestamp=now,
             penalty_percent=penalty,
             message=message,
+            evidence_metadata=evidence_metadata,
         )
         self.violations.append(violation)
         self._last_violation_recorded_at = now
@@ -251,6 +255,7 @@ class WarningManager:
                     "time": v.timestamp,
                     "penalty_percent": v.penalty_percent,
                     "message": v.message,
+                    "evidence_metadata": v.evidence_metadata,
                 }
                 for v in self.violations
             ],

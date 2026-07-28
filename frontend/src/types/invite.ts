@@ -34,4 +34,10 @@ export interface InviteVerifyIdentityResponse {
   confidence: number;
   message: string;
   low_identity_confidence?: boolean;
+  liveness_passed?: boolean;
+  liveness_confidence?: number;
+  warnings?: string[];
+  ocr_name_match?: boolean | null;
+  ocr_name_detected?: string | null;
+  ocr_document_number?: string | null;
 }

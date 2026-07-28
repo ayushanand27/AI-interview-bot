@@ -43,6 +43,8 @@ class InviteLoginRequest(BaseModel):
 class InviteVerifyIdentityRequest(BaseModel):
     id_image_base64: str
     selfie_base64: str
+    selfie_frames_base64: list[str] = Field(default_factory=list)
+    liveness_actions: list[str] = Field(default_factory=list)
     session_id: UUID
 
 
@@ -51,3 +53,9 @@ class InviteVerifyIdentityResponse(BaseModel):
     confidence: float
     message: str
     low_identity_confidence: bool = False
+    liveness_passed: bool = False
+    liveness_confidence: float = 0.0
+    warnings: list[str] = Field(default_factory=list)
+    ocr_name_match: Optional[bool] = None
+    ocr_name_detected: Optional[str] = None
+    ocr_document_number: Optional[str] = None

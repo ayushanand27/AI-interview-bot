@@ -332,14 +332,25 @@ class InviteService:
 
         id_path = upload_dir / f"{token}_id.jpg"
         selfie_path = upload_dir / f"{token}_selfie.jpg"
+        selfie_sequence_paths: list[Path] = []
 
         try:
             id_path.write_bytes(_decode_image_bytes(data.id_image_base64))
             selfie_path.write_bytes(_decode_image_bytes(data.selfie_base64))
+            for idx, frame_data in enumerate(data.selfie_frames_base64):
+                frame_path = upload_dir / f"{token}_selfie_step_{idx + 1}.jpg"
+                frame_path.write_bytes(_decode_image_bytes(frame_data))
+                selfie_sequence_paths.append(frame_path)
         except (ValueError, OSError) as exc:
             raise BadRequestException("Invalid image data provided.") from exc
 
-        verification = verify_faces_from_base64(data.id_image_base64, data.selfie_base64)
+        verification = verify_faces_from_base64(
+            data.id_image_base64,
+            data.selfie_base64,
+            selfie_frames_base64=data.selfie_frames_base64,
+            liveness_actions=data.liveness_actions,
+            expected_candidate_name=record.candidate_name,
+        )
 
         record.id_document_path = id_path.name
         record.selfie_path = selfie_path.name
@@ -371,23 +382,57 @@ class InviteService:
         self.db.add(selfie_artifact)
         await self.db.flush()
 
+        sequence_artifact_ids: list[int] = []
+        for idx, frame_path in enumerate(selfie_sequence_paths):
+            artifact = SessionArtifact(
+                artifact_type="identity_selfie_frame",
+                session_id=data.session_id,
+                candidate_verification_id=record.id,
+                storage_path=frame_path.name,
+                mime_type="image/jpeg",
+                file_size_bytes=frame_path.stat().st_size if frame_path.exists() else None,
+                metadata_json={
+                    "token": token,
+                    "source": "invite_identity",
+                    "frame_index": idx,
+                    "liveness_action": data.liveness_actions[idx]
+                    if idx < len(data.liveness_actions)
+                    else None,
+                },
+                created_at=datetime.now(timezone.utc),
+            )
+            self.db.add(artifact)
+            await self.db.flush()
+            sequence_artifact_ids.append(int(artifact.id))
+
         self.db.add(
             IdentityVerificationAttempt(
-            candidate_verification_id=record.id,
-            token=token,
-            session_id=str(data.session_id),
-            verified=verification.verified,
-            confidence_score=verification.confidence,
-            low_identity_confidence=verification.low_identity_confidence,
-            similarity_score=verification.similarity_score,
-            message=verification.message,
-            id_artifact_id=id_artifact.id,
-            selfie_artifact_id=selfie_artifact.id,
-            created_at=datetime.now(timezone.utc),
-        )
+                candidate_verification_id=record.id,
+                token=token,
+                session_id=str(data.session_id),
+                verified=verification.verified,
+                confidence_score=verification.confidence,
+                low_identity_confidence=verification.low_identity_confidence,
+                similarity_score=verification.similarity_score,
+                liveness_mode="multi_frame_sequence",
+                liveness_confidence=verification.liveness_confidence,
+                ocr_name=verification.ocr_name_detected,
+                ocr_document_number=verification.ocr_document_number,
+                ocr_confidence=verification.ocr_confidence,
+                message=verification.message,
+                evidence_metadata={
+                    **(verification.evidence_metadata or {}),
+                    "warnings": verification.warnings or [],
+                    "ocr_name_match": verification.ocr_name_match,
+                    "sequence_artifact_ids": sequence_artifact_ids,
+                },
+                id_artifact_id=id_artifact.id,
+                selfie_artifact_id=selfie_artifact.id,
+                created_at=datetime.now(timezone.utc),
+            )
         )
 
-        if verification.low_identity_confidence:
+        if verification.low_identity_confidence or not verification.verified:
             session_row = await self.db.get(DBSession, data.session_id)
             if session_row is not None:
                 summary = dict(session_row.proctoring_summary or {})
@@ -395,6 +440,11 @@ class InviteService:
                 summary["identity_similarity_score"] = round(
                     verification.similarity_score, 4
                 )
+                summary["identity_liveness_confidence"] = round(
+                    verification.liveness_confidence, 4
+                )
+                if verification.ocr_name_match is not None:
+                    summary["identity_ocr_name_match"] = verification.ocr_name_match
                 session_row.proctoring_summary = summary
                 session_row.human_review_flag = True
                 review_state = (
@@ -409,7 +459,7 @@ class InviteService:
                         session_id=data.session_id,
                         human_review_required=True,
                         review_status="needs_review",
-                        review_notes="Identity verification confidence below threshold.",
+                        review_notes=verification.message,
                         reviewed_at=None,
                         reviewed_by_user_id=None,
                         created_at=datetime.now(timezone.utc),
@@ -419,9 +469,7 @@ class InviteService:
                 else:
                     review_state.human_review_required = True
                     review_state.review_status = "needs_review"
-                    review_state.review_notes = (
-                        "Identity verification confidence below threshold."
-                    )
+                    review_state.review_notes = verification.message
                     review_state.updated_at = datetime.now(timezone.utc)
 
         await self.db.commit()
@@ -431,4 +479,10 @@ class InviteService:
             confidence=verification.confidence,
             message=verification.message,
             low_identity_confidence=verification.low_identity_confidence,
+            liveness_passed=verification.liveness_passed,
+            liveness_confidence=verification.liveness_confidence,
+            warnings=verification.warnings or [],
+            ocr_name_match=verification.ocr_name_match,
+            ocr_name_detected=verification.ocr_name_detected,
+            ocr_document_number=verification.ocr_document_number,
         )

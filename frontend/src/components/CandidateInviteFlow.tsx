@@ -29,6 +29,35 @@ type InviteStep =
 
 type DetailsMode = "register" | "login";
 
+type LivenessAction = "center" | "move_left" | "move_right" | "smile";
+
+const LIVENESS_STEPS: Array<{
+  action: LivenessAction;
+  title: string;
+  hint: string;
+}> = [
+  {
+    action: "center",
+    title: "Step 1",
+    hint: "Look straight at the camera and keep your face centered.",
+  },
+  {
+    action: "move_left",
+    title: "Step 2",
+    hint: "Move your face slightly to the left side of the frame.",
+  },
+  {
+    action: "move_right",
+    title: "Step 3",
+    hint: "Move your face slightly to the right side of the frame.",
+  },
+  {
+    action: "smile",
+    title: "Step 4",
+    hint: "Smile clearly for the final capture.",
+  },
+];
+
 interface CandidateInviteFlowProps {
   token: string;
 }
@@ -66,9 +95,12 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
   const [idDataUrl, setIdDataUrl] = useState<string | null>(null);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const [selfieDataUrl, setSelfieDataUrl] = useState<string | null>(null);
+  const [selfieSequence, setSelfieSequence] = useState<string[]>([]);
+  const [livenessStepIndex, setLivenessStepIndex] = useState(0);
   const [verifying, setVerifying] = useState(false);
   const [identityVerified, setIdentityVerified] = useState(false);
   const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
+  const [verifyWarnings, setVerifyWarnings] = useState<string[]>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const selfieStreamRef = useRef<MediaStream | null>(null);
@@ -228,6 +260,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
     setIdDataUrl(dataUrl);
     setIdentityVerified(false);
     setVerifyMessage(null);
+    setVerifyWarnings([]);
   }
 
   function captureSelfie() {
@@ -247,15 +280,27 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
     setSelfiePreview(dataUrl);
     setSelfieDataUrl(dataUrl);
+    setSelfieSequence((current) => {
+      const next = [...current];
+      next[livenessStepIndex] = dataUrl;
+      return next;
+    });
+    if (livenessStepIndex < LIVENESS_STEPS.length - 1) {
+      setLivenessStepIndex((current) => current + 1);
+    }
     setIdentityVerified(false);
     setVerifyMessage(null);
+    setVerifyWarnings([]);
   }
 
   function retakeSelfie() {
     setSelfiePreview(null);
     setSelfieDataUrl(null);
+    setSelfieSequence([]);
+    setLivenessStepIndex(0);
     setIdentityVerified(false);
     setVerifyMessage(null);
+    setVerifyWarnings([]);
   }
 
   async function handleVerifyIdentity() {
@@ -267,12 +312,15 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
       const res = await inviteApi.verifyIdentity(token, {
         id_image_base64: idDataUrl,
         selfie_base64: selfieDataUrl,
+        selfie_frames_base64: selfieSequence,
+        liveness_actions: LIVENESS_STEPS.map((step) => step.action),
         session_id: sessionId,
       });
       setVerifyMessage(null);
+      setVerifyWarnings(res.data.warnings ?? []);
       if (res.data.verified) {
         setIdentityVerified(true);
-        if (res.data.low_identity_confidence) {
+        if (res.data.low_identity_confidence || res.data.message) {
           setVerifyMessage(res.data.message);
         }
       } else {
@@ -281,6 +329,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
       }
     } catch (err) {
       setIdentityVerified(false);
+      setVerifyWarnings([]);
       setVerifyMessage(
         err instanceof Error
           ? err.message
@@ -543,7 +592,14 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
 
             <div className="invite-identity-panel">
               <h3>Live Selfie</h3>
-              <p>Take a selfie in good lighting, facing the camera directly.</p>
+              <p>
+                Complete the guided liveness sequence in good lighting. We will capture
+                multiple frames before verifying your ID.
+              </p>
+              <div className="invite-liveness-step">
+                <strong>{LIVENESS_STEPS[livenessStepIndex].title}</strong>:{" "}
+                {LIVENESS_STEPS[livenessStepIndex].hint}
+              </div>
               {!selfiePreview ? (
                 <>
                   <video
@@ -569,14 +625,39 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
                     src={selfiePreview}
                     alt="Selfie preview"
                   />
-                  <p className="invite-check">✓ Selfie captured</p>
+                  <p className="invite-check">
+                    ✓ Last capture saved ({selfieSequence.filter(Boolean).length}/
+                    {LIVENESS_STEPS.length})
+                  </p>
+                  <div className="invite-liveness-progress">
+                    {LIVENESS_STEPS.map((step, index) => (
+                      <span
+                        key={step.action}
+                        className={
+                          selfieSequence[index]
+                            ? "invite-liveness-pill is-complete"
+                            : index === livenessStepIndex
+                              ? "invite-liveness-pill is-active"
+                              : "invite-liveness-pill"
+                        }
+                      >
+                        {step.title}
+                      </span>
+                    ))}
+                  </div>
                   <button
                     type="button"
                     className="secondary"
                     style={{ marginTop: "0.5rem" }}
-                    onClick={retakeSelfie}
+                    onClick={
+                      selfieSequence.filter(Boolean).length >= LIVENESS_STEPS.length
+                        ? retakeSelfie
+                        : captureSelfie
+                    }
                   >
-                    Retake
+                    {selfieSequence.filter(Boolean).length >= LIVENESS_STEPS.length
+                      ? "Restart sequence"
+                      : "Capture next step"}
                   </button>
                 </>
               )}
@@ -586,7 +667,12 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
           <button
             type="button"
             className="primary"
-            disabled={!idDataUrl || !selfieDataUrl || verifying}
+            disabled={
+              !idDataUrl ||
+              !selfieDataUrl ||
+              selfieSequence.filter(Boolean).length < LIVENESS_STEPS.length ||
+              verifying
+            }
             onClick={() => void handleVerifyIdentity()}
           >
             {verifying ? "Verifying your identity…" : "Verify My Identity"}
@@ -601,6 +687,16 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
           {verifyMessage && !identityVerified && (
             <div className="alert error" style={{ marginTop: "1rem" }}>
               {verifyMessage}
+            </div>
+          )}
+
+          {verifyWarnings.length > 0 && (
+            <div className="alert info" style={{ marginTop: "1rem" }}>
+              {verifyWarnings.map((warning) => (
+                <p key={warning} style={{ marginBottom: "0.35rem" }}>
+                  {warning}
+                </p>
+              ))}
             </div>
           )}
 

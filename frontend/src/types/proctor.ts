@@ -51,6 +51,8 @@ export interface VerifyEnvironmentRequest {
   virtual_camera_uncertain?: boolean;
   screen_sharing_active: boolean;
   screen_sharing_capability?: boolean;
+  fullscreen_active?: boolean;
+  selected_camera_label?: string | null;
 }
 
 export interface VerifyEnvironmentResponse {

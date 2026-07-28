@@ -24,7 +24,10 @@ from app.proctoring.object_detector import (
     should_run_object_detection,
     clear_object_detection_schedule,
 )
-from app.services.session_persistence import update_proctoring_summary
+from app.services.session_persistence import (
+    update_proctoring_summary,
+    upsert_session_review_state,
+)
 
 router = APIRouter(tags=["Proctoring"])
 
@@ -57,6 +60,8 @@ class VerifyEnvironmentRequest(BaseModel):
     virtual_camera_uncertain: bool = False
     screen_sharing_active: bool = False
     screen_sharing_capability: bool = False
+    fullscreen_active: bool = True
+    selected_camera_label: str | None = None
 
 
 def _analyze_response(
@@ -207,6 +212,10 @@ def analyze_frame(request: Request, req: FrameRequest):
                 recorded = warning_mgr.record_client_violation(
                     "prohibited_object_detected",
                     hit["message"],
+                    evidence_metadata={
+                        "detector": "yolov8",
+                        "label": hit.get("label", "cell_phone"),
+                    },
                 )
                 if recorded is not None:
                     phone_recorded = True
@@ -281,27 +290,49 @@ def verify_environment(body: VerifyEnvironmentRequest):
             warning_mgr.record_client_violation(
                 "recording_extension",
                 f"Recording extension detected: {ext.name} ({ext.id})",
+                evidence_metadata={"extension_id": ext.id, "extension_name": ext.name},
             )
 
     if body.virtual_camera_detected:
         msg = "Virtual camera detected - please use your real webcam"
         block_reasons.append(msg)
-        warning_mgr.record_client_violation("virtual_camera", msg)
+        warning_mgr.record_client_violation(
+            "virtual_camera",
+            msg,
+            evidence_metadata={"selected_camera_label": body.selected_camera_label},
+        )
     elif body.virtual_camera_uncertain:
         msg = (
             "Unusual camera setup detected — flagged for review; "
             "use your real webcam if possible"
         )
         warnings.append(msg)
-        warning_mgr.record_client_violation("virtual_camera_suspected", msg)
+        warning_mgr.record_client_violation(
+            "virtual_camera_suspected",
+            msg,
+            evidence_metadata={"selected_camera_label": body.selected_camera_label},
+        )
 
     if body.screen_sharing_active:
         msg = "Screen sharing is active — stop sharing before starting the interview"
         block_reasons.append(msg)
-        warning_mgr.record_client_violation("screen_sharing", msg)
+        warning_mgr.record_client_violation(
+            "screen_sharing",
+            msg,
+            evidence_metadata={"screen_sharing_capability": body.screen_sharing_capability},
+        )
     elif body.screen_sharing_capability:
         warnings.append(
             "Screen capture device detected — do not share your screen during the interview"
+        )
+
+    if not body.fullscreen_active:
+        msg = "Fullscreen mode must stay enabled before starting the interview"
+        block_reasons.append(msg)
+        warning_mgr.record_client_violation(
+            "tab_switch",
+            msg,
+            evidence_metadata={"phase": "preflight", "fullscreen_active": False},
         )
 
     if body.user_agent:
@@ -314,6 +345,19 @@ def verify_environment(body: VerifyEnvironmentRequest):
     reason = block_reasons[0] if block_reasons else None
     if len(block_reasons) > 1:
         reason = "; ".join(block_reasons)
+
+    if block_reasons or body.virtual_camera_uncertain or body.screen_sharing_capability:
+        note_parts = [reason] if reason else []
+        if body.virtual_camera_uncertain:
+            note_parts.append("Virtual camera looked suspicious during preflight.")
+        if body.screen_sharing_capability:
+            note_parts.append("Screen capture capability was detected.")
+        upsert_session_review_state(
+            body.session_id,
+            human_review_required=True,
+            review_status="needs_review",
+            review_notes=" ".join(part for part in note_parts if part).strip() or None,
+        )
 
     return {
         "allowed": allowed,
