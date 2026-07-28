@@ -1,32 +1,34 @@
 :root {
   color-scheme: dark;
-  --bg: #050608;
-  --bg-elevated: #0a0d12;
-  --surface: #10141b;
-  --surface-soft: #151a22;
-  --surface-hover: #1b2230;
-  --surface-glass: rgba(16, 20, 27, 0.82);
-  --border: #222a37;
-  --border-strong: #2e384a;
-  --text: #f5f7fb;
-  --text-soft: #d6dbe6;
-  --muted: #8f99ab;
-  --accent: #7c8cff;
-  --accent-hover: #98a5ff;
-  --accent-strong: #6276ff;
+  --bg: #07090c;
+  --bg-elevated: #0c1016;
+  --surface: #12171f;
+  --surface-soft: #171d27;
+  --surface-hover: #1c2430;
+  --surface-glass: rgba(18, 23, 31, 0.88);
+  --border: #243041;
+  --border-strong: #314055;
+  --text: #f3f6fa;
+  --text-soft: #d3dae6;
+  --muted: #8b96a8;
+  --accent: #1fb8a0;
+  --accent-hover: #3dceb8;
+  --accent-strong: #149882;
+  --accent-rgb: 31, 184, 160;
   --success: #22c55e;
   --warning: #f59e0b;
   --danger: #ef4444;
-  --shadow-lg: 0 30px 80px rgba(0, 0, 0, 0.42);
-  --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.28);
-  --radius: 18px;
-  --radius-sm: 12px;
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.26);
+  --radius: 14px;
+  --radius-sm: 10px;
+  --font-display: "Sora", "DM Sans", system-ui, sans-serif;
   font-family: "DM Sans", system-ui, sans-serif;
   line-height: 1.5;
   color: var(--text);
   background:
-    radial-gradient(circle at top, rgba(124, 140, 255, 0.16), transparent 28%),
-    linear-gradient(180deg, #06070a 0%, #090b10 38%, #050608 100%);
+    radial-gradient(ellipse 70% 42% at 50% -8%, rgba(31, 184, 160, 0.12), transparent 55%),
+    linear-gradient(180deg, #080b10 0%, #0a0d12 42%, #07090c 100%);
 }
 
 * {
@@ -77,7 +79,7 @@ button:disabled {
 button.primary {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
   color: white;
-  box-shadow: 0 10px 24px rgba(98, 118, 255, 0.28);
+  box-shadow: 0 10px 24px rgba(var(--accent-rgb), 0.28);
 }
 
 button.primary:hover:not(:disabled) {
@@ -94,8 +96,8 @@ button.secondary {
 
 button.secondary:hover:not(:disabled),
 button.link-button:hover:not(:disabled) {
-  border-color: rgba(124, 140, 255, 0.4);
-  background: rgba(124, 140, 255, 0.08);
+  border-color: rgba(var(--accent-rgb), 0.4);
+  background: rgba(var(--accent-rgb), 0.08);
   color: var(--text);
 }
 
@@ -136,8 +138,8 @@ input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: rgba(124, 140, 255, 0.7);
-  box-shadow: 0 0 0 4px rgba(124, 140, 255, 0.12);
+  border-color: rgba(var(--accent-rgb), 0.7);
+  box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.12);
 }
 
 textarea {
@@ -169,15 +171,17 @@ header {
 }
 
 header h1 {
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 2.75rem);
   font-weight: 700;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.045em;
 }
 
 header p {
   color: var(--muted);
-  margin-top: 0.5rem;
-  max-width: 46rem;
+  margin-top: 0.4rem;
+  max-width: 32rem;
+  font-size: 0.95rem;
 }
 
 .card {
@@ -203,21 +207,24 @@ header p {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(135deg, rgba(124, 140, 255, 0.12), transparent 40%),
+    linear-gradient(135deg, rgba(var(--accent-rgb), 0.08), transparent 42%),
     linear-gradient(0deg, transparent, rgba(255, 255, 255, 0.02));
   pointer-events: none;
 }
 
 .section-title {
-  font-size: 1.2rem;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
   letter-spacing: -0.02em;
-  margin-bottom: 0.9rem;
+  margin-bottom: 0.75rem;
 }
 
 .section-subtitle {
   color: var(--muted);
-  margin-bottom: 1.15rem;
+  margin-bottom: 1rem;
+  font-size: 0.92rem;
+  max-width: 36rem;
 }
 
 .auth-toggle {
@@ -604,29 +611,30 @@ header p {
 }
 
 .checklist-title {
-  margin-bottom: 0.5rem;
-  font-size: 1.2rem;
-  font-weight: 700;
+  margin-bottom: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
 .checklist-intro {
   color: var(--muted);
-  margin-bottom: 1.5rem;
-  font-size: 0.9rem;
-  line-height: 1.55;
+  margin-bottom: 1.15rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .checklist-steps {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  margin-bottom: 1.5rem;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .checklist-step-title {
-  font-size: 1rem;
-  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+  margin-bottom: 0.4rem;
   font-weight: 600;
 }
 

@@ -9,12 +9,18 @@
 
 .invite-flow .invite-welcome {
   text-align: center;
-  padding: 2.4rem 1.2rem;
+  padding: 2rem 1.2rem;
+}
+
+.invite-flow .invite-welcome h2 {
+  font-family: var(--font-display);
+  margin-bottom: 0.5rem;
 }
 
 .invite-flow .invite-meta {
   color: var(--muted);
-  margin: 1rem 0 1.5rem;
+  margin: 0.5rem 0 1.15rem;
+  font-size: 0.92rem;
 }
 
 .invite-identity-grid {
@@ -87,12 +93,12 @@
 
 .invite-liveness-step {
   margin-bottom: 0.75rem;
-  padding: 0.75rem 0.9rem;
-  border-radius: 12px;
-  border: 1px solid rgba(124, 140, 255, 0.2);
-  background: rgba(124, 140, 255, 0.08);
-  color: #dbe4ff;
-  font-size: 0.92rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--accent-rgb), 0.22);
+  background: rgba(var(--accent-rgb), 0.08);
+  color: #c8f5ec;
+  font-size: 0.88rem;
 }
 
 .invite-liveness-progress {
@@ -111,9 +117,9 @@
 }
 
 .invite-liveness-pill.is-active {
-  border-color: rgba(124, 140, 255, 0.5);
-  color: #dbe4ff;
-  background: rgba(124, 140, 255, 0.12);
+  border-color: rgba(var(--accent-rgb), 0.5);
+  color: #c8f5ec;
+  background: rgba(var(--accent-rgb), 0.12);
 }
 
 .invite-liveness-pill.is-complete {
@@ -123,9 +129,9 @@
 }
 
 .invite-flow .alert.info {
-  background: rgba(124, 140, 255, 0.1);
-  color: #c7d2fe;
-  border: 1px solid rgba(124, 140, 255, 0.35);
+  background: rgba(var(--accent-rgb), 0.1);
+  color: #b8efe4;
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
 }
 
 .invite-flow .link-button {

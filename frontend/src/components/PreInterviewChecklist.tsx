@@ -293,17 +293,15 @@ export default function PreInterviewChecklist({
 
   return (
     <div className="card">
-      <h2 className="checklist-title">Before you start your interview</h2>
-      <p className="checklist-intro">
-        This is a proctored session. Complete each step in order before proceeding.
-      </p>
+      <h2 className="checklist-title">Pre-interview checks</h2>
+      <p className="checklist-intro">Complete each step before starting.</p>
 
       <div className="checklist-steps">
         <section>
-          <h3 className="checklist-step-title">Step 1 — Camera &amp; audio access</h3>
+          <h3 className="checklist-step-title">1. Camera &amp; mic</h3>
           {cameraGranted ? (
             <>
-              <div className="alert success alert-flush">Camera &amp; Audio: Ready</div>
+              <div className="alert success alert-flush">Ready</div>
               <video
                 ref={previewVideoRef}
                 className="checklist-preview-video"
@@ -316,8 +314,7 @@ export default function PreInterviewChecklist({
             <>
               {!window.isSecureContext && (
                 <div className="alert warning alert-flush">
-                  This page is not on HTTPS. Browsers block camera access on plain HTTP
-                  (except localhost). Test locally or add SSL to your server.
+                  Camera needs HTTPS (or localhost).
                 </div>
               )}
               <button
@@ -328,8 +325,8 @@ export default function PreInterviewChecklist({
                 style={{ marginBottom: "0.75rem" }}
               >
                 {requestingCamera
-                  ? "Requesting access…"
-                  : "Grant Camera & Audio Access"}
+                  ? "Requesting…"
+                  : "Allow camera & mic"}
               </button>
               {cameraError && (
                 <div className="alert error alert-flush">{cameraError}</div>
@@ -341,11 +338,11 @@ export default function PreInterviewChecklist({
         {cameraGranted && (
           <section>
             <h3 className="checklist-step-title">
-              Step 2 — Screen recording extensions &amp; camera check
+              2. Recording extensions &amp; camera
             </h3>
             {checking ? (
               <div className="alert info alert-flush">
-                Scanning for screen recording extensions and virtual cameras…
+                Scanning environment…
               </div>
             ) : (
               <>
@@ -359,12 +356,11 @@ export default function PreInterviewChecklist({
                   </div>
                 ) : automaticScan ? (
                   <div className="alert success alert-flush">
-                    No screen recording extensions detected.
+                    No recording extensions detected.
                   </div>
                 ) : (
                   <div className="alert info alert-flush">
-                    Please confirm that no screen recording extensions (Loom,
-                    Screencastify, Nimbus, etc.) are active in your browser.
+                    Confirm Loom, Screencastify, Nimbus, etc. are off.
                   </div>
                 )}
 
@@ -396,14 +392,13 @@ export default function PreInterviewChecklist({
 
                 {screenSharingActive && (
                   <div className="alert error alert-stack">
-                    Screen sharing is active. Stop sharing your screen before continuing.
+                    Stop screen sharing before continuing.
                   </div>
                 )}
 
                 {screenSharingCapability && !screenSharingActive && (
                   <div className="alert warning alert-stack">
-                    A screen-capture device was detected. Do not share your screen during
-                    the interview — you may continue, but this will be flagged.
+                    Screen-capture device detected — do not share during the interview.
                   </div>
                 )}
               </>
@@ -417,10 +412,7 @@ export default function PreInterviewChecklist({
                 onChange={(e) => setDisabledExtensions(e.target.checked)}
                 disabled={hasExtensions}
               />
-              <span>
-                <strong>Disable screen recording extensions</strong> — Extensions
-                like Loom, Screencastify, Nimbus, or OBS must be turned off.
-              </span>
+              <span>Recording extensions are disabled</span>
             </label>
             {!checking && (
               <button
@@ -429,7 +421,7 @@ export default function PreInterviewChecklist({
                 style={{ marginTop: "0.5rem" }}
                 onClick={() => void runEnvironmentScan()}
               >
-                Re-scan environment
+                Re-scan
               </button>
             )}
           </section>
@@ -437,29 +429,21 @@ export default function PreInterviewChecklist({
 
         {cameraGranted && (
           <section>
-            <h3 className="checklist-step-title">Step 3 — Close other tabs</h3>
+            <h3 className="checklist-step-title">3. Other tabs</h3>
             <label className="checklist-checkbox-label" style={{ marginTop: 0 }}>
               <input
                 type="checkbox"
                 checked={closedTabs}
                 onChange={(e) => setClosedTabs(e.target.checked)}
               />
-              <span>
-                <strong>Close other tabs &amp; windows</strong> (optional but
-                recommended) — Switching tabs during the interview will trigger a
-                warning.
-              </span>
+              <span>Other tabs closed (tab switches are logged)</span>
             </label>
           </section>
         )}
 
         {cameraGranted && (
           <section>
-            <h3 className="checklist-step-title">Step 4 — Fullscreen mode</h3>
-            <p className="checklist-step-note">
-              Fullscreen is required during the interview. Enter fullscreen after
-              camera access is granted.
-            </p>
+            <h3 className="checklist-step-title">4. Fullscreen</h3>
             {!isFullscreen ? (
               <button
                 type="button"
@@ -469,13 +453,13 @@ export default function PreInterviewChecklist({
                 Enter fullscreen
               </button>
             ) : (
-              <div className="alert success alert-flush">Fullscreen active.</div>
+              <div className="alert success alert-flush">Fullscreen on</div>
             )}
           </section>
         )}
 
         {envVerifying && localChecksPass && (
-          <div className="alert info">Verifying interview environment…</div>
+          <div className="alert info">Verifying environment…</div>
         )}
 
         {envBlockReason && <div className="alert error">{envBlockReason}</div>}
@@ -493,23 +477,23 @@ export default function PreInterviewChecklist({
 
       <div className="actions">
         <button className="primary" disabled={!canProceed} onClick={handleReady}>
-          {loading ? "Starting…" : "I'm ready — Start Interview"}
+          {loading ? "Starting…" : "Start interview"}
         </button>
       </div>
 
       {!canProceed && (
         <p className="checklist-hint">
           {!cameraGranted
-            ? "Grant camera and audio access to continue."
+            ? "Allow camera and mic to continue."
             : hasExtensions
-              ? "Disable detected recording extensions to continue."
+              ? "Disable recording extensions to continue."
               : virtualCamera.blockRecommended
                 ? virtualCamera.message ?? "Use your real webcam to continue."
                 : envVerifying
-                  ? "Waiting for environment verification…"
+                  ? "Verifying environment…"
                   : envAllowed === false
-                    ? envBlockReason ?? "Environment check blocked starting the interview."
-                    : "Complete all checklist steps (extensions, tabs, fullscreen) to enable the start button."}
+                    ? envBlockReason ?? "Environment check blocked start."
+                    : "Finish remaining checks to enable start."}
         </p>
       )}
     </div>

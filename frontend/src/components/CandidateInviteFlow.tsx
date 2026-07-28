@@ -38,23 +38,23 @@ const LIVENESS_STEPS: Array<{
 }> = [
   {
     action: "center",
-    title: "Step 1",
-    hint: "Look straight at the camera and keep your face centered.",
+    title: "1",
+    hint: "Face the camera, centered.",
   },
   {
     action: "move_left",
-    title: "Step 2",
-    hint: "Move your face slightly to the left side of the frame.",
+    title: "2",
+    hint: "Turn slightly left.",
   },
   {
     action: "move_right",
-    title: "Step 3",
-    hint: "Move your face slightly to the right side of the frame.",
+    title: "3",
+    hint: "Turn slightly right.",
   },
   {
     action: "smile",
-    title: "Step 4",
-    hint: "Smile clearly for the final capture.",
+    title: "4",
+    hint: "Smile for the final capture.",
   },
 ];
 
@@ -216,7 +216,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
       if (err instanceof InviteFlowError && err.status === 409) {
         setPrefilledEmail(email);
         setDetailsMode("login");
-        setInfo("You already have an account. Log in below to continue this interview.");
+        setInfo("Account exists — log in to continue.");
         setError(null);
       } else {
         setError(err instanceof Error ? err.message : "Registration failed");
@@ -452,27 +452,26 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
 
       {step === "welcome" && inviteInfo && (
         <div className="card invite-welcome hero-card">
-          <h2>Welcome to your interview</h2>
+          <h2>Your interview</h2>
           <p className="invite-meta">
-            <strong>{inviteInfo.company}</strong> has invited you to interview for{" "}
-            <strong>{inviteInfo.role_title}</strong>.
+            <strong>{inviteInfo.company}</strong> · {inviteInfo.role_title}
           </p>
           <p className="invite-meta">
-            {inviteInfo.question_count} questions · {inviteInfo.difficulty} difficulty
+            {inviteInfo.question_count} questions · {inviteInfo.difficulty}
           </p>
           <button
             type="button"
             className="primary"
             onClick={() => setStep("details")}
           >
-            Start Your Interview
+            Continue
           </button>
         </div>
       )}
 
       {step === "details" && (
         <div className="card auth-panel">
-          <h2>{detailsMode === "register" ? "Your details" : "Log in to continue"}</h2>
+          <h2>{detailsMode === "register" ? "Your details" : "Log in"}</h2>
           {detailsMode === "register" ? (
             <form onSubmit={handleRegister}>
               <label htmlFor="invite-name">Full Name</label>
@@ -513,14 +512,14 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
               <label htmlFor="invite-login-phone">Phone Number (optional)</label>
               <input id="invite-login-phone" name="phone" type="tel" />
               <button type="submit" className="primary" disabled={loading}>
-                {loading ? "Please wait…" : "Log in and continue"}
+                {loading ? "Please wait…" : "Continue"}
               </button>
             </form>
           )}
           <p className="invite-meta" style={{ marginTop: "1rem" }}>
             {detailsMode === "register" ? (
               <>
-                Already have an account?{" "}
+                Have an account?{" "}
                 <button
                   type="button"
                   className="link-button"
@@ -535,7 +534,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
               </>
             ) : (
               <>
-                New candidate?{" "}
+                New here?{" "}
                 <button
                   type="button"
                   className="link-button"
@@ -545,7 +544,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
                     setInfo(null);
                   }}
                 >
-                  Register instead
+                  Register
                 </button>
               </>
             )}
@@ -555,14 +554,11 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
 
       {step === "identity" && (
         <div className="card hero-card">
-          <h2>Identity Verification</h2>
+          <h2>Identity check</h2>
           <div className="invite-identity-grid">
             <div className="invite-identity-panel">
-              <h3>ID Document</h3>
-              <p>
-                Upload a clear photo of your government ID (Aadhaar, PAN, Passport, or
-                Driving License). Your face must be visible and not too small in the image.
-              </p>
+              <h3>ID photo</h3>
+              <p>Government ID with a clear face photo.</p>
               <input
                 ref={idInputRef}
                 type="file"
@@ -575,7 +571,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
                 className="secondary"
                 onClick={() => idInputRef.current?.click()}
               >
-                Upload ID photo
+                Upload ID
               </button>
               {idPreview && (
                 <>
@@ -591,13 +587,11 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
             </div>
 
             <div className="invite-identity-panel">
-              <h3>Live Selfie</h3>
-              <p>
-                Complete the guided liveness sequence in good lighting. We will capture
-                multiple frames before verifying your ID.
-              </p>
+              <h3>Live selfie</h3>
+              <p>Complete the 4-step liveness sequence.</p>
               <div className="invite-liveness-step">
-                <strong>{LIVENESS_STEPS[livenessStepIndex].title}</strong>:{" "}
+                <strong>Step {LIVENESS_STEPS[livenessStepIndex].title}</strong>
+                {" — "}
                 {LIVENESS_STEPS[livenessStepIndex].hint}
               </div>
               {!selfiePreview ? (
@@ -615,7 +609,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
                     style={{ marginTop: "0.75rem" }}
                     onClick={captureSelfie}
                   >
-                    Capture Photo
+                    Capture
                   </button>
                 </>
               ) : (
@@ -626,8 +620,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
                     alt="Selfie preview"
                   />
                   <p className="invite-check">
-                    ✓ Last capture saved ({selfieSequence.filter(Boolean).length}/
-                    {LIVENESS_STEPS.length})
+                    ✓ {selfieSequence.filter(Boolean).length}/{LIVENESS_STEPS.length} captured
                   </p>
                   <div className="invite-liveness-progress">
                     {LIVENESS_STEPS.map((step, index) => (
@@ -656,8 +649,8 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
                     }
                   >
                     {selfieSequence.filter(Boolean).length >= LIVENESS_STEPS.length
-                      ? "Restart sequence"
-                      : "Capture next step"}
+                      ? "Restart"
+                      : "Next capture"}
                   </button>
                 </>
               )}
@@ -675,7 +668,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
             }
             onClick={() => void handleVerifyIdentity()}
           >
-            {verifying ? "Verifying your identity…" : "Verify My Identity"}
+            {verifying ? "Verifying…" : "Verify identity"}
           </button>
 
           {verifyMessage && identityVerified && (
@@ -702,13 +695,13 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
 
           {identityVerified && (
             <>
-              <div className="invite-verified-banner">Identity Verified</div>
+              <div className="invite-verified-banner">Verified</div>
               <button
                 type="button"
                 className="primary"
                 onClick={() => setStep("checklist")}
               >
-                Proceed to Interview
+                Continue
               </button>
             </>
           )}

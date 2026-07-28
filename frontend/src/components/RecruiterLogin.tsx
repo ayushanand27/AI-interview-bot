@@ -64,7 +64,7 @@ export default function RecruiterLogin() {
     <div className="recruiter-portal">
       <header>
         <h1>AI Interview Bot</h1>
-        <p>Sign in to create assessments and review interviews.</p>
+        <p>Recruiter sign-in</p>
       </header>
 
       <div className="rp-card status-panel">

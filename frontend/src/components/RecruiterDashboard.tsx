@@ -822,7 +822,7 @@ export default function RecruiterDashboard({
       <header className="rp-header">
         <div className="rp-header-text">
           <h1>AI Interview Bot</h1>
-          <p>Recruiter portal — assessments and interview review</p>
+          <p>Assessments · reviews · analytics</p>
         </div>
         {onLogout && (
           <button
@@ -839,7 +839,7 @@ export default function RecruiterDashboard({
         <div className="rp-toolbar">
           <div>
             <h2 className="rp-section-title">Assessments</h2>
-            <p className="rp-section-desc">Create invite links from a job description.</p>
+            <p className="rp-section-desc">JD → questions → invite link</p>
           </div>
           <button
             type="button"
@@ -907,7 +907,7 @@ export default function RecruiterDashboard({
                 id="jd-text"
                 value={jdText}
                 onChange={(e) => setJdText(e.target.value)}
-                placeholder="Paste the full job description…"
+                placeholder="Paste job description…"
               />
             ) : (
               <div className="rp-file-block">
@@ -968,7 +968,7 @@ export default function RecruiterDashboard({
             </div>
 
             <div className="rp-type-mix">
-              <span className="rp-type-mix-label">Question types to generate</span>
+              <span className="rp-type-mix-label">Question types</span>
               <div className="rp-type-mix-options">
                 {QUESTION_TYPE_OPTIONS.map((opt) => (
                   <label key={opt.value} className="rp-type-chip">
@@ -998,10 +998,7 @@ export default function RecruiterDashboard({
             {editableQuestions.length > 0 && (
               <div className="rp-preview-block">
                 <div className="rp-preview-header">
-                  <h3 className="rp-preview-title">Edit questions</h3>
-                  <p className="rp-muted-small">
-                    Adjust type, wording, options, correct answers, time, and marks.
-                  </p>
+                  <h3 className="rp-preview-title">Questions</h3>
                 </div>
                 <ol className="rp-questions-editor">
                   {editableQuestions.map((q, i) => (
@@ -1317,10 +1314,7 @@ export default function RecruiterDashboard({
       <section className="rp-card rp-card-wide rp-section">
         <div className="rp-toolbar">
           <div>
-            <h2 className="rp-section-title">Analytics overview</h2>
-            <p className="rp-section-desc">
-              Invite funnel, score trends, integrity distribution, and assessment performance.
-            </p>
+            <h2 className="rp-section-title">Analytics</h2>
           </div>
           <div className="rp-actions">
             <button
@@ -1329,7 +1323,7 @@ export default function RecruiterDashboard({
               disabled={exportingSessions}
               onClick={() => void handleExportSessions()}
             >
-              {exportingSessions ? "…" : "Export sessions CSV"}
+              {exportingSessions ? "…" : "Sessions CSV"}
             </button>
             <button
               type="button"
@@ -1337,7 +1331,7 @@ export default function RecruiterDashboard({
               disabled={exportingAssessments}
               onClick={() => void handleExportAssessments()}
             >
-              {exportingAssessments ? "…" : "Export assessments CSV"}
+              {exportingAssessments ? "…" : "Assessments CSV"}
             </button>
           </div>
         </div>
@@ -1348,7 +1342,7 @@ export default function RecruiterDashboard({
           <>
             <div className="rp-analytics-grid">
               <div className="rp-stat-card">
-                <span className="rp-stat-label">Completed sessions</span>
+                <span className="rp-stat-label">Completed</span>
                 <strong className="rp-stat-value">{analytics.completed_session_count}</strong>
               </div>
               <div className="rp-stat-card">
@@ -1366,17 +1360,17 @@ export default function RecruiterDashboard({
                 </strong>
               </div>
               <div className="rp-stat-card">
-                <span className="rp-stat-label">Integrity flag rate</span>
+                <span className="rp-stat-label">Integrity flags</span>
                 <strong className="rp-stat-value">
                   {formatPercent(analytics.integrity_flag_rate_percent)}
                 </strong>
               </div>
               <div className="rp-stat-card">
-                <span className="rp-stat-label">Review flagged</span>
+                <span className="rp-stat-label">Needs review</span>
                 <strong className="rp-stat-value">{analytics.review_flagged_count}</strong>
               </div>
               <div className="rp-stat-card">
-                <span className="rp-stat-label">Active assessments</span>
+                <span className="rp-stat-label">Active invites</span>
                 <strong className="rp-stat-value">{analytics.invite_count}</strong>
               </div>
             </div>
@@ -1465,17 +1459,14 @@ export default function RecruiterDashboard({
             )}
           </>
         ) : (
-          <p className="rp-empty">Analytics will appear once assessments and interviews exist.</p>
+          <p className="rp-empty">No analytics yet.</p>
         )}
       </section>
 
       <section className="rp-card rp-card-wide rp-section">
         <div className="rp-toolbar">
           <div>
-            <h2 className="rp-section-title">Completed interviews</h2>
-            <p className="rp-section-desc">
-              Filter by role, date, assessment, score band, integrity, or review status.
-            </p>
+            <h2 className="rp-section-title">Interviews</h2>
           </div>
           <div className="rp-actions">
             <button
@@ -1574,17 +1565,12 @@ export default function RecruiterDashboard({
           </label>
         </div>
 
-        <p className="rp-section-desc">
-          Select a row to open the transcript and proctoring summary.
-        </p>
+        <p className="rp-section-desc">Select a row for transcript &amp; proctoring.</p>
 
         {loading && sessions.length === 0 ? (
-          <p className="rp-muted-small rp-loading-inline">Loading interviews…</p>
+          <p className="rp-muted-small rp-loading-inline">Loading…</p>
         ) : sessions.length === 0 ? (
-          <p className="rp-empty">
-            No completed interviews yet. Candidates must finish a session before
-            it appears here.
-          </p>
+          <p className="rp-empty">No completed interviews yet.</p>
         ) : (
           <div className="recruiter-table-wrap">
             <table className="recruiter-table">
@@ -1798,7 +1784,7 @@ export default function RecruiterDashboard({
 
               <section className="rp-evidence-grid">
                 <div className="rp-evidence-card">
-                  <h3 className="rp-preview-title">Review workflow</h3>
+                  <h3 className="rp-preview-title">Review</h3>
                   <div className="rp-review-status-row">
                     <span className={reviewBadgeClass(detail.review_state.review_status)}>
                       {formatReviewStatus(detail.review_state.review_status)}
@@ -1815,7 +1801,7 @@ export default function RecruiterDashboard({
                     value={reviewNotesDraft}
                     onChange={(e) => setReviewNotesDraft(e.target.value)}
                     rows={4}
-                    placeholder="Capture why this session was cleared, escalated, or rejected."
+                    placeholder="Notes for clear / escalate / reject"
                     disabled={reviewUpdating}
                   />
                   <div className="rp-actions">

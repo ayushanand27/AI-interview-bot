@@ -151,15 +151,15 @@ export default function Summary({
 
       {recordingSaved && (
         <div className="alert success" style={{ marginTop: "0.75rem" }}>
-          Interview recording saved successfully.
+          Recording saved.
         </div>
       )}
 
       <section className="summary-overall">
-        <h2>Your results</h2>
+        <h2>Results</h2>
         {displayScore !== null && (
           <p className="summary-score">
-            Overall score: <strong>{displayScore}</strong>
+            Score: <strong>{displayScore}</strong>
             <span className="summary-score-max"> / 100</span>
           </p>
         )}
@@ -169,7 +169,7 @@ export default function Summary({
         </p>
         {penalty > 0 && (
           <p className="summary-penalty">
-            Integrity penalty applied: <strong>-{penalty}%</strong>
+            Penalty: <strong>-{penalty}%</strong>
           </p>
         )}
       </section>
@@ -217,9 +217,9 @@ export default function Summary({
       })}
 
       <section className="summary-recording summary-recording-card">
-        <h2>Your Interview Recording</h2>
+        <h2>Recording</h2>
         {recordingStatus === "loading" && (
-          <p className="summary-recording-note">Checking for your recording…</p>
+          <p className="summary-recording-note">Checking recording…</p>
         )}
         {recordingStatus === "available" && recordingUrl && (
           <>
@@ -228,13 +228,13 @@ export default function Summary({
               Your browser does not support video playback.
             </video>
             <p className="summary-recording-note">
-              This recording is for your personal review only
+              For your personal review only
             </p>
           </>
         )}
         {recordingStatus === "pending" && (
           <p className="summary-recording-note">
-            Uploading your recording… this may take a few seconds.
+            Uploading recording…
           </p>
         )}
         {recordingStatus === "unavailable" && (

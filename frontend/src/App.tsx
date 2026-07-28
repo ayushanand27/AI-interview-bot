@@ -509,8 +509,8 @@ export default function App() {
         <h1>AI Interview Bot</h1>
         <p>
           {isRecruiter
-            ? "Recruiter dashboard — review completed interviews."
-            : "Technical interviews powered by AI — one question at a time."}
+            ? "Create assessments and review interviews."
+            : "Proctored technical interviews, one question at a time."}
         </p>
         {isLoggedIn && (
           <button
@@ -530,8 +530,7 @@ export default function App() {
       {registerVerificationNotice && (
         <div className="alert warning">
           <p>
-            Account created! Check your inbox for a verification link. This page
-            updates automatically after you verify.
+            Check your inbox for a verification link — this page updates after you verify.
           </p>
           <button
             type="button"
@@ -557,21 +556,12 @@ export default function App() {
       )}
 
       {!isLoggedIn ? (
-        <>
-          <div className="card hero-card" style={{ marginBottom: "1.25rem" }}>
-            <div className="pill" style={{ marginBottom: "1rem" }}>AI-led mock interviews</div>
-            <h2 className="section-title">Practice and evaluate technical interviews in a premium, focused workspace.</h2>
-            <p className="section-subtitle">
-              Upload your resume, tailor the role context, complete a proctored interview, and review structured feedback and recordings.
-            </p>
-          </div>
-          <Auth
-            loading={loading}
-            onLoadingChange={setLoading}
-            onError={setError}
-            onAuthenticated={handleAuthenticated}
-          />
-        </>
+        <Auth
+          loading={loading}
+          onLoadingChange={setLoading}
+          onError={setError}
+          onAuthenticated={handleAuthenticated}
+        />
       ) : isRecruiter ? (
         <RecruiterDashboard
           loading={loading}
@@ -584,9 +574,7 @@ export default function App() {
         <div className="card status-panel">
           <h2 className="section-title">Verify your email</h2>
           <p className="invite-meta">
-            We sent a verification link to <strong>{user?.email}</strong>. Open
-            it in your email, then return here — your account will unlock
-            automatically.
+            Open the link sent to <strong>{user?.email}</strong> — this page unlocks automatically.
           </p>
           <button
             type="button"

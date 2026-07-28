@@ -124,9 +124,9 @@ export default function SetupForm({ loading, onStart }: SetupFormProps) {
   return (
     <form className="card hero-card stack" onSubmit={handleSubmit}>
       <div>
-        <h2 className="section-title">Start your interview</h2>
+        <h2 className="section-title">Start interview</h2>
         <p className="section-subtitle">
-          Upload your resume, add a job description, and generate an interview flow tailored to the role.
+          Resume + job description required.
         </p>
       </div>
 
