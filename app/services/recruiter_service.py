@@ -25,6 +25,10 @@ from app.schemas.recruiter import (
     TranscriptItem,
 )
 from app.services.question_utils import question_text
+from app.services.adaptive_interview import (
+    adaptive_summary_for_recruiter,
+    question_adaptive_meta,
+)
 from app.services.report_service import generate_session_report_pdf, report_filename
 from app.services.session_persistence import (
     get_session_review_state,
@@ -289,12 +293,17 @@ def _session_to_detail(
         answer = answers[i] if i < len(answers) else None
         judgment_raw = judgments[i] if i < len(judgments) else None
         judgment = judgment_raw if isinstance(judgment_raw, dict) else None
+        adaptive_meta = question_adaptive_meta(question)
+        source = str(adaptive_meta.get("source") or "") or None
         transcript.append(
             TranscriptItem(
                 index=i + 1,
                 question=question_text(question),
                 answer=answer,
                 judgment=judgment,
+                is_adaptive_follow_up=source == "adaptive_follow_up",
+                adaptive_topic=adaptive_meta.get("topic"),
+                adaptive_source=source,
             )
         )
 
@@ -337,6 +346,9 @@ def _session_to_detail(
         recording_available=bool(row.recording_filename),
         recording_filename=row.recording_filename,
         transcript=transcript,
+        adaptive_interview=adaptive_summary_for_recruiter(
+            getattr(row, "adaptive_state", None)
+        ),
     )
 
 

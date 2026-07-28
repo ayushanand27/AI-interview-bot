@@ -153,6 +153,7 @@ def session_to_dict(session: InterviewSession, updated_at: datetime) -> dict[str
         "current_question_index": session.current_question_index,
         "total_questions": session.total_questions,
         "answered_count": len(session.answers),
+        "adaptive_state": getattr(session, "adaptive_state", None),
         "created_at": session.created_at.isoformat(),
         "updated_at": updated_at.isoformat(),
     }
@@ -175,6 +176,7 @@ def _row_to_interview_session(obj: DBSess) -> InterviewSession:
         final_score=obj.final_score,
         proctoring_summary=obj.proctoring_summary,
         invite_token=getattr(obj, "invite_token", None),
+        adaptive_state=getattr(obj, "adaptive_state", None),
         current_question_index=int(obj.current_question_index or 0),
         created_at=obj.created_at,
     )
@@ -197,6 +199,7 @@ def _interview_session_to_row(session: InterviewSession, now: datetime) -> DBSes
         final_score=session.final_score,
         proctoring_summary=session.proctoring_summary,
         invite_token=getattr(session, "invite_token", None),
+        adaptive_state=getattr(session, "adaptive_state", None),
         current_question_index=session.current_question_index,
         total_questions=session.total_questions,
         created_at=session.created_at,
@@ -222,6 +225,7 @@ def _apply_session_fields(obj: DBSess, session: InterviewSession, now: datetime)
     session_invite = getattr(session, "invite_token", None)
     if session_invite:
         obj.invite_token = session_invite
+    obj.adaptive_state = getattr(session, "adaptive_state", None)
     obj.current_question_index = session.current_question_index
     obj.total_questions = session.total_questions
     obj.updated_at = now

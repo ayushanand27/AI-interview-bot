@@ -101,6 +101,22 @@ export interface TranscriptItem {
   question: string;
   answer: string | null;
   judgment: AnswerJudgment | null;
+  is_adaptive_follow_up?: boolean;
+  adaptive_topic?: string | null;
+  adaptive_source?: string | null;
+}
+
+export interface AdaptiveInterviewSummary {
+  enabled?: boolean;
+  prompt_version?: string;
+  target_difficulty?: string;
+  current_difficulty?: string;
+  topics?: string[];
+  must_hit_competencies?: string[];
+  coverage?: Record<string, number>;
+  competency_hits?: Record<string, number>;
+  adaptation_count?: number;
+  adaptations?: Array<Record<string, unknown>>;
 }
 
 export interface RecruiterSessionDetail {
@@ -135,4 +151,5 @@ export interface RecruiterSessionDetail {
   recording_available: boolean;
   recording_filename: string | null;
   transcript: TranscriptItem[];
+  adaptive_interview?: AdaptiveInterviewSummary | null;
 }

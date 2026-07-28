@@ -1919,11 +1919,24 @@ export default function RecruiterDashboard({
                 )}
 
               <div className="rp-transcript">
+                {detail.adaptive_interview?.enabled && (
+                  <p className="rp-cell-muted" style={{ marginBottom: "0.75rem" }}>
+                    Adaptive interview · {detail.adaptive_interview.adaptation_count ?? 0} follow-up
+                    {(detail.adaptive_interview.adaptation_count ?? 0) === 1 ? "" : "s"}
+                    {detail.adaptive_interview.current_difficulty
+                      ? ` · difficulty ${detail.adaptive_interview.current_difficulty}`
+                      : ""}
+                  </p>
+                )}
                 {detail.transcript.map((item) => {
                   const j = item.judgment;
                   return (
                     <div key={item.index} className="summary-item">
-                      <h3>Q{item.index}</h3>
+                      <h3>
+                        Q{item.index}
+                        {item.is_adaptive_follow_up ? " · Follow-up" : ""}
+                        {item.adaptive_topic ? ` · ${item.adaptive_topic}` : ""}
+                      </h3>
                       <p>{item.question}</p>
                       <h3 className="rp-answer-title">Answer</h3>
                       <p className="answer-text">

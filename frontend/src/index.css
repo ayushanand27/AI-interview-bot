@@ -406,9 +406,14 @@ header p {
 }
 
 .question-marks,
-.question-type-tag {
+.question-type-tag,
+.question-adaptive-badge {
   color: var(--text-muted, #94a3b8);
   font-weight: 500;
+}
+
+.question-adaptive-badge {
+  color: #7dd3fc;
 }
 
 .option-list {

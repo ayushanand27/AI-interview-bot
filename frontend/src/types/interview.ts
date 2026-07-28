@@ -38,6 +38,9 @@ export interface CurrentQuestionResponse {
   question_type?: QuestionType | string | null;
   options?: string[] | null;
   tolerance?: number | null;
+  is_adaptive_follow_up?: boolean;
+  adaptive_topic?: string | null;
+  adaptive_difficulty?: string | null;
 }
 
 export interface AudioTranscribeResponse {

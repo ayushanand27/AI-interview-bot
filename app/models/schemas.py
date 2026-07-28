@@ -111,6 +111,18 @@ class CurrentQuestionResponse(BaseModel):
         None,
         description="Allowed absolute error for numerical questions (hint only).",
     )
+    is_adaptive_follow_up: bool = Field(
+        False,
+        description="True when this question was adapted from prior answer quality (Phase 5).",
+    )
+    adaptive_topic: Optional[str] = Field(
+        None,
+        description="Coverage topic for the current adaptive/seed question when available.",
+    )
+    adaptive_difficulty: Optional[str] = Field(
+        None,
+        description="Difficulty band for the current question when adaptive interviewing is active.",
+    )
 
 
 class AnswerSubmitRequest(BaseModel):

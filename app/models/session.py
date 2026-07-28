@@ -23,8 +23,10 @@ class InterviewSession:
     job_description: Optional[str] = None
     proctoring_summary: Optional[dict[str, Any]] = None
     invite_token: Optional[str] = None
+    # Phase 5 adaptive interviewing (None for invite/fixed assessments).
+    adaptive_state: Optional[dict[str, Any]] = None
     status: SessionStatus = SessionStatus.CREATED
-    questions: list[str] = field(default_factory=list)
+    questions: list[Any] = field(default_factory=list)
     answers: list[str] = field(default_factory=list)
     # Per-answer judgment objects returned by the judge service
     answer_judgments: list[dict] = field(default_factory=list)

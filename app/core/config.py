@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     MAX_ANSWER_LENGTH: int = 2000
     QUESTION_TIMER_SECONDS: int = 180  # Per-question time limit (3 minutes)
     SESSION_IDLE_TIMEOUT_MINUTES: int = 15
+    # Phase 5 adaptive interviewing (open AI interviews only; invites stay fixed)
+    ADAPTIVE_INTERVIEW_ENABLED: bool = True
+    ADAPTIVE_QUALITY_LOW: float = 55.0
+    ADAPTIVE_QUALITY_HIGH: float = 80.0
 
     # ── File Upload ───────────────────────────────────────
     UPLOAD_DIR: str = "uploads"         # Local folder for resume/audio files

@@ -111,6 +111,9 @@ class TranscriptItem(BaseModel):
     question: str
     answer: Optional[str] = None
     judgment: Optional[dict[str, Any]] = None
+    is_adaptive_follow_up: bool = False
+    adaptive_topic: Optional[str] = None
+    adaptive_source: Optional[str] = None
 
 
 class RecruiterSessionDetail(BaseModel):
@@ -140,6 +143,7 @@ class RecruiterSessionDetail(BaseModel):
     recording_available: bool = False
     recording_filename: Optional[str] = None
     transcript: list[TranscriptItem]
+    adaptive_interview: Optional[dict[str, Any]] = None
 
 
 class HumanReviewUpdateRequest(BaseModel):

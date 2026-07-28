@@ -978,6 +978,13 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
             {question.marks != null && (
               <span className="question-marks"> · {question.marks} marks</span>
             )}
+            {question.is_adaptive_follow_up && (
+              <span className="question-adaptive-badge" title="Adapted from your previous answer">
+                {" "}
+                · Follow-up
+                {question.adaptive_topic ? ` · ${question.adaptive_topic}` : ""}
+              </span>
+            )}
             {isObjective && (
               <span className="question-type-tag"> · {qType.toUpperCase()}</span>
             )}

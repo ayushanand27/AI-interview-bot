@@ -52,6 +52,14 @@ from app.services.question_utils import (
     question_time_seconds,
     question_type,
 )
+from app.services.adaptive_interview import (
+    build_blueprint,
+    enrich_seed_questions,
+    initial_adaptive_state,
+    is_invite_locked,
+    maybe_adapt_next_question,
+    public_adaptive_flags,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -213,7 +221,22 @@ class InterviewService:
             job_description=session.job_description,
         )
 
-        session.questions = questions
+        # Invite assessments stay on fixed banks; open interviews get adaptive state.
+        if is_invite_locked(session):
+            session.questions = questions
+            session.adaptive_state = None
+        else:
+            blueprint = build_blueprint(
+                role_title=session.role_title,
+                experience_level=session.experience_level,
+                question_count=count,
+                topic_focus=session.topic_focus,
+                job_description=session.job_description,
+                resume_text=session.resume_text,
+            )
+            session.questions = enrich_seed_questions(questions, blueprint)
+            session.adaptive_state = initial_adaptive_state(blueprint)
+
         session.answers = []
         session.current_question_index = 0
         session.status = SessionStatus.QUESTIONS_READY
@@ -278,6 +301,7 @@ class InterviewService:
             raw_question,
             shuffle_seed=f"{session.session_id}:{index}",
         )
+        adaptive_flags = public_adaptive_flags(raw_question)
 
         return CurrentQuestionResponse(
             session_id=session.session_id,
@@ -293,6 +317,9 @@ class InterviewService:
             question_type=str(view.get("type") or question_type(raw_question)),
             options=view.get("options"),
             tolerance=view.get("tolerance"),
+            is_adaptive_follow_up=bool(adaptive_flags.get("is_adaptive_follow_up")),
+            adaptive_topic=adaptive_flags.get("adaptive_topic"),
+            adaptive_difficulty=adaptive_flags.get("adaptive_difficulty"),
         )
 
     def submit_answer(
@@ -354,6 +381,15 @@ class InterviewService:
 
         # store judgment parallel to answers
         session.answer_judgments[index] = judgment
+
+        # Phase 5: adapt the next remaining subjective question when enabled.
+        if has_more:
+            maybe_adapt_next_question(
+                session,
+                answered_index=index,
+                judgment=judgment if isinstance(judgment, dict) else None,
+                generate_follow_up=get_llm_service().generate_follow_up_question,
+            )
 
         if session.current_question_index >= session.total_questions:
             self._compute_and_save_final_score(session)
