@@ -1,5 +1,12 @@
+export type QuestionType = "subjective" | "mcq" | "msq" | "numerical";
+
 export interface AssessmentQuestion {
   text: string;
+  type?: QuestionType;
+  options?: string[] | null;
+  correct_indices?: number[] | null;
+  correct_answer?: string | null;
+  tolerance?: number | null;
   time_seconds: number;
   marks: number;
 }

@@ -52,6 +52,7 @@ async def generate_questions(
     question_count: int = Form(...),
     difficulty: str = Form(...),
     jd_text: str = Form(""),
+    question_types: str | None = Form(None),
     jd_pdf: UploadFile | None = File(None),
     _current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
 ):
@@ -69,11 +70,19 @@ async def generate_questions(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    parsed_types = None
+    if question_types and question_types.strip():
+        try:
+            parsed_types = json.loads(question_types)
+        except json.JSONDecodeError:
+            parsed_types = [p.strip() for p in question_types.split(",") if p.strip()]
+
     try:
         data = GenerateQuestionsRequest(
             jd_text=combined_jd,
             question_count=question_count,
             difficulty=difficulty,
+            question_types=parsed_types,
         )
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=exc.errors()) from exc

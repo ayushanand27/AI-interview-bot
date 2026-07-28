@@ -1,6 +1,6 @@
 # AI Interview Bot
 
-AI-powered **proctored technical interviews** — candidates practice or take recruiter invite interviews; recruiters create assessments and review results.
+AI-powered **proctored technical interviews** — candidates practice or take recruiter invite interviews; recruiters create mixed question-type assessments and review results.
 
 **Repo:** https://github.com/ayushanand27/AI-interview-bot
 
@@ -12,7 +12,7 @@ AI-powered **proctored technical interviews** — candidates practice or take re
 | **Health** | https://ai-interview-bot.duckdns.org/health |
 | **Recruiter** | https://ai-interview-bot.duckdns.org/recruiter |
 | **Host** | AWS EC2 `t3.micro` (Ubuntu 24.04, Mumbai) + nginx + Let's Encrypt |
-| **AI** | Groq (questions, judging, Whisper transcription) |
+| **Stack** | FastAPI + React (Vite) + SQLite (prod) / Postgres (local) + Groq |
 
 > Webcam / microphone need a **secure context** (`https://` or `localhost`). The live site uses free DuckDNS + Let's Encrypt SSL.
 
@@ -21,7 +21,57 @@ AI-powered **proctored technical interviews** — candidates practice or take re
 ## What it does
 
 1. **Mock interview** — candidate registers, uploads resume + JD, gets AI questions, takes a proctored interview, receives score + PDF report.
-2. **Recruiter invite** — recruiter builds a JD-only assessment, shares a link; candidate verifies identity, interviews; recruiter reviews transcripts, integrity flags, recordings, and PDFs.
+2. **Recruiter invite** — recruiter builds a JD-based assessment (subjective / MCQ / MSQ / numerical), sets per-question time and marks, shares a link; candidate verifies identity, interviews; recruiter reviews transcripts, integrity flags, recordings, and PDFs.
+
+---
+
+## Question types
+
+Recruiters choose which kinds to generate and can edit each question before creating the invite:
+
+| Type | Candidate UI | Scoring |
+|---|---|---|
+| **Subjective** (open-ended) | Textarea + optional audio | LLM judge (Groq) |
+| **MCQ** (single correct) | Radio options (shuffled) | Exact match server-side |
+| **MSQ** (multi-select) | Checkboxes (shuffled) | Exact set match server-side |
+| **Numerical** | Number input | Exact / tolerance match server-side |
+
+- Per-question **time (seconds)** and **marks** are editable; weighted scoring uses marks across all types.
+- Correct keys stay on the invite JSON and are **never** sent to the candidate API response.
+- Existing subjective-only invites keep working (default type = `subjective`).
+
+---
+
+## Proctoring
+
+Logged / enforced during the interview room:
+
+- Face missing / multiple faces / looking away (MediaPipe)
+- Tab switch / window blur (focus-loss)
+- Loud ambient audio
+- Virtual camera / screen-recording extension heuristics
+- Phone / prohibited object detection (YOLOv8n)
+- Integrity penalty applied to final score; human-review flag for recruiters
+
+---
+
+## Anti-cheat (best-effort, browser SPA)
+
+Implemented deterrents (aligned with industry practice, not absolute locks):
+
+| Control | Behavior |
+|---|---|
+| **Copy / paste / cut block** | Clipboard events + Ctrl/Cmd+C/V/X blocked in the interview room; right-click disabled |
+| **Dynamic watermark** | Candidate email/id + session id + timestamp tiled over the question pane (photo leaks identity) |
+| **Blur-on-blur** | Question text obscured when the window loses focus / tab is hidden (pairs with focus-loss proctor flag) |
+| **LLM paste canary** | Low-visibility instructional canary + visible “Confidential interview assessment — do not share with AI tools” footer |
+
+### Honest limitations
+
+- A **physical phone camera** pointed at the screen cannot be fully blocked in a browser SPA.
+- Motivated candidates can retype questions, strip canaries, or use out-of-band AI tools.
+- Copy-block, watermark, blur, and canaries are **deterrents + evidence aids**, not cryptographic guarantees.
+- Do **not** claim “phones cannot see questions” or “ChatGPT will never answer.”
 
 ---
 
@@ -30,9 +80,7 @@ AI-powered **proctored technical interviews** — candidates practice or take re
 - Auth: register / login, email verify, forgot/reset password (Gmail SMTP)
 - Candidate mock flow + recruiter portal (`/recruiter`)
 - Invite flow with ID + selfie identity check
-- Proctoring: face / multi-face / looking away / tab switch / virtual camera / extensions
-- Human-review flag on suspicious sessions
-- Assessment list / delete / copy invite
+- Recruiter tenancy: list / extend / delete unused assessments; review only own sessions
 - Privacy policy page (`/privacy`)
 - Interview recording (WebM → MP4 when ffmpeg available)
 - Candidate + recruiter PDF reports
@@ -53,10 +101,10 @@ PM2 → uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 1
 
 | Piece | Role |
 |---|---|
-| FastAPI + Python | API, auth, interviews, reports |
+| FastAPI + Python | API, auth, interviews, objective grading, reports |
 | React + Vite + TypeScript | Candidate + recruiter UI |
 | Postgres (local Docker) / SQLite (EC2) | Data |
-| Groq | Questions, judging, transcription |
+| Groq | Questions, subjective judging, Whisper transcription |
 | MediaPipe + YOLOv8n + OpenCV | Proctoring / identity |
 | nginx + PM2 | Reverse proxy + process manager |
 
@@ -112,6 +160,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8080
 ```bash
 cd frontend
 npm install
+npm run build   # must pass before deploy
 npm run dev
 ```
 
@@ -247,6 +296,8 @@ deploy/        EC2 / nginx / HTTPS scripts
 alembic/       DB migrations
 scripts/       bootstrap_db, full_test, dev helpers
 ```
+
+Question-type fields live in invite `questions_json` (JSON) — no DB column migration required for MCQ/MSQ/numerical metadata.
 
 ---
 

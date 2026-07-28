@@ -99,6 +99,18 @@ class CurrentQuestionResponse(BaseModel):
         None,
         description="Per-question scoring weight / max marks when configured.",
     )
+    question_type: Optional[str] = Field(
+        "subjective",
+        description="subjective | mcq | msq | numerical",
+    )
+    options: Optional[list[str]] = Field(
+        None,
+        description="Shuffled options for MCQ/MSQ (correct keys never included).",
+    )
+    tolerance: Optional[float] = Field(
+        None,
+        description="Allowed absolute error for numerical questions (hint only).",
+    )
 
 
 class AnswerSubmitRequest(BaseModel):

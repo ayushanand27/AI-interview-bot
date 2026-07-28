@@ -14,6 +14,11 @@ import {
 } from "../hooks/useExtensionDetection";
 import { confirmAnswerSubmit, getAnswerWarnings, MAX_ANSWER_LENGTH } from "../utils/validateAnswer";
 import { startAmbientAudioMonitor } from "../utils/audioMonitor";
+import {
+  CONFIDENTIAL_FOOTER,
+  attachInterviewClipboardGuards,
+  wrapQuestionWithCanary,
+} from "../utils/antiCheat";
 
 const LOUD_AUDIO_MESSAGE = "Please maintain a quiet environment";
 const TAB_SWITCH_MESSAGE =
@@ -83,6 +88,7 @@ interface InterviewRoomProps {
   onSubmitAnswer: (answer: string) => void;
   onEndEarly: () => void;
   onIdleTimeout: () => void;
+  candidateEmail?: string | null;
 }
 
 export interface InterviewRoomHandle {
@@ -115,10 +121,17 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
       onSubmitAnswer,
       onEndEarly,
       onIdleTimeout,
+      candidateEmail,
     },
     ref,
   ) {
   const [answer, setAnswer] = useState("");
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+  const [contentObscured, setContentObscured] = useState(false);
+  const [watermarkClock, setWatermarkClock] = useState(() =>
+    new Date().toLocaleString(),
+  );
+  const roomRootRef = useRef<HTMLDivElement | null>(null);
   const [penaltyPercent, setPenaltyPercent] = useState(0);
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const [proctorBanner, setProctorBanner] = useState<string | null>(null);
@@ -136,6 +149,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
   );
 
   const answerRef = useRef("");
+  const selectedOptionsRef = useRef<string[]>([]);
   const lastActivityRef = useRef(Date.now());
   const questionTimerExpiredRef = useRef(false);
 
@@ -179,6 +193,18 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
 
   const warnings = answer.trim() ? getAnswerWarnings(answer) : [];
   const integrity = integrityDisplay(penaltyPercent);
+  const qType = (question.question_type || "subjective").toLowerCase();
+  const isObjective = qType === "mcq" || qType === "msq" || qType === "numerical";
+  const questionOptions = question.options ?? [];
+  const watermarkLine = [
+    candidateEmail?.trim() || "candidate",
+    `session:${sessionId.slice(0, 8)}`,
+    watermarkClock,
+  ].join(" · ");
+  const displayQuestion = question.question || "";
+  const canaryPayload = question.question
+    ? wrapQuestionWithCanary("", sessionId).trim()
+    : "";
 
   useEffect(() => {
     answerRef.current = answer;
@@ -186,7 +212,12 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
   }, [answer]);
 
   useEffect(() => {
+    selectedOptionsRef.current = selectedOptions;
+  }, [selectedOptions]);
+
+  useEffect(() => {
     setAnswer("");
+    setSelectedOptions([]);
     setAudioWarning(null);
     setTranscribeNotice(null);
     const timerSec =
@@ -196,7 +227,69 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     setSecondsLeft(timerSec);
     questionTimerExpiredRef.current = false;
     lastActivityRef.current = Date.now();
-  }, [question.question_index, question.time_seconds]);
+  }, [question.question_index, question.time_seconds, question.question_type]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setWatermarkClock(new Date().toLocaleString());
+    }, 15_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const root = roomRootRef.current;
+    if (!root) return;
+    return attachInterviewClipboardGuards(root, () => {
+      setFlashMessage("Copy / paste is disabled during the interview");
+      window.setTimeout(() => setFlashMessage(null), 2000);
+    });
+  }, []);
+
+  useEffect(() => {
+    function syncObscure() {
+      const hidden = document.hidden || !document.hasFocus();
+      setContentObscured(hidden);
+    }
+    function onBlur() {
+      window.setTimeout(syncObscure, 200);
+    }
+    document.addEventListener("visibilitychange", syncObscure);
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", syncObscure);
+    syncObscure();
+    return () => {
+      document.removeEventListener("visibilitychange", syncObscure);
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", syncObscure);
+    };
+  }, []);
+
+  function resolveSubmitPayload(): string | null {
+    if (qType === "mcq") {
+      return selectedOptions[0]?.trim() || null;
+    }
+    if (qType === "msq") {
+      if (selectedOptions.length === 0) return null;
+      return JSON.stringify([...selectedOptions].sort());
+    }
+    if (qType === "numerical") {
+      return answer.trim() || null;
+    }
+    return answer.trim() || null;
+  }
+
+  function toggleOption(option: string) {
+    lastActivityRef.current = Date.now();
+    if (qType === "mcq") {
+      setSelectedOptions([option]);
+      return;
+    }
+    setSelectedOptions((prev) =>
+      prev.includes(option)
+        ? prev.filter((o) => o !== option)
+        : [...prev, option],
+    );
+  }
 
   const processRecordedAudio = useCallback(
     async (blob: Blob) => {
@@ -755,10 +848,22 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
           window.clearInterval(timerId);
           if (!questionTimerExpiredRef.current && !loading) {
             questionTimerExpiredRef.current = true;
-            const trimmed = answerRef.current.trim();
-            onSubmitAnswer(
-              trimmed || "(No answer — time limit reached)",
-            );
+            const type = (question.question_type || "subjective").toLowerCase();
+            let payload = "(No answer — time limit reached)";
+            if (type === "mcq") {
+              payload =
+                selectedOptionsRef.current[0]?.trim() ||
+                "(No answer — time limit reached)";
+            } else if (type === "msq") {
+              payload =
+                selectedOptionsRef.current.length > 0
+                  ? JSON.stringify([...selectedOptionsRef.current].sort())
+                  : "(No answer — time limit reached)";
+            } else {
+              const trimmed = answerRef.current.trim();
+              payload = trimmed || "(No answer — time limit reached)";
+            }
+            onSubmitAnswer(payload);
           }
           return 0;
         }
@@ -776,20 +881,10 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     touchActivity();
-    const trimmed = answer.trim();
-    if (!trimmed || loading) return;
-    if (!confirmAnswerSubmit(trimmed)) return;
-    onSubmitAnswer(trimmed);
-  }
-
-  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
-    const pasted = e.clipboardData.getData("text");
-    if (getAnswerWarnings(pasted).length > 0) {
-      const ok = window.confirm(
-        "You pasted content that looks like files, prompts, or long notes — not a typical interview answer.\n\nPaste anyway?",
-      );
-      if (!ok) e.preventDefault();
-    }
+    const payload = resolveSubmitPayload();
+    if (!payload || loading) return;
+    if (!isObjective && !confirmAnswerSubmit(payload)) return;
+    onSubmitAnswer(payload);
   }
 
   const pipPreview =
@@ -861,7 +956,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
 
       {pipPreview}
 
-      <div className="card interview-room">
+      <div className="card interview-room" ref={roomRootRef}>
         <div className="integrity-bar">
           <span className={integrity.className}>{integrity.label}</span>
           {penaltyPercent > 0 && (
@@ -880,6 +975,12 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
         <div className="progress">
           <span>
             Question {currentNum} of {question.total_questions}
+            {question.marks != null && (
+              <span className="question-marks"> · {question.marks} marks</span>
+            )}
+            {isObjective && (
+              <span className="question-type-tag"> · {qType.toUpperCase()}</span>
+            )}
           </span>
           <span
             className={`question-timer${secondsLeft <= 30 ? " question-timer-urgent" : ""}`}
@@ -899,77 +1000,171 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
 
         <p className="session-id">Session: {sessionId}</p>
 
-        <div className="question-box">{question.question}</div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="field">
-            <label htmlFor="answer">Your answer</label>
-            <textarea
-              id="answer"
-              value={answer}
-              onChange={(e) => {
-                touchActivity();
-                setAnswer(e.target.value);
-              }}
-              onPaste={handlePaste}
-              placeholder="Type your answer, or record with the microphone…"
-              required
-              maxLength={MAX_ANSWER_LENGTH}
-              disabled={loading || isAudioRecording || transcribing}
-            />
-            <p className="answer-char-count" aria-live="polite">
-              {answer.length}/{MAX_ANSWER_LENGTH} characters
-            </p>
-            {(isAudioRecording || transcribing) && (
-              <div className="recording-indicator" role="status">
-                {isAudioRecording && (
-                  <>
-                    <span className="recording-dot" aria-hidden />
-                    Recording {formatRecordingTime(recordingSeconds)}
-                  </>
-                )}
-                {transcribing && !isAudioRecording && (
-                  <span>Transcribing your answer…</span>
-                )}
-              </div>
-            )}
-            {audioWarning && (
-              <div className="alert info alert-stack">
-                {audioWarning}
-              </div>
-            )}
-            {transcribeNotice && (
-              <div className="alert info alert-stack">
-                {transcribeNotice}
-              </div>
-            )}
-            {warnings.length > 0 && (
-              <div className="alert info alert-stack">
-                {warnings.map((w) => (
-                  <div key={w}>⚠ {w}</div>
-                ))}
-              </div>
+        <div
+          className={`question-box anti-leak-pane${contentObscured ? " is-obscured" : ""}`}
+        >
+          <div className="question-watermark" aria-hidden="true">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <span key={i}>{watermarkLine}</span>
+            ))}
+          </div>
+          <div className="question-text-protected user-select-none">
+            {displayQuestion}
+            {canaryPayload && (
+              <span className="ai-canary-hidden" aria-hidden="true">
+                {canaryPayload}
+              </span>
             )}
           </div>
+          <p className="question-confidential-footer">{CONFIDENTIAL_FOOTER}</p>
+          {contentObscured && (
+            <div className="question-obscure-overlay" role="status">
+              Return focus to continue — question hidden while away
+            </div>
+          )}
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          {(qType === "mcq" || qType === "msq") && (
+            <div className="field objective-options">
+              <label>
+                {qType === "mcq"
+                  ? "Select one answer"
+                  : "Select all that apply"}
+              </label>
+              <div className="option-list">
+                {questionOptions.map((opt) => {
+                  const checked = selectedOptions.includes(opt);
+                  return (
+                    <label
+                      key={opt}
+                      className={`option-choice${checked ? " is-selected" : ""}`}
+                    >
+                      <input
+                        type={qType === "mcq" ? "radio" : "checkbox"}
+                        name="objective-answer"
+                        checked={checked}
+                        onChange={() => toggleOption(opt)}
+                        disabled={loading}
+                      />
+                      <span>{opt}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {qType === "numerical" && (
+            <div className="field">
+              <label htmlFor="answer">Your numerical answer</label>
+              <input
+                id="answer"
+                type="text"
+                inputMode="decimal"
+                value={answer}
+                onChange={(e) => {
+                  touchActivity();
+                  setAnswer(e.target.value);
+                }}
+                onCopy={(e) => e.preventDefault()}
+                onCut={(e) => e.preventDefault()}
+                onPaste={(e) => e.preventDefault()}
+                placeholder="Enter a number"
+                required
+                disabled={loading}
+                className="numerical-answer-input"
+              />
+              {question.tolerance != null && question.tolerance > 0 && (
+                <p className="answer-char-count">
+                  Tolerance allowed: +/-{question.tolerance}
+                </p>
+              )}
+            </div>
+          )}
+
+          {qType === "subjective" && (
+            <div className="field">
+              <label htmlFor="answer">Your answer</label>
+              <textarea
+                id="answer"
+                value={answer}
+                onChange={(e) => {
+                  touchActivity();
+                  setAnswer(e.target.value);
+                }}
+                onCopy={(e) => e.preventDefault()}
+                onCut={(e) => e.preventDefault()}
+                onPaste={(e) => e.preventDefault()}
+                placeholder="Type your answer, or record with the microphone…"
+                required
+                maxLength={MAX_ANSWER_LENGTH}
+                disabled={loading || isAudioRecording || transcribing}
+              />
+              <p className="answer-char-count" aria-live="polite">
+                {answer.length}/{MAX_ANSWER_LENGTH} characters
+              </p>
+              {(isAudioRecording || transcribing) && (
+                <div className="recording-indicator" role="status">
+                  {isAudioRecording && (
+                    <>
+                      <span className="recording-dot" aria-hidden />
+                      Recording {formatRecordingTime(recordingSeconds)}
+                    </>
+                  )}
+                  {transcribing && !isAudioRecording && (
+                    <span>Transcribing your answer…</span>
+                  )}
+                </div>
+              )}
+              {audioWarning && (
+                <div className="alert info alert-stack">
+                  {audioWarning}
+                </div>
+              )}
+              {transcribeNotice && (
+                <div className="alert info alert-stack">
+                  {transcribeNotice}
+                </div>
+              )}
+              {warnings.length > 0 && (
+                <div className="alert info alert-stack">
+                  {warnings.map((w) => (
+                    <div key={w}>⚠ {w}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="actions">
-            <button
-              type="button"
-              className={isAudioRecording ? "danger" : "secondary"}
-              onClick={handleMicClick}
-              disabled={loading || transcribing}
-              title={isAudioRecording ? "Stop recording" : "Record audio answer"}
-            >
-              {isAudioRecording ? "Stop recording" : "Record answer"}
-            </button>
+            {qType === "subjective" && (
+              <button
+                type="button"
+                className={isAudioRecording ? "danger" : "secondary"}
+                onClick={handleMicClick}
+                disabled={loading || transcribing}
+                title={isAudioRecording ? "Stop recording" : "Record audio answer"}
+              >
+                {isAudioRecording ? "Stop recording" : "Record answer"}
+              </button>
+            )}
             <button
               type="submit"
               className="primary"
-              disabled={loading || !answer.trim() || isAudioRecording || transcribing}
+              disabled={
+                loading ||
+                !resolveSubmitPayload() ||
+                isAudioRecording ||
+                transcribing
+              }
             >
               {loading ? "Submitting…" : "Submit answer"}
             </button>
-            {answer.trim() && !isAudioRecording && !transcribing && (
+            {qType === "subjective" &&
+              answer.trim() &&
+              !isAudioRecording &&
+              !transcribing && (
               <button
                 type="button"
                 className="secondary"
@@ -982,8 +1177,16 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
             <button
               type="button"
               className="secondary"
-              onClick={() => setAnswer("")}
-              disabled={loading || !answer.trim() || isAudioRecording || transcribing}
+              onClick={() => {
+                setAnswer("");
+                setSelectedOptions([]);
+              }}
+              disabled={
+                loading ||
+                (!answer.trim() && selectedOptions.length === 0) ||
+                isAudioRecording ||
+                transcribing
+              }
             >
               Clear answer
             </button>

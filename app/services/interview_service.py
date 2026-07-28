@@ -44,9 +44,12 @@ from app.utils.exceptions import (
 from app.services.resume_parser import extract_text_from_document
 from app.utils.file_validation import validate_document_upload
 from app.services.question_utils import (
+    grade_objective_answer,
+    public_question_view,
     question_marks,
     question_text as extract_question_text,
     question_time_seconds,
+    question_type,
 )
 
 
@@ -261,19 +264,25 @@ class InterviewService:
 
         index = session.current_question_index
         raw_question = session.questions[index]
-        question_prompt = extract_question_text(raw_question)
+        view = public_question_view(
+            raw_question,
+            shuffle_seed=f"{session.session_id}:{index}",
+        )
 
         return CurrentQuestionResponse(
             session_id=session.session_id,
             status=session.status,
             question_index=index,
             total_questions=session.total_questions,
-            question=question_prompt,
+            question=view["text"],
             is_complete=False,
             message="Answer this question, then submit your response.",
             proctor_warning_count=proctor_warnings,
-            time_seconds=question_time_seconds(raw_question),
-            marks=question_marks(raw_question),
+            time_seconds=int(view.get("time_seconds") or question_time_seconds(raw_question)),
+            marks=float(view.get("marks") or question_marks(raw_question)),
+            question_type=str(view.get("type") or question_type(raw_question)),
+            options=view.get("options"),
+            tolerance=view.get("tolerance"),
         )
 
     def submit_answer(
@@ -317,14 +326,19 @@ class InterviewService:
 
         session_store.save(session)
 
-        # Call judge for this answer and store judgment
+        # Objective types graded server-side; subjective uses LLM judge
+        raw_question = session.questions[index]
         try:
-            question_prompt = extract_question_text(session.questions[index])
-            judgment = judge_answer(
-                question=question_prompt,
-                answer=answer.strip(),
-                job_role=session.role_title,
-            )
+            objective = grade_objective_answer(raw_question, answer.strip())
+            if objective is not None:
+                judgment = objective
+            else:
+                question_prompt = extract_question_text(raw_question)
+                judgment = judge_answer(
+                    question=question_prompt,
+                    answer=answer.strip(),
+                    job_role=session.role_title,
+                )
         except Exception:
             judgment = {"error": "judging_failed"}
 

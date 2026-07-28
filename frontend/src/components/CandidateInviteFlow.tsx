@@ -639,6 +639,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
               onSubmitAnswer={handleSubmitAnswer}
               onEndEarly={handleEndEarly}
               onIdleTimeout={handleIdleTimeout}
+              candidateEmail={candidateEmail}
             />
           ) : (
             <div className="card loading">Loading next question…</div>

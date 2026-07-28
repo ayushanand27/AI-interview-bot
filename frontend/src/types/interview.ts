@@ -22,6 +22,8 @@ export interface InterviewSessionResponse {
   created_at: string;
 }
 
+export type QuestionType = "subjective" | "mcq" | "msq" | "numerical";
+
 export interface CurrentQuestionResponse {
   session_id: string;
   status: SessionStatus;
@@ -33,6 +35,9 @@ export interface CurrentQuestionResponse {
   proctor_warning_count?: number;
   time_seconds?: number | null;
   marks?: number | null;
+  question_type?: QuestionType | string | null;
+  options?: string[] | null;
+  tolerance?: number | null;
 }
 
 export interface AudioTranscribeResponse {

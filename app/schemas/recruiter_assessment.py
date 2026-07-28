@@ -1,6 +1,7 @@
 """Schemas for recruiter JD-based assessment creation."""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -8,12 +9,20 @@ from app.services.question_utils import (
     DEFAULT_QUESTION_MARKS,
     MAX_ASSESSMENT_QUESTIONS,
     MIN_ASSESSMENT_QUESTIONS,
+    QUESTION_TYPES,
     default_time_seconds,
 )
+
+QuestionType = Literal["subjective", "mcq", "msq", "numerical"]
 
 
 class AssessmentQuestion(BaseModel):
     text: str = Field(..., min_length=3)
+    type: QuestionType = "subjective"
+    options: list[str] | None = None
+    correct_indices: list[int] | None = None
+    correct_answer: str | None = None
+    tolerance: float | None = None
     time_seconds: int = Field(default_factory=default_time_seconds)
     marks: float = Field(default=DEFAULT_QUESTION_MARKS)
 
@@ -24,6 +33,68 @@ class AssessmentQuestion(BaseModel):
         if len(text) < 3:
             raise ValueError("Question text must be at least 3 characters")
         return text
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def normalize_type(cls, v: object) -> str:
+        if v is None or v == "":
+            return "subjective"
+        normalized = str(v).strip().lower()
+        if normalized not in QUESTION_TYPES:
+            raise ValueError(
+                "type must be one of: subjective, mcq, msq, numerical"
+            )
+        return normalized
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def clean_options(cls, v: object) -> list[str] | None:
+        if v is None:
+            return None
+        if not isinstance(v, list):
+            raise ValueError("options must be a list of strings")
+        cleaned = [str(item).strip() for item in v if str(item).strip()]
+        return cleaned or None
+
+    @field_validator("correct_indices", mode="before")
+    @classmethod
+    def clean_indices(cls, v: object) -> list[int] | None:
+        if v is None:
+            return None
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return [int(v)]
+        if not isinstance(v, list):
+            raise ValueError("correct_indices must be a list of integers")
+        out: list[int] = []
+        for item in v:
+            try:
+                idx = int(item)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("correct_indices must be integers") from exc
+            if idx not in out:
+                out.append(idx)
+        return out
+
+    @field_validator("correct_answer", mode="before")
+    @classmethod
+    def clean_correct_answer(cls, v: object) -> str | None:
+        if v is None:
+            return None
+        text = str(v).strip()
+        return text or None
+
+    @field_validator("tolerance", mode="before")
+    @classmethod
+    def clean_tolerance(cls, v: object) -> float | None:
+        if v is None or v == "":
+            return None
+        try:
+            value = float(v)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("tolerance must be a number") from exc
+        if value < 0:
+            raise ValueError("tolerance must be >= 0")
+        return value
 
     @field_validator("time_seconds")
     @classmethod
@@ -39,11 +110,51 @@ class AssessmentQuestion(BaseModel):
             raise ValueError("marks must be between 0.5 and 100")
         return float(v)
 
+    @model_validator(mode="after")
+    def validate_by_type(self) -> "AssessmentQuestion":
+        if self.type in ("mcq", "msq"):
+            options = self.options or []
+            if len(options) < 2:
+                raise ValueError(f"{self.type.upper()} requires at least 2 options")
+            if len(options) > 8:
+                raise ValueError(f"{self.type.upper()} allows at most 8 options")
+            indices = self.correct_indices or []
+            if not indices:
+                raise ValueError(f"{self.type.upper()} requires correct_indices")
+            if any(i < 0 or i >= len(options) for i in indices):
+                raise ValueError("correct_indices must refer to valid options")
+            if self.type == "mcq" and len(indices) != 1:
+                raise ValueError("MCQ requires exactly one correct index")
+            if self.type == "msq" and len(indices) < 1:
+                raise ValueError("MSQ requires at least one correct index")
+            self.correct_answer = None
+            self.tolerance = None
+        elif self.type == "numerical":
+            if not self.correct_answer:
+                raise ValueError("Numerical questions require correct_answer")
+            try:
+                float(str(self.correct_answer).replace(",", "").strip())
+            except ValueError as exc:
+                raise ValueError(
+                    "correct_answer must be a number for numerical questions"
+                ) from exc
+            self.options = None
+            self.correct_indices = None
+            if self.tolerance is None:
+                self.tolerance = 0.0
+        else:
+            self.options = None
+            self.correct_indices = None
+            self.correct_answer = None
+            self.tolerance = None
+        return self
+
 
 class GenerateQuestionsRequest(BaseModel):
     jd_text: str = Field(..., min_length=20)
     question_count: int
     difficulty: str
+    question_types: list[QuestionType] | None = None
 
     @field_validator("question_count")
     @classmethod
@@ -71,6 +182,27 @@ class GenerateQuestionsRequest(BaseModel):
             raise ValueError("Job description must be at least 20 characters")
         return text
 
+    @field_validator("question_types", mode="before")
+    @classmethod
+    def normalize_question_types(cls, v: object) -> list[str] | None:
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            parts = [p.strip().lower() for p in v.split(",") if p.strip()]
+        elif isinstance(v, list):
+            parts = [str(p).strip().lower() for p in v if str(p).strip()]
+        else:
+            raise ValueError("question_types must be a list")
+        cleaned: list[str] = []
+        for part in parts:
+            if part not in QUESTION_TYPES:
+                raise ValueError(
+                    "question_types entries must be subjective, mcq, msq, or numerical"
+                )
+            if part not in cleaned:
+                cleaned.append(part)
+        return cleaned or None
+
 
 class GenerateQuestionsResponse(BaseModel):
     questions: list[AssessmentQuestion]
@@ -83,6 +215,7 @@ class CreateAssessmentRequest(BaseModel):
     difficulty: str
     expiry_hours: int
     questions: list[AssessmentQuestion] | None = None
+    question_types: list[QuestionType] | None = None
 
     @field_validator("question_count")
     @classmethod
@@ -116,6 +249,11 @@ class CreateAssessmentRequest(BaseModel):
         if len(text) < 20:
             raise ValueError("Job description must be at least 20 characters")
         return text
+
+    @field_validator("question_types", mode="before")
+    @classmethod
+    def normalize_question_types(cls, v: object) -> list[str] | None:
+        return GenerateQuestionsRequest.normalize_question_types(v)
 
     @model_validator(mode="after")
     def validate_custom_questions(self) -> "CreateAssessmentRequest":

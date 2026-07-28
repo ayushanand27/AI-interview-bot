@@ -4,13 +4,73 @@ import type {
   RecruiterSessionDetail,
   RecruiterSessionSummary,
 } from "../types/recruiter";
-import type { AssessmentQuestion, AssessmentSummary } from "../types/assessment";
+import type {
+  AssessmentQuestion,
+  AssessmentSummary,
+  QuestionType,
+} from "../types/assessment";
 import "../recruiter-portal.css";
 
 const DEFAULT_TIME_SECONDS =
   Number(import.meta.env.VITE_QUESTION_TIMER_SECONDS) || 180;
 const MIN_QUESTIONS = 2;
 const MAX_QUESTIONS = 20;
+
+const QUESTION_TYPE_OPTIONS: { value: QuestionType; label: string }[] = [
+  { value: "subjective", label: "Subjective" },
+  { value: "mcq", label: "MCQ (single)" },
+  { value: "msq", label: "MSQ (multi)" },
+  { value: "numerical", label: "Numerical" },
+];
+
+function emptyOptions(): string[] {
+  return ["", "", "", ""];
+}
+
+function defaultQuestion(type: QuestionType = "subjective"): AssessmentQuestion {
+  const base: AssessmentQuestion = {
+    text: "",
+    type,
+    time_seconds: DEFAULT_TIME_SECONDS,
+    marks: 10,
+  };
+  if (type === "mcq" || type === "msq") {
+    base.options = emptyOptions();
+    base.correct_indices = type === "mcq" ? [0] : [0, 1];
+  }
+  if (type === "numerical") {
+    base.correct_answer = "";
+    base.tolerance = 0;
+  }
+  return base;
+}
+
+function normalizeEditableQuestion(q: AssessmentQuestion): AssessmentQuestion {
+  const type = (q.type || "subjective") as QuestionType;
+  const next: AssessmentQuestion = {
+    text: q.text ?? "",
+    type,
+    time_seconds: Number(q.time_seconds) || DEFAULT_TIME_SECONDS,
+    marks: Number(q.marks) || 10,
+  };
+  if (type === "mcq" || type === "msq") {
+    const options =
+      q.options && q.options.length >= 2 ? [...q.options] : emptyOptions();
+    while (options.length < 2) options.push("");
+    next.options = options;
+    next.correct_indices =
+      q.correct_indices && q.correct_indices.length > 0
+        ? [...q.correct_indices]
+        : type === "mcq"
+          ? [0]
+          : [0];
+  }
+  if (type === "numerical") {
+    next.correct_answer = q.correct_answer ?? "";
+    next.tolerance = Number(q.tolerance ?? 0);
+  }
+  return next;
+}
 
 const VIOLATION_TYPE_LABELS: Record<string, string> = {
   no_face: "Face not detected",
@@ -82,6 +142,12 @@ export default function RecruiterDashboard({
   const [questionCount, setQuestionCount] = useState(5);
   const [difficulty, setDifficulty] = useState("Medium");
   const [expiryHours, setExpiryHours] = useState(48);
+  const [questionTypes, setQuestionTypes] = useState<QuestionType[]>([
+    "subjective",
+    "mcq",
+    "msq",
+    "numerical",
+  ]);
   const [assessmentLoading, setAssessmentLoading] = useState(false);
   const [editableQuestions, setEditableQuestions] = useState<AssessmentQuestion[]>(
     [],
@@ -259,8 +325,11 @@ export default function RecruiterDashboard({
         jd_pdf: jdMode === "pdf" ? jdPdfFile : null,
         question_count: questionCount,
         difficulty,
+        question_types: questionTypes,
       });
-      setEditableQuestions(res.data.questions ?? []);
+      setEditableQuestions(
+        (res.data.questions ?? []).map((q) => normalizeEditableQuestion(q)),
+      );
       setDraftJdText(
         res.data.jd_text?.trim() ||
           (jdMode === "paste" ? jdText.trim() : ""),
@@ -289,29 +358,162 @@ export default function RecruiterDashboard({
     setEditableQuestions((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function toggleQuestionType(type: QuestionType) {
+    setQuestionTypes((prev) => {
+      if (prev.includes(type)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((t) => t !== type);
+      }
+      return [...prev, type];
+    });
+  }
+
+  function changeQuestionType(index: number, type: QuestionType) {
+    setEditableQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== index) return q;
+        const next = defaultQuestion(type);
+        next.text = q.text;
+        next.time_seconds = q.time_seconds;
+        next.marks = q.marks;
+        if ((type === "mcq" || type === "msq") && q.options?.length) {
+          next.options = [...q.options];
+          next.correct_indices =
+            type === "mcq"
+              ? [q.correct_indices?.[0] ?? 0]
+              : q.correct_indices?.length
+                ? [...q.correct_indices]
+                : [0];
+        }
+        if (type === "numerical") {
+          next.correct_answer = q.correct_answer ?? "";
+          next.tolerance = q.tolerance ?? 0;
+        }
+        return next;
+      }),
+    );
+  }
+
+  function updateOption(qi: number, oi: number, value: string) {
+    setEditableQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qi) return q;
+        const options = [...(q.options ?? emptyOptions())];
+        options[oi] = value;
+        return { ...q, options };
+      }),
+    );
+  }
+
+  function addOption(qi: number) {
+    setEditableQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qi) return q;
+        const options = [...(q.options ?? [])];
+        if (options.length >= 8) return q;
+        options.push("");
+        return { ...q, options };
+      }),
+    );
+  }
+
+  function removeOption(qi: number, oi: number) {
+    setEditableQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qi) return q;
+        const options = [...(q.options ?? [])];
+        if (options.length <= 2) return q;
+        options.splice(oi, 1);
+        const correct_indices = (q.correct_indices ?? [])
+          .filter((idx) => idx !== oi)
+          .map((idx) => (idx > oi ? idx - 1 : idx));
+        return {
+          ...q,
+          options,
+          correct_indices:
+            correct_indices.length > 0
+              ? correct_indices
+              : q.type === "mcq"
+                ? [0]
+                : [0],
+        };
+      }),
+    );
+  }
+
+  function toggleCorrectIndex(qi: number, oi: number) {
+    setEditableQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qi) return q;
+        if (q.type === "mcq") {
+          return { ...q, correct_indices: [oi] };
+        }
+        const current = new Set(q.correct_indices ?? []);
+        if (current.has(oi)) current.delete(oi);
+        else current.add(oi);
+        const correct_indices = Array.from(current).sort((a, b) => a - b);
+        return {
+          ...q,
+          correct_indices: correct_indices.length ? correct_indices : [oi],
+        };
+      }),
+    );
+  }
+
   function addQuestion() {
     if (editableQuestions.length >= MAX_QUESTIONS) {
       onError(`At most ${MAX_QUESTIONS} questions are allowed.`);
       return;
     }
-    setEditableQuestions((prev) => [
-      ...prev,
-      {
-        text: "",
-        time_seconds: DEFAULT_TIME_SECONDS,
-        marks: 10,
-      },
-    ]);
+    setEditableQuestions((prev) => [...prev, defaultQuestion("subjective")]);
   }
 
   async function handleCreateAssessment() {
-    const cleaned = editableQuestions
-      .map((q) => ({
-        text: q.text.trim(),
+    const cleaned: AssessmentQuestion[] = [];
+    for (const q of editableQuestions) {
+      const text = q.text.trim();
+      if (text.length < 3) continue;
+      const type = (q.type || "subjective") as QuestionType;
+      const base: AssessmentQuestion = {
+        text,
+        type,
         time_seconds: Number(q.time_seconds) || DEFAULT_TIME_SECONDS,
         marks: Number(q.marks) || 10,
-      }))
-      .filter((q) => q.text.length >= 3);
+      };
+      if (type === "mcq" || type === "msq") {
+        const options = (q.options ?? [])
+          .map((o) => o.trim())
+          .filter((o) => o.length > 0);
+        if (options.length < 2) {
+          onError(`Each ${type.toUpperCase()} needs at least 2 options.`);
+          return;
+        }
+        const correct_indices = (q.correct_indices ?? []).filter(
+          (idx) => idx >= 0 && idx < options.length,
+        );
+        if (type === "mcq" && correct_indices.length !== 1) {
+          onError("Each MCQ needs exactly one correct option.");
+          return;
+        }
+        if (type === "msq" && correct_indices.length < 1) {
+          onError("Each MSQ needs at least one correct option.");
+          return;
+        }
+        base.options = options;
+        base.correct_indices =
+          type === "mcq" ? [correct_indices[0]] : correct_indices;
+      }
+      if (type === "numerical") {
+        const correct_answer = String(q.correct_answer ?? "").trim();
+        if (!correct_answer || Number.isNaN(Number(correct_answer))) {
+          onError("Numerical questions need a numeric correct answer.");
+          return;
+        }
+        base.correct_answer = correct_answer;
+        base.tolerance = Number(q.tolerance ?? 0);
+      }
+      cleaned.push(base);
+    }
 
     if (cleaned.length < MIN_QUESTIONS) {
       onError(`Add at least ${MIN_QUESTIONS} questions with text.`);
@@ -332,7 +534,11 @@ export default function RecruiterDashboard({
         questions: cleaned,
       });
       setApprovedInviteLink(res.data.invite_link);
-      setEditableQuestions(res.data.questions_preview ?? cleaned);
+      setEditableQuestions(
+        (res.data.questions_preview ?? cleaned).map((q) =>
+          normalizeEditableQuestion(q),
+        ),
+      );
       loadAssessments();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to create assessment");
@@ -577,6 +783,23 @@ export default function RecruiterDashboard({
               </div>
             </div>
 
+            <div className="rp-type-mix">
+              <span className="rp-type-mix-label">Question types to generate</span>
+              <div className="rp-type-mix-options">
+                {QUESTION_TYPE_OPTIONS.map((opt) => (
+                  <label key={opt.value} className="rp-type-chip">
+                    <input
+                      type="checkbox"
+                      checked={questionTypes.includes(opt.value)}
+                      onChange={() => toggleQuestionType(opt.value)}
+                      disabled={assessmentLoading}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <button
               type="button"
               className="rp-primary"
@@ -593,7 +816,7 @@ export default function RecruiterDashboard({
                 <div className="rp-preview-header">
                   <h3 className="rp-preview-title">Edit questions</h3>
                   <p className="rp-muted-small">
-                    Adjust wording, time (seconds), and marks before sharing.
+                    Adjust type, wording, options, correct answers, time, and marks.
                   </p>
                 </div>
                 <ol className="rp-questions-editor">
@@ -601,6 +824,25 @@ export default function RecruiterDashboard({
                     <li key={i} className="rp-question-edit-row">
                       <div className="rp-question-edit-top">
                         <span className="rp-question-num">Q{i + 1}</span>
+                        <label className="rp-inline-type">
+                          Type
+                          <select
+                            value={q.type || "subjective"}
+                            onChange={(e) =>
+                              changeQuestionType(
+                                i,
+                                e.target.value as QuestionType,
+                              )
+                            }
+                            disabled={assessmentLoading}
+                          >
+                            {QUESTION_TYPE_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
                         <button
                           type="button"
                           className="rp-secondary rp-btn-compact"
@@ -622,6 +864,89 @@ export default function RecruiterDashboard({
                         disabled={assessmentLoading}
                         placeholder="Question text"
                       />
+                      {(q.type === "mcq" || q.type === "msq") && (
+                        <div className="rp-options-editor">
+                          <p className="rp-muted-small">
+                            Options — mark correct
+                            {q.type === "msq" ? " (multi)" : " (one)"}
+                          </p>
+                          {(q.options ?? []).map((opt, oi) => (
+                            <div key={oi} className="rp-option-row">
+                              <input
+                                type={q.type === "mcq" ? "radio" : "checkbox"}
+                                name={`correct-${i}`}
+                                checked={(q.correct_indices ?? []).includes(oi)}
+                                onChange={() => toggleCorrectIndex(i, oi)}
+                                disabled={assessmentLoading}
+                                title="Mark as correct"
+                              />
+                              <input
+                                type="text"
+                                value={opt}
+                                onChange={(e) =>
+                                  updateOption(i, oi, e.target.value)
+                                }
+                                placeholder={`Option ${oi + 1}`}
+                                disabled={assessmentLoading}
+                              />
+                              <button
+                                type="button"
+                                className="rp-secondary rp-btn-compact"
+                                disabled={
+                                  assessmentLoading ||
+                                  (q.options?.length ?? 0) <= 2
+                                }
+                                onClick={() => removeOption(i, oi)}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            className="rp-secondary rp-btn-compact"
+                            disabled={
+                              assessmentLoading || (q.options?.length ?? 0) >= 8
+                            }
+                            onClick={() => addOption(i)}
+                          >
+                            Add option
+                          </button>
+                        </div>
+                      )}
+                      {q.type === "numerical" && (
+                        <div className="rp-question-meta-row">
+                          <label>
+                            Correct answer
+                            <input
+                              type="text"
+                              value={q.correct_answer ?? ""}
+                              onChange={(e) =>
+                                updateQuestion(i, {
+                                  correct_answer: e.target.value,
+                                })
+                              }
+                              disabled={assessmentLoading}
+                              placeholder="e.g. 42"
+                            />
+                          </label>
+                          <label>
+                            Tolerance ±
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={q.tolerance ?? 0}
+                              onChange={(e) =>
+                                updateQuestion(i, {
+                                  tolerance: Number(e.target.value) || 0,
+                                })
+                              }
+                              disabled={assessmentLoading}
+                            />
+                          </label>
+                        </div>
+                      )}
                       <div className="rp-question-meta-row">
                         <label>
                           Time (sec)
@@ -633,7 +958,8 @@ export default function RecruiterDashboard({
                             value={q.time_seconds}
                             onChange={(e) =>
                               updateQuestion(i, {
-                                time_seconds: Number(e.target.value) || DEFAULT_TIME_SECONDS,
+                                time_seconds:
+                                  Number(e.target.value) || DEFAULT_TIME_SECONDS,
                               })
                             }
                             disabled={assessmentLoading}

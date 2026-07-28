@@ -1,7 +1,10 @@
-"""Helpers for invite/session question objects (text, timer, marks)."""
+"""Helpers for invite/session question objects (text, type, timer, marks)."""
 
 from __future__ import annotations
 
+import json
+import random
+import re
 from typing import Any
 
 from app.core.config import settings
@@ -9,6 +12,9 @@ from app.core.config import settings
 DEFAULT_QUESTION_MARKS = 10
 MIN_ASSESSMENT_QUESTIONS = 2
 MAX_ASSESSMENT_QUESTIONS = 20
+
+QUESTION_TYPES = ("subjective", "mcq", "msq", "numerical")
+OBJECTIVE_TYPES = frozenset({"mcq", "msq", "numerical"})
 
 
 def default_time_seconds() -> int:
@@ -43,14 +49,108 @@ def question_marks(item: Any) -> float:
     return float(DEFAULT_QUESTION_MARKS)
 
 
+def question_type(item: Any) -> str:
+    if isinstance(item, dict):
+        raw = str(item.get("type", item.get("question_type", "subjective")) or "subjective")
+        normalized = raw.strip().lower()
+        if normalized in QUESTION_TYPES:
+            return normalized
+    return "subjective"
+
+
+def question_options(item: Any) -> list[str]:
+    if not isinstance(item, dict):
+        return []
+    raw = item.get("options")
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for opt in raw:
+        text = str(opt).strip() if opt is not None else ""
+        if text:
+            out.append(text)
+    return out
+
+
+def question_correct_indices(item: Any) -> list[int]:
+    if not isinstance(item, dict):
+        return []
+    options = question_options(item)
+    raw = item.get("correct_indices")
+    indices: list[int] = []
+    if isinstance(raw, list):
+        for value in raw:
+            try:
+                idx = int(value)
+            except (TypeError, ValueError):
+                continue
+            if 0 <= idx < len(options) and idx not in indices:
+                indices.append(idx)
+    elif isinstance(raw, (int, float)):
+        idx = int(raw)
+        if 0 <= idx < len(options):
+            indices = [idx]
+
+    # Legacy: correct_answer as option text or single index string
+    if not indices and item.get("correct_answer") is not None and options:
+        ca = item.get("correct_answer")
+        if isinstance(ca, (int, float)) and not isinstance(ca, bool):
+            idx = int(ca)
+            if 0 <= idx < len(options):
+                indices = [idx]
+        else:
+            ca_text = str(ca).strip().lower()
+            for i, opt in enumerate(options):
+                if opt.strip().lower() == ca_text and i not in indices:
+                    indices.append(i)
+    return indices
+
+
+def question_correct_answer(item: Any) -> str | None:
+    if not isinstance(item, dict):
+        return None
+    raw = item.get("correct_answer")
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    return text if text else None
+
+
+def question_tolerance(item: Any) -> float:
+    if not isinstance(item, dict):
+        return 0.0
+    raw = item.get("tolerance")
+    try:
+        value = float(raw) if raw is not None else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, value)
+
+
 def normalize_question(item: Any) -> dict[str, Any]:
-    """Normalize to {text, time_seconds, marks}."""
+    """Normalize to a full question object including type metadata."""
     text = question_text(item)
-    return {
+    qtype = question_type(item)
+    options = question_options(item) if qtype in ("mcq", "msq") else []
+    correct_indices = question_correct_indices(item) if qtype in ("mcq", "msq") else []
+    if qtype == "mcq" and len(correct_indices) > 1:
+        correct_indices = correct_indices[:1]
+    correct_answer = question_correct_answer(item) if qtype == "numerical" else None
+    tolerance = question_tolerance(item) if qtype == "numerical" else 0.0
+
+    payload: dict[str, Any] = {
         "text": text,
+        "type": qtype,
         "time_seconds": question_time_seconds(item),
         "marks": question_marks(item),
     }
+    if qtype in ("mcq", "msq"):
+        payload["options"] = options
+        payload["correct_indices"] = correct_indices
+    if qtype == "numerical":
+        payload["correct_answer"] = correct_answer or ""
+        payload["tolerance"] = tolerance
+    return payload
 
 
 def normalize_questions(items: list[Any] | None) -> list[dict[str, Any]]:
@@ -64,3 +164,192 @@ def normalize_questions(items: list[Any] | None) -> list[dict[str, Any]]:
 
 def questions_as_text_list(items: list[Any] | None) -> list[str]:
     return [q["text"] for q in normalize_questions(items)]
+
+
+def shuffle_options(options: list[str], *, seed: str | None = None) -> list[str]:
+    """Return a shuffled copy of options (stable when seed is provided)."""
+    if len(options) <= 1:
+        return list(options)
+    shuffled = list(options)
+    rng = random.Random(seed) if seed is not None else random.Random()
+    rng.shuffle(shuffled)
+    return shuffled
+
+
+def public_question_view(
+    item: Any,
+    *,
+    shuffle_seed: str | None = None,
+) -> dict[str, Any]:
+    """Candidate-safe question payload (no correct answers)."""
+    q = normalize_question(item)
+    view: dict[str, Any] = {
+        "text": q["text"],
+        "type": q["type"],
+        "time_seconds": q["time_seconds"],
+        "marks": q["marks"],
+    }
+    if q["type"] in ("mcq", "msq"):
+        options = list(q.get("options") or [])
+        view["options"] = shuffle_options(options, seed=shuffle_seed)
+    if q["type"] == "numerical":
+        view["tolerance"] = float(q.get("tolerance") or 0.0)
+    return view
+
+
+def _parse_float(value: str) -> float | None:
+    cleaned = value.strip().replace(",", "")
+    cleaned = re.sub(r"[^\d.\-eE+]", "", cleaned)
+    if not cleaned or cleaned in {".", "-", "+", "-.", "+."}:
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def _selected_texts_from_answer(answer: str, options: list[str]) -> list[str]:
+    """Resolve candidate answer string into selected option texts."""
+    raw = (answer or "").strip()
+    if not raw or not options:
+        return []
+
+    # JSON array of strings or indices
+    if raw.startswith("["):
+        try:
+            payload = json.loads(raw)
+            if isinstance(payload, list):
+                texts: list[str] = []
+                for item in payload:
+                    if isinstance(item, (int, float)) and not isinstance(item, bool):
+                        idx = int(item)
+                        if 0 <= idx < len(options):
+                            texts.append(options[idx])
+                    else:
+                        text = str(item).strip()
+                        if text:
+                            texts.append(text)
+                return texts
+        except json.JSONDecodeError:
+            pass
+
+    # Pipe / newline separated multi-select
+    if "|" in raw or "\n" in raw:
+        parts = re.split(r"[|\n]+", raw)
+        return [p.strip() for p in parts if p.strip()]
+
+    # Single index
+    if re.fullmatch(r"\d+", raw):
+        idx = int(raw)
+        if 0 <= idx < len(options):
+            return [options[idx]]
+
+    # Comma-separated indices
+    if re.fullmatch(r"[\d,\s]+", raw) and "," in raw:
+        texts = []
+        for part in raw.split(","):
+            part = part.strip()
+            if part.isdigit():
+                idx = int(part)
+                if 0 <= idx < len(options):
+                    texts.append(options[idx])
+        if texts:
+            return texts
+
+    return [raw]
+
+
+def grade_objective_answer(question: Any, answer: str) -> dict[str, Any] | None:
+    """Grade MCQ / MSQ / numerical answers server-side. Returns None for subjective."""
+    q = normalize_question(question)
+    qtype = q["type"]
+    if qtype not in OBJECTIVE_TYPES:
+        return None
+
+    marks = float(q["marks"])
+    answer_text = (answer or "").strip()
+
+    if qtype == "numerical":
+        expected_raw = str(q.get("correct_answer") or "").strip()
+        expected = _parse_float(expected_raw)
+        actual = _parse_float(answer_text)
+        tolerance = float(q.get("tolerance") or 0.0)
+        if expected is None or actual is None:
+            score = 0.0
+            reasoning = "Numerical answer could not be parsed or expected answer is missing."
+            correct = False
+        else:
+            correct = abs(actual - expected) <= tolerance + 1e-9
+            score = 100.0 if correct else 0.0
+            reasoning = (
+                f"Correct within tolerance +/-{tolerance}."
+                if correct
+                else f"Expected {expected_raw} (+/-{tolerance}); received {answer_text}."
+            )
+        return {
+            "weighted_total": score,
+            "overall_reasoning": reasoning,
+            "strengths": ["Exact match"] if correct else [],
+            "improvements": [] if correct else ["Review the expected numerical result."],
+            "criteria_scores": {
+                "objective": {
+                    "score": score,
+                    "reasoning": reasoning,
+                }
+            },
+            "grading_mode": "objective_numerical",
+            "is_correct": correct,
+            "max_marks": marks,
+        }
+
+    options = list(q.get("options") or [])
+    correct_indices = list(q.get("correct_indices") or [])
+    correct_texts = {
+        options[i].strip().lower()
+        for i in correct_indices
+        if 0 <= i < len(options)
+    }
+    selected = _selected_texts_from_answer(answer_text, options)
+    selected_norm = {t.strip().lower() for t in selected if t.strip()}
+
+    if qtype == "mcq":
+        correct = len(correct_texts) == 1 and selected_norm == correct_texts
+        score = 100.0 if correct else 0.0
+        reasoning = (
+            "Selected the correct option."
+            if correct
+            else "Incorrect option selected."
+        )
+        return {
+            "weighted_total": score,
+            "overall_reasoning": reasoning,
+            "strengths": ["Correct selection"] if correct else [],
+            "improvements": [] if correct else ["Review the concept covered by this MCQ."],
+            "criteria_scores": {
+                "objective": {"score": score, "reasoning": reasoning}
+            },
+            "grading_mode": "objective_mcq",
+            "is_correct": correct,
+            "max_marks": marks,
+        }
+
+    # MSQ — all-or-nothing exact set match
+    correct = bool(correct_texts) and selected_norm == correct_texts
+    score = 100.0 if correct else 0.0
+    reasoning = (
+        "Selected exactly the correct set of options."
+        if correct
+        else "Multi-select answer did not match the expected option set."
+    )
+    return {
+        "weighted_total": score,
+        "overall_reasoning": reasoning,
+        "strengths": ["Correct multi-select"] if correct else [],
+        "improvements": [] if correct else ["Review which options apply; all must be selected."],
+        "criteria_scores": {
+            "objective": {"score": score, "reasoning": reasoning}
+        },
+        "grading_mode": "objective_msq",
+        "is_correct": correct,
+        "max_marks": marks,
+    }

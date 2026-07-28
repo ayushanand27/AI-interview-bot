@@ -656,11 +656,15 @@ export const recruiterApi = {
     jd_pdf?: File | null;
     question_count: number;
     difficulty: string;
+    question_types?: string[];
   }) {
     const form = new FormData();
     form.append("jd_text", payload.jd_text ?? "");
     form.append("question_count", String(payload.question_count));
     form.append("difficulty", payload.difficulty);
+    if (payload.question_types && payload.question_types.length > 0) {
+      form.append("question_types", JSON.stringify(payload.question_types));
+    }
     if (payload.jd_pdf) {
       form.append("jd_pdf", payload.jd_pdf);
     }

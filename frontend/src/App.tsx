@@ -635,6 +635,7 @@ export default function App() {
                   onSubmitAnswer={handleSubmitAnswer}
                   onEndEarly={handleEndEarly}
                   onIdleTimeout={handleIdleTimeout}
+                  candidateEmail={user?.email}
                 />
               ) : (
                 <div className="card loading">Loading next question…</div>

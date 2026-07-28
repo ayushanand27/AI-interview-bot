@@ -323,6 +323,126 @@ header p {
   line-height: 1.65;
 }
 
+.question-box.anti-leak-pane {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.question-watermark {
+  pointer-events: none;
+  position: absolute;
+  inset: -20%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  transform: rotate(-18deg);
+  opacity: 0.14;
+  z-index: 1;
+  user-select: none;
+}
+
+.question-watermark span {
+  font-size: 0.72rem;
+  white-space: nowrap;
+  color: var(--text-muted, #94a3b8);
+  letter-spacing: 0.02em;
+}
+
+.question-text-protected {
+  position: relative;
+  z-index: 2;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.user-select-none {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ai-canary-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0.01;
+  font-size: 1px;
+  color: transparent;
+}
+
+.question-confidential-footer {
+  position: relative;
+  z-index: 2;
+  margin: 0.85rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted, #94a3b8);
+  user-select: none;
+}
+
+.question-box.is-obscured .question-text-protected {
+  filter: blur(10px);
+  opacity: 0.25;
+}
+
+.question-obscure-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.72);
+  color: #e2e8f0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.question-marks,
+.question-type-tag {
+  color: var(--text-muted, #94a3b8);
+  font-weight: 500;
+}
+
+.option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.option-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.option-choice.is-selected {
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.option-choice input {
+  margin-top: 0.2rem;
+}
+
+.numerical-answer-input {
+  width: 100%;
+  max-width: 280px;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
