@@ -14,10 +14,16 @@ from pathlib import Path
 from typing import Any, Optional
 from uuid import UUID
 
-from sqlalchemy import create_engine, func, select, update
+from sqlalchemy import create_engine, delete, func, select, update
 from sqlalchemy.orm import sessionmaker as sync_sessionmaker
 
 from app.core.config import settings
+from app.db.evidence_model import (
+    IdentityVerificationAttempt,
+    ProctorEvent,
+    SessionArtifact,
+    SessionReviewState,
+)
 from app.db.session import AsyncSessionLocal
 from app.db.session_model import Session as DBSess
 from app.models.schemas import SessionStatus
@@ -27,6 +33,44 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SESSIONS_DIR = PROJECT_ROOT / "data" / "sessions"
 
 _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _coerce_uuid(value: UUID | str | None) -> UUID | None:
+    if value is None:
+        return None
+    if isinstance(value, UUID):
+        return value
+    try:
+        return UUID(str(value))
+    except (ValueError, TypeError):
+        return None
+
+
+def _ensure_utc(dt: datetime | None) -> datetime:
+    if dt is None:
+        return _utc_now()
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _timestamp_to_datetime(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        return _ensure_utc(value)
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.fromtimestamp(float(value), tz=timezone.utc)
+        except (ValueError, OSError):
+            return _utc_now()
+    return _utc_now()
+
+
+def _review_status_for_flag(flagged: bool) -> str:
+    return "needs_review" if flagged else "cleared"
 
 
 def _sync_database_url() -> str:
@@ -248,11 +292,355 @@ def list_saved_session_ids() -> list[str]:
     return _run_async(_list_session_ids_async())
 
 
+async def _replace_proctor_events_async(
+    session_id: UUID, summary_dict: dict[str, Any]
+) -> list[dict[str, Any]]:
+    warnings = summary_dict.get("violations") or summary_dict.get("warnings") or []
+    async with AsyncSessionLocal() as db:
+        await db.execute(delete(ProctorEvent).where(ProctorEvent.session_id == session_id))
+
+        created: list[dict[str, Any]] = []
+        now = _utc_now()
+        for idx, item in enumerate(warnings):
+            if not isinstance(item, dict):
+                continue
+            event_type = str(item.get("type") or item.get("gaze") or "unknown")
+            severity = str(item.get("severity") or item.get("level") or "minor")
+            timestamp = item.get("time", item.get("timestamp"))
+            event_dt = _timestamp_to_datetime(timestamp)
+            message = str(item.get("message") or item.get("reason") or event_type)
+            penalty = item.get("penalty_percent", 0.0)
+            try:
+                penalty_value = float(penalty)
+            except (TypeError, ValueError):
+                penalty_value = 0.0
+
+            metadata = {
+                "source": "summary_backfill",
+                "ordinal": idx,
+            }
+            for key in ("gaze", "level", "reason"):
+                if item.get(key) is not None:
+                    metadata[key] = item.get(key)
+
+            db.add(
+                ProctorEvent(
+                    session_id=session_id,
+                    event_type=event_type,
+                    severity=severity,
+                    message=message,
+                    penalty_percent=penalty_value,
+                    event_timestamp=event_dt,
+                    evidence_metadata=metadata,
+                    created_at=now,
+                )
+            )
+            created.append(
+                {
+                    "type": event_type,
+                    "severity": severity,
+                    "time": event_dt.timestamp(),
+                    "penalty_percent": penalty_value,
+                    "message": message,
+                }
+            )
+
+        await db.commit()
+        return created
+
+
+async def _list_proctor_events_async(session_id: UUID) -> list[dict[str, Any]]:
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(ProctorEvent)
+            .where(ProctorEvent.session_id == session_id)
+            .order_by(ProctorEvent.event_timestamp.asc(), ProctorEvent.id.asc())
+        )
+        rows = result.scalars().all()
+        return [
+            {
+                "type": row.event_type,
+                "severity": row.severity,
+                "time": _ensure_utc(row.event_timestamp).timestamp(),
+                "penalty_percent": float(row.penalty_percent or 0.0),
+                "message": row.message,
+                "evidence_metadata": row.evidence_metadata or None,
+            }
+            for row in rows
+        ]
+
+
+def list_proctor_events(session_id: UUID | str) -> list[dict[str, Any]]:
+    session_uuid = _coerce_uuid(session_id)
+    if session_uuid is None:
+        return []
+    return _run_async(_list_proctor_events_async(session_uuid))
+
+
+async def _upsert_session_artifact_async(
+    *,
+    artifact_type: str,
+    session_id: UUID | None = None,
+    candidate_verification_id: int | None = None,
+    storage_path: str | None = None,
+    mime_type: str | None = None,
+    file_size_bytes: int | None = None,
+    metadata_json: dict[str, Any] | None = None,
+) -> int:
+    now = _utc_now()
+    async with AsyncSessionLocal() as db:
+        query = select(SessionArtifact).where(
+            SessionArtifact.artifact_type == artifact_type,
+            SessionArtifact.session_id == session_id,
+            SessionArtifact.candidate_verification_id == candidate_verification_id,
+            SessionArtifact.storage_path == storage_path,
+        )
+        existing = (await db.execute(query)).scalar_one_or_none()
+        if existing is None:
+            existing = SessionArtifact(
+                artifact_type=artifact_type,
+                session_id=session_id,
+                candidate_verification_id=candidate_verification_id,
+                storage_path=storage_path,
+                mime_type=mime_type,
+                file_size_bytes=file_size_bytes,
+                metadata_json=metadata_json,
+                created_at=now,
+            )
+            db.add(existing)
+        else:
+            existing.mime_type = mime_type
+            existing.file_size_bytes = file_size_bytes
+            existing.metadata_json = metadata_json
+        await db.commit()
+        await db.refresh(existing)
+        return int(existing.id)
+
+
+def upsert_session_artifact(
+    *,
+    artifact_type: str,
+    session_id: UUID | str | None = None,
+    candidate_verification_id: int | None = None,
+    storage_path: str | None = None,
+    mime_type: str | None = None,
+    file_size_bytes: int | None = None,
+    metadata_json: dict[str, Any] | None = None,
+) -> int:
+    return int(
+        _run_async(
+            _upsert_session_artifact_async(
+                artifact_type=artifact_type,
+                session_id=_coerce_uuid(session_id),
+                candidate_verification_id=candidate_verification_id,
+                storage_path=storage_path,
+                mime_type=mime_type,
+                file_size_bytes=file_size_bytes,
+                metadata_json=metadata_json,
+            )
+        )
+    )
+
+
+async def _list_session_artifacts_async(
+    *,
+    session_id: UUID | None = None,
+    candidate_verification_id: int | None = None,
+    artifact_type: str | None = None,
+) -> list[SessionArtifact]:
+    async with AsyncSessionLocal() as db:
+        query = select(SessionArtifact)
+        if session_id is not None:
+            query = query.where(SessionArtifact.session_id == session_id)
+        if candidate_verification_id is not None:
+            query = query.where(
+                SessionArtifact.candidate_verification_id == candidate_verification_id
+            )
+        if artifact_type is not None:
+            query = query.where(SessionArtifact.artifact_type == artifact_type)
+        query = query.order_by(SessionArtifact.created_at.desc(), SessionArtifact.id.desc())
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+
+def list_session_artifacts(
+    *,
+    session_id: UUID | str | None = None,
+    candidate_verification_id: int | None = None,
+    artifact_type: str | None = None,
+) -> list[SessionArtifact]:
+    return _run_async(
+        _list_session_artifacts_async(
+            session_id=_coerce_uuid(session_id),
+            candidate_verification_id=candidate_verification_id,
+            artifact_type=artifact_type,
+        )
+    )
+
+
+async def _upsert_session_review_state_async(
+    session_id: UUID,
+    *,
+    human_review_required: bool,
+    review_status: str | None = None,
+    review_notes: str | None = None,
+    reviewed_by_user_id: int | None = None,
+    reviewed_at: datetime | None = None,
+) -> bool:
+    now = _utc_now()
+    async with AsyncSessionLocal() as db:
+        existing = (
+            await db.execute(
+                select(SessionReviewState).where(SessionReviewState.session_id == session_id)
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            existing = SessionReviewState(
+                session_id=session_id,
+                human_review_required=human_review_required,
+                review_status=review_status or _review_status_for_flag(human_review_required),
+                review_notes=review_notes,
+                reviewed_at=_ensure_utc(reviewed_at) if reviewed_at else None,
+                reviewed_by_user_id=reviewed_by_user_id,
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(existing)
+        else:
+            existing.human_review_required = human_review_required
+            existing.review_status = review_status or _review_status_for_flag(
+                human_review_required
+            )
+            if review_notes is not None:
+                existing.review_notes = review_notes
+            existing.reviewed_at = _ensure_utc(reviewed_at) if reviewed_at else None
+            existing.reviewed_by_user_id = reviewed_by_user_id
+            existing.updated_at = now
+        await db.commit()
+        return True
+
+
+def upsert_session_review_state(
+    session_id: UUID | str,
+    *,
+    human_review_required: bool,
+    review_status: str | None = None,
+    review_notes: str | None = None,
+    reviewed_by_user_id: int | None = None,
+    reviewed_at: datetime | None = None,
+) -> bool:
+    session_uuid = _coerce_uuid(session_id)
+    if session_uuid is None:
+        return False
+    return bool(
+        _run_async(
+            _upsert_session_review_state_async(
+                session_uuid,
+                human_review_required=human_review_required,
+                review_status=review_status,
+                review_notes=review_notes,
+                reviewed_by_user_id=reviewed_by_user_id,
+                reviewed_at=reviewed_at,
+            )
+        )
+    )
+
+
+async def _get_session_review_state_async(session_id: UUID) -> dict[str, Any] | None:
+    async with AsyncSessionLocal() as db:
+        existing = (
+            await db.execute(
+                select(SessionReviewState).where(SessionReviewState.session_id == session_id)
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            return None
+        return {
+            "human_review_required": bool(existing.human_review_required),
+            "review_status": existing.review_status,
+            "review_notes": existing.review_notes,
+            "reviewed_at": existing.reviewed_at,
+            "reviewed_by_user_id": existing.reviewed_by_user_id,
+        }
+
+
+def get_session_review_state(session_id: UUID | str) -> dict[str, Any] | None:
+    session_uuid = _coerce_uuid(session_id)
+    if session_uuid is None:
+        return None
+    return _run_async(_get_session_review_state_async(session_uuid))
+
+
+async def _record_identity_verification_attempt_async(
+    *,
+    candidate_verification_id: int,
+    token: str,
+    session_id: str | None,
+    verified: bool,
+    confidence_score: float | None,
+    low_identity_confidence: bool,
+    similarity_score: float | None,
+    message: str,
+    id_artifact_id: int | None,
+    selfie_artifact_id: int | None,
+) -> int:
+    now = _utc_now()
+    async with AsyncSessionLocal() as db:
+        attempt = IdentityVerificationAttempt(
+            candidate_verification_id=candidate_verification_id,
+            token=token,
+            session_id=session_id,
+            verified=verified,
+            confidence_score=confidence_score,
+            low_identity_confidence=low_identity_confidence,
+            similarity_score=similarity_score,
+            message=message,
+            id_artifact_id=id_artifact_id,
+            selfie_artifact_id=selfie_artifact_id,
+            created_at=now,
+        )
+        db.add(attempt)
+        await db.commit()
+        await db.refresh(attempt)
+        return int(attempt.id)
+
+
+def record_identity_verification_attempt(
+    *,
+    candidate_verification_id: int,
+    token: str,
+    session_id: str | None,
+    verified: bool,
+    confidence_score: float | None,
+    low_identity_confidence: bool,
+    similarity_score: float | None,
+    message: str,
+    id_artifact_id: int | None,
+    selfie_artifact_id: int | None,
+) -> int:
+    return int(
+        _run_async(
+            _record_identity_verification_attempt_async(
+                candidate_verification_id=candidate_verification_id,
+                token=token,
+                session_id=session_id,
+                verified=verified,
+                confidence_score=confidence_score,
+                low_identity_confidence=low_identity_confidence,
+                similarity_score=similarity_score,
+                message=message,
+                id_artifact_id=id_artifact_id,
+                selfie_artifact_id=selfie_artifact_id,
+            )
+        )
+    )
+
+
 async def _update_proctoring_summary_async(
     session_id: UUID, summary_dict: dict[str, Any]
 ) -> bool:
     """Update only proctoring_summary (and updated_at) for an existing session row."""
-    now = datetime.now(timezone.utc)
+    now = _utc_now()
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             update(DBSess)
@@ -262,7 +650,8 @@ async def _update_proctoring_summary_async(
         if result.rowcount == 0:
             return False
         await db.commit()
-        return True
+    await _replace_proctor_events_async(session_id, summary_dict)
+    return True
 
 
 def update_proctoring_summary(session_id: UUID | str, summary_dict: dict[str, Any]) -> bool:
@@ -471,5 +860,23 @@ def set_human_review_flag(session_id: UUID, flagged: bool = True) -> bool:
         if obj is None:
             return False
         obj.human_review_flag = flagged
+        now = _utc_now()
+        review = db.execute(
+            select(SessionReviewState).where(SessionReviewState.session_id == session_id)
+        )
+        review = review.scalar_one_or_none()
+        if review is None:
+            review = SessionReviewState(
+                session_id=session_id,
+                human_review_required=flagged,
+                review_status=_review_status_for_flag(flagged),
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(review)
+        else:
+            review.human_review_required = flagged
+            review.review_status = _review_status_for_flag(flagged)
+            review.updated_at = now
         db.commit()
         return True

@@ -26,6 +26,11 @@ from app.core.security import (
     verify_password,
 )
 from app.db.candidate_verification_model import CandidateVerification
+from app.db.evidence_model import (
+    IdentityVerificationAttempt,
+    SessionArtifact,
+    SessionReviewState,
+)
 from app.db.interview_invite_model import InterviewInvite
 from app.db.session_model import Session as DBSession
 from app.models.schemas import SessionStatus
@@ -340,6 +345,47 @@ class InviteService:
         record.selfie_path = selfie_path.name
         record.verified = verification.verified
         record.confidence_score = verification.confidence
+        await self.db.flush()
+
+        id_artifact = SessionArtifact(
+            artifact_type="identity_id_image",
+            session_id=data.session_id,
+            candidate_verification_id=record.id,
+            storage_path=id_path.name,
+            mime_type="image/jpeg",
+            file_size_bytes=id_path.stat().st_size if id_path.exists() else None,
+            metadata_json={"token": token, "source": "invite_identity"},
+            created_at=datetime.now(timezone.utc),
+        )
+        selfie_artifact = SessionArtifact(
+            artifact_type="identity_selfie_image",
+            session_id=data.session_id,
+            candidate_verification_id=record.id,
+            storage_path=selfie_path.name,
+            mime_type="image/jpeg",
+            file_size_bytes=selfie_path.stat().st_size if selfie_path.exists() else None,
+            metadata_json={"token": token, "source": "invite_identity"},
+            created_at=datetime.now(timezone.utc),
+        )
+        self.db.add(id_artifact)
+        self.db.add(selfie_artifact)
+        await self.db.flush()
+
+        self.db.add(
+            IdentityVerificationAttempt(
+            candidate_verification_id=record.id,
+            token=token,
+            session_id=str(data.session_id),
+            verified=verification.verified,
+            confidence_score=verification.confidence,
+            low_identity_confidence=verification.low_identity_confidence,
+            similarity_score=verification.similarity_score,
+            message=verification.message,
+            id_artifact_id=id_artifact.id,
+            selfie_artifact_id=selfie_artifact.id,
+            created_at=datetime.now(timezone.utc),
+        )
+        )
 
         if verification.low_identity_confidence:
             session_row = await self.db.get(DBSession, data.session_id)
@@ -351,6 +397,32 @@ class InviteService:
                 )
                 session_row.proctoring_summary = summary
                 session_row.human_review_flag = True
+                review_state = (
+                    await self.db.execute(
+                        select(SessionReviewState).where(
+                            SessionReviewState.session_id == data.session_id
+                        )
+                    )
+                ).scalar_one_or_none()
+                if review_state is None:
+                    review_state = SessionReviewState(
+                        session_id=data.session_id,
+                        human_review_required=True,
+                        review_status="needs_review",
+                        review_notes="Identity verification confidence below threshold.",
+                        reviewed_at=None,
+                        reviewed_by_user_id=None,
+                        created_at=datetime.now(timezone.utc),
+                        updated_at=datetime.now(timezone.utc),
+                    )
+                    self.db.add(review_state)
+                else:
+                    review_state.human_review_required = True
+                    review_state.review_status = "needs_review"
+                    review_state.review_notes = (
+                        "Identity verification confidence below threshold."
+                    )
+                    review_state.updated_at = datetime.now(timezone.utc)
 
         await self.db.commit()
 

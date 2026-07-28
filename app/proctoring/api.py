@@ -216,7 +216,7 @@ def analyze_frame(request: Request, req: FrameRequest):
         except Exception as exc:
             print(f"[proctor] Object detection failed: {exc}", flush=True)
 
-    return _build_analyze_payload(
+    payload = _build_analyze_payload(
         req.session_id,
         result["status"],
         result["gaze_direction"],
@@ -226,6 +226,8 @@ def analyze_frame(request: Request, req: FrameRequest):
         alert_message=phone_alert,
         force_violation_type="prohibited_object_detected" if phone_recorded else None,
     )
+    _persist_proctoring_summary(req.session_id, warning_mgr.get_integrity_report())
+    return payload
 
 
 @router.get("/warnings")
@@ -249,6 +251,7 @@ def report_audio_violation(body: AudioViolationRequest):
         body.message,
     )
     report = warning_mgr.get_integrity_report()
+    _persist_proctoring_summary(body.session_id, report)
     return {
         "recorded": violation is not None,
         "session_id": body.session_id,

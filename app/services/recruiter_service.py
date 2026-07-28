@@ -17,6 +17,12 @@ from app.db.session_model import Session as DBSession
 from app.schemas.recruiter import RecruiterSessionDetail, RecruiterSessionSummary, TranscriptItem
 from app.services.question_utils import question_text
 from app.services.report_service import generate_session_report_pdf, report_filename
+from app.services.session_persistence import (
+    get_session_review_state,
+    list_proctor_events,
+    upsert_session_artifact,
+    upsert_session_review_state,
+)
 
 COMPLETED_STATUSES = ("completed", "ended")
 
@@ -90,6 +96,9 @@ def _duration_minutes(row: DBSession) -> Optional[int]:
 
 
 def _human_review_flag(row: DBSession) -> bool:
+    review_state = get_session_review_state(row.session_id)
+    if review_state is not None:
+        return bool(review_state.get("human_review_required"))
     if bool(getattr(row, "human_review_flag", False)):
         return True
     proctoring = row.proctoring_summary if isinstance(row.proctoring_summary, dict) else {}
@@ -97,6 +106,41 @@ def _human_review_flag(row: DBSession) -> bool:
         return True
     level = proctoring.get("integrity_level")
     return level in ("moderate_concerns", "serious_concerns")
+
+
+def _integrity_level_from_penalty(penalty: float) -> str:
+    if penalty <= 0:
+        return "clean"
+    if penalty <= 10:
+        return "minor_concerns"
+    if penalty <= 25:
+        return "moderate_concerns"
+    return "serious_concerns"
+
+
+def _build_proctoring_summary(row: DBSession) -> dict[str, Any] | None:
+    summary = dict(row.proctoring_summary or {})
+    events = list_proctor_events(row.session_id)
+    if events:
+        penalty = round(sum(float(e.get("penalty_percent", 0.0)) for e in events), 2)
+        summary["violations"] = events
+        summary["warnings"] = [
+            {
+                "level": idx + 1,
+                "reason": event.get("message", ""),
+                "timestamp": event.get("time"),
+                "gaze": event.get("type"),
+                "severity": event.get("severity"),
+                "penalty_percent": event.get("penalty_percent", 0.0),
+            }
+            for idx, event in enumerate(events)
+        ]
+        summary["total_violations"] = len(events)
+        summary["warning_count"] = len(events)
+        summary["score_penalty_percent"] = penalty
+        summary["integrity_level"] = _integrity_level_from_penalty(penalty)
+        summary["terminated"] = False
+    return summary or None
 
 
 def _session_to_summary(row: DBSession) -> RecruiterSessionSummary:
@@ -118,7 +162,7 @@ def _session_to_detail(row: DBSession) -> RecruiterSessionDetail:
     questions = list(row.questions or [])
     answers = list(row.answers or [])
     judgments = list(row.answer_judgments or [])
-    proctoring = row.proctoring_summary if isinstance(row.proctoring_summary, dict) else None
+    proctoring = _build_proctoring_summary(row)
 
     transcript: list[TranscriptItem] = []
     for i, question in enumerate(questions):
@@ -211,8 +255,17 @@ class RecruiterService:
     ) -> tuple[bytes, str]:
         row = await self._get_owned_completed_row(recruiter_id, session_id)
         detail = _session_to_detail(row)
-        pdf_bytes = generate_session_report_pdf(detail, row.proctoring_summary)
-        return pdf_bytes, report_filename(detail)
+        pdf_bytes = generate_session_report_pdf(detail, _build_proctoring_summary(row))
+        filename = report_filename(detail)
+        upsert_session_artifact(
+            artifact_type="recruiter_report_pdf",
+            session_id=session_id,
+            storage_path=None,
+            mime_type="application/pdf",
+            file_size_bytes=len(pdf_bytes),
+            metadata_json={"filename": filename, "generated_on_demand": True},
+        )
+        return pdf_bytes, filename
 
     async def set_human_review_flag(
         self, recruiter_id: int, session_id: UUID, flagged: bool
@@ -220,6 +273,12 @@ class RecruiterService:
         row = await self._get_owned_completed_row(recruiter_id, session_id)
         row.human_review_flag = flagged
         await self.db.commit()
+        upsert_session_review_state(
+            session_id,
+            human_review_required=flagged,
+            review_status="needs_review" if flagged else "cleared",
+            reviewed_by_user_id=recruiter_id,
+        )
         await self.db.refresh(row)
         return _session_to_detail(row)
 

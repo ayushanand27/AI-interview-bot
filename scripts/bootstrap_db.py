@@ -21,6 +21,7 @@ from app.core.config import settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.session import engine  # noqa: E402
 import app.db.candidate_verification_model  # noqa: F401, E402
+import app.db.evidence_model  # noqa: F401, E402
 import app.db.interview_invite_model  # noqa: F401, E402
 import app.db.session_model  # noqa: F401, E402
 import app.models.user  # noqa: F401, E402

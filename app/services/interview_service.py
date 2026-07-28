@@ -33,6 +33,7 @@ from app.services.session_persistence import (
     mark_candidate_report_email_sent,
     update_recording_filename,
     update_recording_mp4_filename,
+    upsert_session_artifact,
 )
 from app.services.audio_service import transcribe_audio
 from app.core.exceptions import ForbiddenException
@@ -532,11 +533,29 @@ class InterviewService:
 
         if not update_recording_filename(session_id, filename):
             raise SessionNotFoundError(str(session_id))
+        upsert_session_artifact(
+            artifact_type="session_recording_webm" if safe_ext == ".webm" else "session_recording_mp4",
+            session_id=session_id,
+            storage_path=filename,
+            mime_type="video/webm" if safe_ext == ".webm" else "video/mp4",
+            file_size_bytes=len(video_bytes),
+            metadata_json={"source": "candidate_upload"},
+        )
 
         if safe_ext == ".webm":
             mp4_path = _convert_recording_to_mp4(str(path))
             if mp4_path:
-                update_recording_mp4_filename(session_id, Path(mp4_path).name)
+                mp4_name = Path(mp4_path).name
+                update_recording_mp4_filename(session_id, mp4_name)
+                mp4_file = Path(mp4_path)
+                upsert_session_artifact(
+                    artifact_type="session_recording_mp4",
+                    session_id=session_id,
+                    storage_path=mp4_name,
+                    mime_type="video/mp4",
+                    file_size_bytes=mp4_file.stat().st_size if mp4_file.exists() else None,
+                    metadata_json={"source": "ffmpeg_transcode"},
+                )
 
         return filename
 
@@ -594,7 +613,16 @@ class InterviewService:
             duration_minutes=duration_minutes,
             interview_date=interview_date,
         )
-        return pdf_bytes, candidate_report_filename(session, candidate_name=candidate_name)
+        filename = candidate_report_filename(session, candidate_name=candidate_name)
+        upsert_session_artifact(
+            artifact_type="candidate_report_pdf",
+            session_id=session.session_id,
+            storage_path=None,
+            mime_type="application/pdf",
+            file_size_bytes=len(pdf_bytes),
+            metadata_json={"filename": filename, "generated_on_demand": True},
+        )
+        return pdf_bytes, filename
 
     def _maybe_send_candidate_report_email(
         self,
