@@ -651,6 +651,29 @@ export const recruiterApi = {
 
 
 
+  updateReviewState(
+    sessionId: string,
+    payload: { review_status: string; review_notes?: string | null },
+  ) {
+
+    return request<ApiEnvelope<RecruiterSessionDetail>>(
+
+      `/api/v1/recruiter/sessions/${sessionId}/review`,
+
+      {
+
+        method: "PATCH",
+
+        body: JSON.stringify(payload),
+
+      },
+
+    );
+
+  },
+
+
+
   async generateQuestions(payload: {
     jd_text?: string;
     jd_pdf?: File | null;

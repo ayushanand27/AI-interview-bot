@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 from uuid import UUID
@@ -12,9 +13,17 @@ from sqlalchemy.types import String
 
 from app.core.exceptions import NotFoundException
 from app.db.candidate_verification_model import CandidateVerification
+from app.db.evidence_model import IdentityVerificationAttempt
 from app.db.interview_invite_model import InterviewInvite
 from app.db.session_model import Session as DBSession
-from app.schemas.recruiter import RecruiterSessionDetail, RecruiterSessionSummary, TranscriptItem
+from app.schemas.recruiter import (
+    RecruiterIdentityVerificationMetadata,
+    RecruiterProctorEvent,
+    RecruiterReviewState,
+    RecruiterSessionDetail,
+    RecruiterSessionSummary,
+    TranscriptItem,
+)
 from app.services.question_utils import question_text
 from app.services.report_service import generate_session_report_pdf, report_filename
 from app.services.session_persistence import (
@@ -25,6 +34,7 @@ from app.services.session_persistence import (
 )
 
 COMPLETED_STATUSES = ("completed", "ended")
+REVIEW_STATUSES_REQUIRING_ATTENTION = {"needs_review", "in_review", "escalated"}
 
 
 def _uuid_key(value: object) -> str:
@@ -118,6 +128,96 @@ def _integrity_level_from_penalty(penalty: float) -> str:
     return "serious_concerns"
 
 
+def _normalize_review_status(status: Optional[str]) -> str:
+    value = str(status or "").strip().lower().replace("-", "_")
+    return value or "pending"
+
+
+def _human_review_required_for_status(status: str) -> bool:
+    normalized = _normalize_review_status(status)
+    return normalized in REVIEW_STATUSES_REQUIRING_ATTENTION
+
+
+def _coerce_warnings(raw: object) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    return [str(item) for item in raw if str(item).strip()]
+
+
+def _review_state_payload(row: DBSession) -> RecruiterReviewState:
+    stored = get_session_review_state(row.session_id) or {}
+    review_status = _normalize_review_status(
+        stored.get("review_status")
+        or ("needs_review" if _human_review_flag(row) else "pending")
+    )
+    return RecruiterReviewState(
+        human_review_required=bool(
+            stored.get("human_review_required", _human_review_required_for_status(review_status))
+        ),
+        review_status=review_status,
+        review_notes=stored.get("review_notes"),
+        reviewed_at=stored.get("reviewed_at"),
+        reviewed_by_user_id=stored.get("reviewed_by_user_id"),
+    )
+
+
+def _identity_metadata_payload(
+    attempt: IdentityVerificationAttempt | None,
+    row: DBSession,
+) -> RecruiterIdentityVerificationMetadata | None:
+    if attempt is None:
+        proctoring = row.proctoring_summary if isinstance(row.proctoring_summary, dict) else {}
+        similarity = proctoring.get("identity_similarity_score")
+        if not isinstance(similarity, (int, float)) and not proctoring.get("low_identity_confidence"):
+            return None
+        return RecruiterIdentityVerificationMetadata(
+            low_identity_confidence=bool(proctoring.get("low_identity_confidence")),
+            similarity_score=float(similarity) if isinstance(similarity, (int, float)) else None,
+            liveness_confidence=(
+                float(proctoring.get("identity_liveness_confidence"))
+                if isinstance(proctoring.get("identity_liveness_confidence"), (int, float))
+                else None
+            ),
+            ocr_name_match=(
+                bool(proctoring.get("identity_ocr_name_match"))
+                if isinstance(proctoring.get("identity_ocr_name_match"), bool)
+                else None
+            ),
+        )
+
+    metadata = attempt.evidence_metadata if isinstance(attempt.evidence_metadata, dict) else None
+    return RecruiterIdentityVerificationMetadata(
+        verified=bool(attempt.verified),
+        confidence_score=(
+            float(attempt.confidence_score)
+            if isinstance(attempt.confidence_score, (int, float))
+            else None
+        ),
+        low_identity_confidence=bool(attempt.low_identity_confidence),
+        similarity_score=(
+            float(attempt.similarity_score)
+            if isinstance(attempt.similarity_score, (int, float))
+            else None
+        ),
+        liveness_mode=attempt.liveness_mode,
+        liveness_confidence=(
+            float(attempt.liveness_confidence)
+            if isinstance(attempt.liveness_confidence, (int, float))
+            else None
+        ),
+        ocr_name=attempt.ocr_name,
+        ocr_document_number=attempt.ocr_document_number,
+        ocr_confidence=(
+            float(attempt.ocr_confidence) if isinstance(attempt.ocr_confidence, (int, float)) else None
+        ),
+        ocr_name_match=metadata.get("ocr_name_match") if metadata else None,
+        message=attempt.message,
+        warnings=_coerce_warnings(metadata.get("warnings") if metadata else None),
+        evidence_metadata=metadata,
+        created_at=attempt.created_at,
+    )
+
+
 def _build_proctoring_summary(row: DBSession) -> dict[str, Any] | None:
     summary = dict(row.proctoring_summary or {})
     events = list_proctor_events(row.session_id)
@@ -143,8 +243,14 @@ def _build_proctoring_summary(row: DBSession) -> dict[str, Any] | None:
     return summary or None
 
 
+def _build_proctor_event_timeline(row: DBSession) -> list[RecruiterProctorEvent]:
+    return [RecruiterProctorEvent(**event) for event in list_proctor_events(row.session_id)]
+
+
 def _session_to_summary(row: DBSession) -> RecruiterSessionSummary:
     score, recommendation = _extract_final_score(row.final_score)
+    review_state = _review_state_payload(row)
+    proctoring = _build_proctoring_summary(row) or {}
     return RecruiterSessionSummary(
         session_id=row.session_id,
         candidate_name=_candidate_display_name(row.resume_filename),
@@ -155,14 +261,26 @@ def _session_to_summary(row: DBSession) -> RecruiterSessionSummary:
         status=row.status,
         recording_available=bool(row.recording_filename),
         human_review_flag=_human_review_flag(row),
+        review_status=review_state.review_status,
+        review_notes=review_state.review_notes,
+        reviewed_at=review_state.reviewed_at,
+        integrity_level=proctoring.get("integrity_level"),
+        integrity_event_count=int(proctoring.get("total_violations", 0) or 0),
+        low_identity_confidence=bool(proctoring.get("low_identity_confidence")),
     )
 
 
-def _session_to_detail(row: DBSession) -> RecruiterSessionDetail:
+def _session_to_detail(
+    row: DBSession,
+    identity_attempt: IdentityVerificationAttempt | None = None,
+) -> RecruiterSessionDetail:
     questions = list(row.questions or [])
     answers = list(row.answers or [])
     judgments = list(row.answer_judgments or [])
     proctoring = _build_proctoring_summary(row)
+    review_state = _review_state_payload(row)
+    proctor_events = _build_proctor_event_timeline(row)
+    identity_verification = _identity_metadata_payload(identity_attempt, row)
 
     transcript: list[TranscriptItem] = []
     for i, question in enumerate(questions):
@@ -206,10 +324,14 @@ def _session_to_detail(row: DBSession) -> RecruiterSessionDetail:
         adjusted_score=_extract_adjusted_score(row.final_score),
         integrity_penalty_percent=penalty,
         integrity_level=integrity_level,
+        integrity_event_count=len(proctor_events),
         proctoring_summary=proctoring,
         low_identity_confidence=low_identity_confidence,
         identity_similarity_score=identity_similarity_score,
         human_review_flag=_human_review_flag(row),
+        review_state=review_state,
+        identity_verification=identity_verification,
+        proctor_events=proctor_events,
         recording_available=bool(row.recording_filename),
         recording_filename=row.recording_filename,
         transcript=transcript,
@@ -248,13 +370,15 @@ class RecruiterService:
         self, recruiter_id: int, session_id: UUID
     ) -> RecruiterSessionDetail:
         row = await self._get_owned_completed_row(recruiter_id, session_id)
-        return _session_to_detail(row)
+        identity_attempt = await self._get_latest_identity_attempt(session_id)
+        return _session_to_detail(row, identity_attempt)
 
     async def get_session_report(
         self, recruiter_id: int, session_id: UUID
     ) -> tuple[bytes, str]:
         row = await self._get_owned_completed_row(recruiter_id, session_id)
-        detail = _session_to_detail(row)
+        identity_attempt = await self._get_latest_identity_attempt(session_id)
+        detail = _session_to_detail(row, identity_attempt)
         pdf_bytes = generate_session_report_pdf(detail, _build_proctoring_summary(row))
         filename = report_filename(detail)
         upsert_session_artifact(
@@ -280,7 +404,32 @@ class RecruiterService:
             reviewed_by_user_id=recruiter_id,
         )
         await self.db.refresh(row)
-        return _session_to_detail(row)
+        identity_attempt = await self._get_latest_identity_attempt(session_id)
+        return _session_to_detail(row, identity_attempt)
+
+    async def update_review_state(
+        self,
+        recruiter_id: int,
+        session_id: UUID,
+        review_status: str,
+        review_notes: str | None = None,
+    ) -> RecruiterSessionDetail:
+        row = await self._get_owned_completed_row(recruiter_id, session_id)
+        normalized_status = _normalize_review_status(review_status)
+        review_required = _human_review_required_for_status(normalized_status)
+        row.human_review_flag = review_required
+        await self.db.commit()
+        upsert_session_review_state(
+            session_id,
+            human_review_required=review_required,
+            review_status=normalized_status,
+            review_notes=review_notes,
+            reviewed_by_user_id=recruiter_id,
+            reviewed_at=datetime.now(timezone.utc),
+        )
+        await self.db.refresh(row)
+        identity_attempt = await self._get_latest_identity_attempt(session_id)
+        return _session_to_detail(row, identity_attempt)
 
     async def recruiter_owns_session(
         self, recruiter_id: int, session_id: UUID
@@ -325,3 +474,16 @@ class RecruiterService:
             )
         )
         return verification.first() is not None
+
+    async def _get_latest_identity_attempt(
+        self, session_id: UUID
+    ) -> IdentityVerificationAttempt | None:
+        attempt = await self.db.execute(
+            select(IdentityVerificationAttempt)
+            .where(IdentityVerificationAttempt.session_id == str(session_id))
+            .order_by(
+                IdentityVerificationAttempt.created_at.desc(),
+                IdentityVerificationAttempt.id.desc(),
+            )
+        )
+        return attempt.scalars().first()

@@ -151,6 +151,45 @@ def _violations_timeline(proctoring_summary: Optional[dict[str, Any]]) -> list[s
     return lines
 
 
+def _review_state_lines(detail: RecruiterSessionDetail) -> list[str]:
+    review = detail.review_state
+    lines = [
+        f"Review status: {review.review_status}",
+        f"Human review required: {'Yes' if review.human_review_required else 'No'}",
+    ]
+    if review.review_notes:
+        lines.append(f"Reviewer notes: {review.review_notes}")
+    if review.reviewed_at:
+        lines.append(f"Last reviewed at: {_format_date(review.reviewed_at)}")
+    if review.reviewed_by_user_id is not None:
+        lines.append(f"Reviewed by user ID: {review.reviewed_by_user_id}")
+    return lines
+
+
+def _identity_review_lines(detail: RecruiterSessionDetail) -> list[str]:
+    identity = detail.identity_verification
+    if not identity:
+        return ["No structured identity verification evidence recorded."]
+
+    lines = [
+        f"Verified: {'Yes' if identity.verified else 'No' if identity.verified is not None else 'Unknown'}",
+        f"Low identity confidence: {'Yes' if identity.low_identity_confidence else 'No'}",
+    ]
+    if identity.similarity_score is not None:
+        lines.append(f"Face similarity score: {identity.similarity_score}")
+    if identity.liveness_confidence is not None:
+        lines.append(f"Liveness confidence: {identity.liveness_confidence}")
+    if identity.ocr_name is not None:
+        lines.append(f"OCR name: {identity.ocr_name}")
+    if identity.ocr_name_match is not None:
+        lines.append(f"OCR name match: {'Yes' if identity.ocr_name_match else 'No'}")
+    if identity.message:
+        lines.append(f"Verification message: {identity.message}")
+    if identity.warnings:
+        lines.append("Warnings: " + "; ".join(identity.warnings))
+    return lines
+
+
 def generate_session_report_pdf(
     detail: RecruiterSessionDetail,
     proctoring_summary: Optional[dict[str, Any]] = None,
@@ -231,9 +270,19 @@ def generate_session_report_pdf(
         story.append(Paragraph("No overall score available.", styles["muted"]))
 
     story.append(Spacer(1, 0.1 * inch))
+    story.append(Paragraph("Reviewer workflow", styles["heading"]))
+    for line in _review_state_lines(detail):
+        story.append(Paragraph(_escape(line), styles["body"]))
+
+    story.append(Spacer(1, 0.1 * inch))
     story.append(Paragraph("Proctoring & integrity", styles["heading"]))
     summary = proctoring_summary or detail.proctoring_summary
     for line in _violations_timeline(summary):
+        story.append(Paragraph(_escape(line), styles["body"]))
+
+    story.append(Spacer(1, 0.1 * inch))
+    story.append(Paragraph("Identity verification", styles["heading"]))
+    for line in _identity_review_lines(detail):
         story.append(Paragraph(_escape(line), styles["body"]))
 
     story.append(Spacer(1, 0.1 * inch))

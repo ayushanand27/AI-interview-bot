@@ -2,6 +2,35 @@ import type { AnswerJudgment } from "./interview";
 import type { FinalScore } from "./interview";
 import type { IntegrityViolation } from "./proctor";
 
+export interface RecruiterReviewState {
+  human_review_required: boolean;
+  review_status: string;
+  review_notes: string | null;
+  reviewed_at: string | null;
+  reviewed_by_user_id: number | null;
+}
+
+export interface RecruiterIdentityVerificationMetadata {
+  verified?: boolean | null;
+  confidence_score?: number | null;
+  low_identity_confidence: boolean;
+  similarity_score?: number | null;
+  liveness_mode?: string | null;
+  liveness_confidence?: number | null;
+  ocr_name?: string | null;
+  ocr_document_number?: string | null;
+  ocr_confidence?: number | null;
+  ocr_name_match?: boolean | null;
+  message?: string | null;
+  warnings: string[];
+  evidence_metadata?: Record<string, unknown> | null;
+  created_at?: string | null;
+}
+
+export interface RecruiterProctorEvent extends IntegrityViolation {
+  evidence_metadata?: Record<string, unknown> | null;
+}
+
 export interface RecruiterSessionSummary {
   session_id: string;
   candidate_name: string;
@@ -12,6 +41,12 @@ export interface RecruiterSessionSummary {
   status: string;
   recording_available: boolean;
   human_review_flag?: boolean;
+  review_status: string;
+  review_notes?: string | null;
+  reviewed_at?: string | null;
+  integrity_level?: string | null;
+  integrity_event_count: number;
+  low_identity_confidence: boolean;
 }
 
 export interface TranscriptItem {
@@ -37,6 +72,7 @@ export interface RecruiterSessionDetail {
   adjusted_score: number | null;
   integrity_penalty_percent: number;
   integrity_level: string | null;
+  integrity_event_count: number;
   proctoring_summary: {
     total_violations?: number;
     violations?: IntegrityViolation[];
@@ -46,6 +82,9 @@ export interface RecruiterSessionDetail {
   low_identity_confidence?: boolean;
   identity_similarity_score?: number | null;
   human_review_flag?: boolean;
+  review_state: RecruiterReviewState;
+  identity_verification?: RecruiterIdentityVerificationMetadata | null;
+  proctor_events: RecruiterProctorEvent[];
   recording_available: boolean;
   recording_filename: string | null;
   transcript: TranscriptItem[];

@@ -109,6 +109,27 @@ function formatScore(score: number | null): string {
   return String(Math.round(score));
 }
 
+function formatReviewStatus(status: string | null | undefined): string {
+  const normalized = (status ?? "pending").replace(/_/g, " ").trim();
+  if (!normalized) return "Pending";
+  return normalized.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function reviewBadgeClass(status: string | null | undefined): string {
+  switch (status) {
+    case "cleared":
+      return "rp-review-badge rp-review-badge-clear";
+    case "rejected":
+      return "rp-review-badge rp-review-badge-reject";
+    case "escalated":
+      return "rp-review-badge rp-review-badge-escalate";
+    case "in_review":
+      return "rp-review-badge rp-review-badge-progress";
+    default:
+      return "rp-review-badge";
+  }
+}
+
 function fullInviteUrl(relativeLink: string): string {
   return `${window.location.origin}${relativeLink}`;
 }
@@ -161,6 +182,7 @@ export default function RecruiterDashboard({
   const [deletingToken, setDeletingToken] = useState<string | null>(null);
   const [extendingToken, setExtendingToken] = useState<string | null>(null);
   const [reviewUpdating, setReviewUpdating] = useState(false);
+  const [reviewNotesDraft, setReviewNotesDraft] = useState("");
 
   function loadAssessments() {
     setAssessmentsLoading(true);
@@ -208,6 +230,7 @@ export default function RecruiterDashboard({
   useEffect(() => {
     if (!selectedId) {
       setDetail(null);
+      setReviewNotesDraft("");
       return;
     }
 
@@ -220,12 +243,14 @@ export default function RecruiterDashboard({
       .then((res) => {
         if (!cancelled) {
           setDetail(res.data);
+          setReviewNotesDraft(res.data?.review_state?.review_notes ?? "");
         }
       })
       .catch((err) => {
         if (!cancelled) {
           onError(err instanceof Error ? err.message : "Failed to load session");
           setDetail(null);
+          setReviewNotesDraft("");
         }
       })
       .finally(() => {
@@ -611,16 +636,65 @@ export default function RecruiterDashboard({
       const updated = res.data;
       if (updated) {
         setDetail(updated);
+        setReviewNotesDraft(updated.review_state?.review_notes ?? "");
         setSessions((prev) =>
           prev.map((s) =>
             s.session_id === updated.session_id
-              ? { ...s, human_review_flag: updated.human_review_flag }
+              ? {
+                  ...s,
+                  human_review_flag: updated.human_review_flag,
+                  review_status: updated.review_state.review_status,
+                  review_notes: updated.review_state.review_notes,
+                  reviewed_at: updated.review_state.reviewed_at,
+                  integrity_level: updated.integrity_level,
+                  integrity_event_count: updated.integrity_event_count,
+                  low_identity_confidence: updated.low_identity_confidence ?? false,
+                }
               : s,
           ),
         );
       }
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to update review flag");
+    } finally {
+      setReviewUpdating(false);
+    }
+  }
+
+  async function handleUpdateReviewState(reviewStatus: string) {
+    if (!detail) return;
+    setReviewUpdating(true);
+    onError(null);
+    try {
+      const res = await recruiterApi.updateReviewState(detail.session_id, {
+        review_status: reviewStatus,
+        review_notes: reviewNotesDraft.trim() || null,
+      });
+      const updated = res.data;
+      if (updated) {
+        setDetail(updated);
+        setReviewNotesDraft(updated.review_state.review_notes ?? "");
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.session_id === updated.session_id
+              ? {
+                  ...s,
+                  human_review_flag: updated.human_review_flag,
+                  review_status: updated.review_state.review_status,
+                  review_notes: updated.review_state.review_notes,
+                  reviewed_at: updated.review_state.reviewed_at,
+                  integrity_level: updated.integrity_level,
+                  integrity_event_count: updated.integrity_event_count,
+                  low_identity_confidence: updated.low_identity_confidence ?? false,
+                }
+              : s,
+          ),
+        );
+      }
+    } catch (err) {
+      onError(
+        err instanceof Error ? err.message : "Failed to update review disposition",
+      );
     } finally {
       setReviewUpdating(false);
     }
@@ -1152,7 +1226,7 @@ export default function RecruiterDashboard({
                   <th>Role</th>
                   <th>Date</th>
                   <th>Score</th>
-                  <th>Status</th>
+                  <th>Review</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1178,11 +1252,24 @@ export default function RecruiterDashboard({
                       ) : null}
                     </td>
                     <td>
-                      {row.human_review_flag ? (
-                        <span className="rp-review-badge">Review</span>
-                      ) : (
-                        <span className="rp-muted-small">—</span>
-                      )}
+                      <div className="rp-review-cell">
+                        <span className={reviewBadgeClass(row.review_status)}>
+                          {formatReviewStatus(row.review_status)}
+                        </span>
+                        {(row.human_review_flag || row.low_identity_confidence) && (
+                          <div className="rp-row-signals">
+                            {row.low_identity_confidence && (
+                              <span className="rp-signal-chip">Identity</span>
+                            )}
+                            {row.integrity_event_count > 0 && (
+                              <span className="rp-signal-chip">
+                                {row.integrity_event_count} event
+                                {row.integrity_event_count === 1 ? "" : "s"}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <div className="rp-row-actions">
@@ -1290,7 +1377,7 @@ export default function RecruiterDashboard({
 
               {detail.human_review_flag && (
                 <div className="alert warning rp-summary-spaced">
-                  Flagged for human review.
+                  This session still needs recruiter attention.
                 </div>
               )}
 
@@ -1341,16 +1428,122 @@ export default function RecruiterDashboard({
                 </div>
               )}
 
-              {detail.proctoring_summary?.violations &&
-                detail.proctoring_summary.violations.length > 0 && (
+              <section className="rp-evidence-grid">
+                <div className="rp-evidence-card">
+                  <h3 className="rp-preview-title">Review workflow</h3>
+                  <div className="rp-review-status-row">
+                    <span className={reviewBadgeClass(detail.review_state.review_status)}>
+                      {formatReviewStatus(detail.review_state.review_status)}
+                    </span>
+                    {detail.review_state.reviewed_at && (
+                      <span className="rp-muted-small">
+                        Updated {formatDate(detail.review_state.reviewed_at)}
+                      </span>
+                    )}
+                  </div>
+                  <label htmlFor="review-notes">Reviewer notes</label>
+                  <textarea
+                    id="review-notes"
+                    value={reviewNotesDraft}
+                    onChange={(e) => setReviewNotesDraft(e.target.value)}
+                    rows={4}
+                    placeholder="Capture why this session was cleared, escalated, or rejected."
+                    disabled={reviewUpdating}
+                  />
+                  <div className="rp-actions">
+                    <button
+                      type="button"
+                      className="rp-secondary"
+                      disabled={reviewUpdating}
+                      onClick={() => void handleUpdateReviewState("in_review")}
+                    >
+                      Mark in review
+                    </button>
+                    <button
+                      type="button"
+                      className="rp-secondary"
+                      disabled={reviewUpdating}
+                      onClick={() => void handleUpdateReviewState("escalated")}
+                    >
+                      Escalate
+                    </button>
+                    <button
+                      type="button"
+                      className="rp-secondary"
+                      disabled={reviewUpdating}
+                      onClick={() => void handleUpdateReviewState("rejected")}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      className="rp-primary rp-btn-inline"
+                      disabled={reviewUpdating}
+                      onClick={() => void handleUpdateReviewState("cleared")}
+                    >
+                      {reviewUpdating ? "Saving…" : "Clear for decision"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rp-evidence-card">
+                  <h3 className="rp-preview-title">Identity verification</h3>
+                  {detail.identity_verification ? (
+                    <div className="rp-evidence-list">
+                      <p>
+                        Match score:{" "}
+                        <strong>
+                          {detail.identity_verification.similarity_score != null
+                            ? detail.identity_verification.similarity_score.toFixed(2)
+                            : "—"}
+                        </strong>
+                      </p>
+                      <p>
+                        Liveness:{" "}
+                        <strong>
+                          {detail.identity_verification.liveness_confidence != null
+                            ? detail.identity_verification.liveness_confidence.toFixed(2)
+                            : "—"}
+                        </strong>
+                      </p>
+                      <p>
+                        OCR name match:{" "}
+                        <strong>
+                          {detail.identity_verification.ocr_name_match == null
+                            ? "—"
+                            : detail.identity_verification.ocr_name_match
+                              ? "Yes"
+                              : "No"}
+                        </strong>
+                      </p>
+                      {detail.identity_verification.message && (
+                        <p>{detail.identity_verification.message}</p>
+                      )}
+                      {detail.identity_verification.warnings.length > 0 && (
+                        <ul className="summary-violations-list">
+                          {detail.identity_verification.warnings.map((warning, idx) => (
+                            <li key={idx}>{warning}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="rp-muted-small">
+                      No structured identity verification evidence was recorded for this session.
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              {detail.proctor_events.length > 0 && (
                   <section className="rp-violations-panel">
-                    <h3 className="rp-preview-title">Proctoring</h3>
+                    <h3 className="rp-preview-title">Proctor event timeline</h3>
                     <ul className="summary-violations-list">
-                      {detail.proctoring_summary.violations.map((v, idx) => (
+                      {detail.proctor_events.map((v, idx) => (
                         <li key={`${v.time}-${idx}`}>
                           {new Date(v.time * 1000).toLocaleTimeString()} ·{" "}
                           {formatViolationType(v.type)} ({v.severity}) · −
-                          {v.penalty_percent}%
+                          {v.penalty_percent}%{v.message ? ` · ${v.message}` : ""}
                         </li>
                       ))}
                     </ul>

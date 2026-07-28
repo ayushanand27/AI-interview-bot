@@ -12,6 +12,7 @@ from app.models.user import User, UserRole
 from app.schemas.common import BaseResponse
 from app.schemas.recruiter import (
     HumanReviewUpdateRequest,
+    RecruiterReviewUpdateRequest,
     RecruiterSessionDetail,
     RecruiterSessionSummary,
 )
@@ -93,5 +94,30 @@ async def update_human_review(
     return BaseResponse(
         success=True,
         message="Human review flag updated",
+        data=detail,
+    )
+
+
+@router.patch(
+    "/sessions/{session_id}/review",
+    response_model=BaseResponse[RecruiterSessionDetail],
+    summary="Update recruiter review disposition and notes",
+)
+async def update_review_state(
+    session_id: UUID,
+    body: RecruiterReviewUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    service = RecruiterService(db)
+    detail = await service.update_review_state(
+        current_user.id,
+        session_id,
+        body.review_status,
+        body.review_notes,
+    )
+    return BaseResponse(
+        success=True,
+        message="Review disposition updated",
         data=detail,
     )

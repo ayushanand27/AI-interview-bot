@@ -480,6 +480,52 @@
   border: 1px solid rgba(251, 191, 36, 0.3);
 }
 
+.recruiter-portal .rp-review-badge-clear {
+  background: rgba(74, 222, 128, 0.12);
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.recruiter-portal .rp-review-badge-progress {
+  background: rgba(96, 165, 250, 0.12);
+  color: #93c5fd;
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.recruiter-portal .rp-review-badge-escalate {
+  background: rgba(167, 139, 250, 0.12);
+  color: #c4b5fd;
+  border-color: rgba(167, 139, 250, 0.28);
+}
+
+.recruiter-portal .rp-review-badge-reject {
+  background: rgba(248, 113, 113, 0.12);
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.32);
+}
+
+.recruiter-portal .rp-review-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.recruiter-portal .rp-row-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.recruiter-portal .rp-signal-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--rp-border);
+  color: var(--rp-muted);
+  font-size: 0.72rem;
+}
+
 .recruiter-portal .privacy-section {
   margin-bottom: 1.5rem;
 }
@@ -610,6 +656,33 @@
 
 .recruiter-portal .rp-violations-panel {
   margin-bottom: 1rem;
+}
+
+.recruiter-portal .rp-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.recruiter-portal .rp-evidence-card {
+  border: 1px solid var(--rp-border);
+  border-radius: 12px;
+  padding: 0.9rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.recruiter-portal .rp-review-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.recruiter-portal .rp-evidence-list p {
+  margin: 0 0 0.5rem;
+  line-height: 1.45;
 }
 
 .recruiter-portal .rp-violations-panel .summary-violations-list {
