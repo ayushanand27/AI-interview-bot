@@ -107,7 +107,7 @@ button.danger {
   border: 1px solid rgba(239, 68, 68, 0.45);
 }
 
-input,
+input:not([type="radio"]):not([type="checkbox"]):not([type="file"]):not([type="range"]):not([type="color"]),
 select,
 textarea {
   width: 100%;

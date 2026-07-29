@@ -135,7 +135,7 @@
   margin-bottom: 0.3rem;
 }
 
-.recruiter-portal input,
+.recruiter-portal input:not([type="radio"]):not([type="checkbox"]):not([type="file"]),
 .recruiter-portal select,
 .recruiter-portal textarea {
   width: 100%;
@@ -874,16 +874,53 @@
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  width: 100%;
 }
 
 .recruiter-portal .rp-option-row {
   display: flex;
   align-items: center;
   gap: 0.45rem;
+  width: 100%;
+  min-width: 0;
 }
 
-.recruiter-portal .rp-option-row input[type="text"] {
-  flex: 1;
+/* Global portal inputs use width:100%; that collapses text fields in this flex row. */
+.recruiter-portal .rp-option-row input[type="radio"],
+.recruiter-portal .rp-option-row input[type="checkbox"] {
+  width: auto;
+  min-width: 1.1rem;
+  height: auto;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  accent-color: var(--rp-accent);
+  cursor: pointer;
+}
+
+.recruiter-portal .rp-option-row input[type="radio"]:focus,
+.recruiter-portal .rp-option-row input[type="checkbox"]:focus {
+  outline: 2px solid rgba(var(--rp-accent-rgb), 0.45);
+  outline-offset: 2px;
+  box-shadow: none;
+  border-color: transparent;
+}
+
+.recruiter-portal .rp-option-row input[type="text"],
+.recruiter-portal .rp-option-row .rp-option-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  margin-bottom: 0;
+}
+
+.recruiter-portal .rp-option-row .rp-btn-compact {
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .recruiter-portal .rp-question-edit-top {

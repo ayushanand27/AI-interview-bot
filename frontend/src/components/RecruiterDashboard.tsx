@@ -1063,12 +1063,14 @@ export default function RecruiterDashboard({
                               />
                               <input
                                 type="text"
+                                className="rp-option-text"
                                 value={opt}
                                 onChange={(e) =>
                                   updateOption(i, oi, e.target.value)
                                 }
                                 placeholder={`Option ${oi + 1}`}
                                 disabled={assessmentLoading}
+                                aria-label={`Option ${oi + 1}`}
                               />
                               <button
                                 type="button"
