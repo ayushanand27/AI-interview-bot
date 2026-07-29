@@ -191,8 +191,12 @@ python scripts/full_test.py
 | `SMTP_EMAIL` / `SMTP_PASSWORD` | Gmail + **App Password** (not normal password) |
 | `APP_ENV` | `development` / `production` |
 | `UPLOAD_DIR` | Uploads path |
+| `S3_BUCKET` / `AWS_*` | Optional S3 object storage |
+| `ARTIFACT_RETENTION_DAYS` / `IDENTITY_RETENTION_DAYS` / `RECORDING_RETENTION_DAYS` | Cleanup TTLs |
 
 See `.env.example` and `.env.production.example`.
+
+**AWS free-tier P0 checklist (RDS + S3):** [`docs/P0_AWS_FREE_TIER_SETUP.md`](docs/P0_AWS_FREE_TIER_SETUP.md)
 
 **Gmail App Password:** enable 2FA → [App passwords](https://myaccount.google.com/apppasswords) → put 16-char value in `SMTP_PASSWORD`.
 

@@ -317,6 +317,18 @@ def main() -> int:
         f"bytes={len(r.content)}",
     )
 
+    # ── Privacy / DSAR (P0) ───────────────────────────────────────
+    r = requests.get(f"{BASE}/api/v1/privacy/export", timeout=15)
+    test("Privacy export requires auth", r.status_code == 401)
+
+    r = requests.get(
+        f"{BASE}/api/v1/privacy/export",
+        headers=cand_headers,
+        timeout=30,
+    )
+    export_ok = r.status_code == 200 and isinstance(r.json(), dict) and "sessions" in r.json()
+    test("Candidate privacy export JSON", export_ok)
+
     # ── Summary ────────────────────────────────────────────────────
     print("\n" + "=" * 50)
     passed = sum(1 for r in results if r.startswith("PASS"))

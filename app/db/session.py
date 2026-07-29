@@ -40,8 +40,9 @@ _engine_kwargs: dict = {
     "future": True,
     "pool_pre_ping": True,
 }
-if settings.DATABASE_URL.startswith("postgresql"):
-    _engine_kwargs.update(pool_size=5, max_overflow=10)
+if settings.is_postgres:
+    # Free-tier RDS / small EC2: keep the pool tiny to avoid connection storms.
+    _engine_kwargs.update(pool_size=3, max_overflow=2, pool_recycle=1800)
 
 engine = create_async_engine(
     settings.DATABASE_URL,

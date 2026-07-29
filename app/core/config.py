@@ -25,8 +25,9 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # ── Database ──────────────────────────────────────────
-    # SQLite for now — change to PostgreSQL URL in production
-    # Format: sqlite+aiosqlite:///./filename.db
+    # Local/dev: sqlite+aiosqlite:///./interview_bot.db
+    # Docker Postgres: postgresql+asyncpg://interview:interview@127.0.0.1:5433/interview_bot
+    # RDS free tier: postgresql+asyncpg://USER:PASS@HOST:5432/interview_bot
     DATABASE_URL: str
 
     # ── Auth ──────────────────────────────────────────────
@@ -54,8 +55,22 @@ class Settings(BaseSettings):
     ADAPTIVE_QUALITY_HIGH: float = 80.0
 
     # ── File Upload ───────────────────────────────────────
-    UPLOAD_DIR: str = "uploads"         # Local folder for resume/audio files
+    UPLOAD_DIR: str = "uploads"         # Local folder / S3 download cache
     MAX_FILE_SIZE_MB: int = 10
+
+    # ── Object storage (optional S3) ───────────────────────
+    # When S3_BUCKET + AWS credentials are set, uploads also go to S3.
+    # Without them, storage falls back to UPLOAD_DIR (backward compatible).
+    S3_BUCKET: str = ""
+    S3_PREFIX: str = "interview-bot"
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_REGION: str = "ap-south-1"
+
+    # ── Retention (days) — used by cleanup job ────────────
+    ARTIFACT_RETENTION_DAYS: int = 90
+    IDENTITY_RETENTION_DAYS: int = 30
+    RECORDING_RETENTION_DAYS: int = 60
 
     # ── CORS ──────────────────────────────────────────────
     # Comma-separated list of allowed frontend origins
@@ -105,6 +120,24 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.APP_ENV.strip().lower() == "production"
+
+    @property
+    def is_postgres(self) -> bool:
+        url = (self.DATABASE_URL or "").lower()
+        return url.startswith("postgres") or "postgresql" in url.split(":", 1)[0]
+
+    @property
+    def is_sqlite(self) -> bool:
+        return (self.DATABASE_URL or "").lower().startswith("sqlite")
+
+    @property
+    def s3_enabled(self) -> bool:
+        """True when bucket and credentials are present — otherwise local disk only."""
+        return bool(
+            self.S3_BUCKET.strip()
+            and self.AWS_ACCESS_KEY_ID.strip()
+            and self.AWS_SECRET_ACCESS_KEY.strip()
+        )
 
     @property
     def effective_frontend_url(self) -> str:

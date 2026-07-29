@@ -48,3 +48,9 @@ reportlab==4.2.5
 
 # ── Media ─────────────────────────────────────────────────
 ffmpeg-python==0.2.0
+
+# ── OCR (ID document text hints) ──────────────────────────
+pytesseract==0.3.13
+
+# ── AWS S3 (optional — local UPLOAD_DIR used when unset) ──
+boto3==1.35.99

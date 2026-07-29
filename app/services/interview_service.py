@@ -43,12 +43,12 @@ from app.utils.exceptions import (
     SessionNotFoundError,
 )
 from app.services.resume_parser import extract_text_from_document
+from app.services.object_storage import get_object_storage
 from app.utils.file_validation import validate_document_upload
 from app.services.question_utils import (
     grade_objective_answer,
     public_question_view,
-    question_marks,
-    question_text as extract_question_text,
+    question_marks,    question_text as extract_question_text,
     question_time_seconds,
     question_type,
 )
@@ -579,13 +579,12 @@ class InterviewService:
         if not video_bytes:
             raise ValueError("Recording file is empty")
 
-        upload_dir = Path(settings.UPLOAD_DIR)
-        upload_dir.mkdir(parents=True, exist_ok=True)
-
+        storage = get_object_storage()
         safe_ext = ext if ext in {".webm", ".mp4"} else ".webm"
         filename = f"{session_id}_recording{safe_ext}"
-        path = upload_dir / filename
-        path.write_bytes(video_bytes)
+        mime = "video/webm" if safe_ext == ".webm" else "video/mp4"
+        storage.put_bytes(filename, video_bytes, content_type=mime)
+        path = storage.resolve_local_path(filename)
 
         if not update_recording_filename(session_id, filename):
             raise SessionNotFoundError(str(session_id))
@@ -593,24 +592,36 @@ class InterviewService:
             artifact_type="session_recording_webm" if safe_ext == ".webm" else "session_recording_mp4",
             session_id=session_id,
             storage_path=filename,
-            mime_type="video/webm" if safe_ext == ".webm" else "video/mp4",
+            mime_type=mime,
             file_size_bytes=len(video_bytes),
-            metadata_json={"source": "candidate_upload"},
+            metadata_json={
+                "source": "candidate_upload",
+                "storage_backend": storage.backend,
+            },
         )
 
         if safe_ext == ".webm":
             mp4_path = _convert_recording_to_mp4(str(path))
             if mp4_path:
                 mp4_name = Path(mp4_path).name
-                update_recording_mp4_filename(session_id, mp4_name)
                 mp4_file = Path(mp4_path)
+                if mp4_file.is_file():
+                    storage.put_bytes(
+                        mp4_name,
+                        mp4_file.read_bytes(),
+                        content_type="video/mp4",
+                    )
+                update_recording_mp4_filename(session_id, mp4_name)
                 upsert_session_artifact(
                     artifact_type="session_recording_mp4",
                     session_id=session_id,
                     storage_path=mp4_name,
                     mime_type="video/mp4",
                     file_size_bytes=mp4_file.stat().st_size if mp4_file.exists() else None,
-                    metadata_json={"source": "ffmpeg_transcode"},
+                    metadata_json={
+                        "source": "ffmpeg_transcode",
+                        "storage_backend": storage.backend,
+                    },
                 )
 
         return filename
@@ -623,22 +634,25 @@ class InterviewService:
             _run_async,
         )
 
-        upload_dir = Path(settings.UPLOAD_DIR)
+        storage = get_object_storage()
 
         mp4_filename = _run_async(_get_recording_mp4_filename_async(session_id))
         if mp4_filename:
-            mp4_path = upload_dir / mp4_filename
-            if mp4_path.is_file():
+            try:
+                mp4_path = storage.resolve_local_path(mp4_filename)
                 return mp4_path, "video/mp4", "interview_recording.mp4"
+            except FileNotFoundError:
+                pass
 
         filename = _run_async(_get_recording_filename_async(session_id))
         if filename:
-            webm_path = upload_dir / filename
-            if webm_path.is_file():
+            try:
+                webm_path = storage.resolve_local_path(filename)
                 return webm_path, "video/webm", "interview_recording.webm"
+            except FileNotFoundError:
+                pass
 
         raise FileNotFoundError(str(session_id))
-
     def get_session_recording_path(self, session_id: UUID) -> Path:
         """Return path to stored recording file, preferring mp4 when available."""
         path, _, _ = self.resolve_recording_file(session_id)

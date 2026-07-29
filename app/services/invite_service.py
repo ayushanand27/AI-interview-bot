@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import secrets
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
@@ -46,6 +45,7 @@ from app.schemas.invite import (
 )
 from app.services.identity_verification import verify_faces_from_base64
 from app.services.email_service import send_invite_welcome_password_email
+from app.services.object_storage import get_object_storage
 from app.services.question_utils import normalize_questions
 
 
@@ -339,20 +339,24 @@ class InviteService:
         if record is None:
             raise NotFoundException("Registration not found for this invite and session.")
 
-        upload_dir = Path(settings.UPLOAD_DIR)
-        upload_dir.mkdir(parents=True, exist_ok=True)
-
-        id_path = upload_dir / f"{token}_id.jpg"
-        selfie_path = upload_dir / f"{token}_selfie.jpg"
-        selfie_sequence_paths: list[Path] = []
+        storage = get_object_storage()
+        id_key = f"{token}_id.jpg"
+        selfie_key = f"{token}_selfie.jpg"
+        selfie_sequence_keys: list[str] = []
 
         try:
-            id_path.write_bytes(_decode_image_bytes(data.id_image_base64))
-            selfie_path.write_bytes(_decode_image_bytes(data.selfie_base64))
+            id_bytes = _decode_image_bytes(data.id_image_base64)
+            selfie_bytes = _decode_image_bytes(data.selfie_base64)
+            storage.put_bytes(id_key, id_bytes, content_type="image/jpeg")
+            storage.put_bytes(selfie_key, selfie_bytes, content_type="image/jpeg")
             for idx, frame_data in enumerate(data.selfie_frames_base64):
-                frame_path = upload_dir / f"{token}_selfie_step_{idx + 1}.jpg"
-                frame_path.write_bytes(_decode_image_bytes(frame_data))
-                selfie_sequence_paths.append(frame_path)
+                frame_key = f"{token}_selfie_step_{idx + 1}.jpg"
+                storage.put_bytes(
+                    frame_key,
+                    _decode_image_bytes(frame_data),
+                    content_type="image/jpeg",
+                )
+                selfie_sequence_keys.append(frame_key)
         except (ValueError, OSError) as exc:
             raise BadRequestException("Invalid image data provided.") from exc
 
@@ -364,8 +368,8 @@ class InviteService:
             expected_candidate_name=record.candidate_name,
         )
 
-        record.id_document_path = id_path.name
-        record.selfie_path = selfie_path.name
+        record.id_document_path = id_key
+        record.selfie_path = selfie_key
         record.verified = verification.verified
         record.confidence_score = verification.confidence
         await self.db.flush()
@@ -374,20 +378,28 @@ class InviteService:
             artifact_type="identity_id_image",
             session_id=data.session_id,
             candidate_verification_id=record.id,
-            storage_path=id_path.name,
+            storage_path=id_key,
             mime_type="image/jpeg",
-            file_size_bytes=id_path.stat().st_size if id_path.exists() else None,
-            metadata_json={"token": token, "source": "invite_identity"},
+            file_size_bytes=len(id_bytes),
+            metadata_json={
+                "token": token,
+                "source": "invite_identity",
+                "storage_backend": storage.backend,
+            },
             created_at=datetime.now(timezone.utc),
         )
         selfie_artifact = SessionArtifact(
             artifact_type="identity_selfie_image",
             session_id=data.session_id,
             candidate_verification_id=record.id,
-            storage_path=selfie_path.name,
+            storage_path=selfie_key,
             mime_type="image/jpeg",
-            file_size_bytes=selfie_path.stat().st_size if selfie_path.exists() else None,
-            metadata_json={"token": token, "source": "invite_identity"},
+            file_size_bytes=len(selfie_bytes),
+            metadata_json={
+                "token": token,
+                "source": "invite_identity",
+                "storage_backend": storage.backend,
+            },
             created_at=datetime.now(timezone.utc),
         )
         self.db.add(id_artifact)
@@ -395,18 +407,20 @@ class InviteService:
         await self.db.flush()
 
         sequence_artifact_ids: list[int] = []
-        for idx, frame_path in enumerate(selfie_sequence_paths):
+        for idx, frame_key in enumerate(selfie_sequence_keys):
+            frame_size = (storage.local_root / frame_key).stat().st_size
             artifact = SessionArtifact(
                 artifact_type="identity_selfie_frame",
                 session_id=data.session_id,
                 candidate_verification_id=record.id,
-                storage_path=frame_path.name,
+                storage_path=frame_key,
                 mime_type="image/jpeg",
-                file_size_bytes=frame_path.stat().st_size if frame_path.exists() else None,
+                file_size_bytes=frame_size,
                 metadata_json={
                     "token": token,
                     "source": "invite_identity",
                     "frame_index": idx,
+                    "storage_backend": storage.backend,
                     "liveness_action": data.liveness_actions[idx]
                     if idx < len(data.liveness_actions)
                     else None,
@@ -416,7 +430,6 @@ class InviteService:
             self.db.add(artifact)
             await self.db.flush()
             sequence_artifact_ids.append(int(artifact.id))
-
         self.db.add(
             IdentityVerificationAttempt(
                 candidate_verification_id=record.id,

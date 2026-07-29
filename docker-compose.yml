@@ -1,7 +1,10 @@
-# Local development only — production EC2 can keep SQLite or use managed Postgres.
+# Local development / optional EC2 Docker Postgres when RDS is not ready yet.
 # Start:  docker compose up -d
 # Stop:   docker compose down
 # URL:    postgresql+asyncpg://interview:interview@localhost:5433/interview_bot
+#
+# Production preferred: RDS PostgreSQL free tier (see docs/P0_AWS_FREE_TIER_SETUP.md).
+# Do not point production DATABASE_URL at this container unless you accept data loss on reboot.
 
 services:
   postgres:

@@ -30,6 +30,13 @@ source .venv/bin/activate
 echo "==> Installing Python dependencies..."
 pip install -r requirements.txt
 
+# OCR binary for identity document text hints (safe if already installed)
+if ! command -v tesseract >/dev/null 2>&1; then
+  echo "==> Installing tesseract-ocr..."
+  sudo apt-get update -y
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y tesseract-ocr
+fi
+
 echo "==> Building frontend..."
 cd frontend
 npm ci

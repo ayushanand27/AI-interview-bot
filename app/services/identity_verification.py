@@ -255,10 +255,14 @@ def _extract_id_text(image: np.ndarray) -> tuple[str | None, float | None]:
     except Exception:
         return None, None
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray = cv2.GaussianBlur(gray, (3, 3), 0)
-    gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-    text = pytesseract.image_to_string(gray, config="--psm 6")
+    try:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        gray = cv2.GaussianBlur(gray, (3, 3), 0)
+        gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+        text = pytesseract.image_to_string(gray, config="--psm 6")
+    except Exception:
+        # Missing tesseract binary or decode failure — degrade gracefully.
+        return None, None
     cleaned = " ".join(text.split())
     if not cleaned:
         return None, None

@@ -35,6 +35,7 @@ apt-get install -y \
   git \
   curl \
   ffmpeg \
+  tesseract-ocr \
   libgl1 \
   libgles2 \
   libegl1 \
