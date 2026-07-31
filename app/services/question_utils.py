@@ -13,8 +13,11 @@ DEFAULT_QUESTION_MARKS = 10
 MIN_ASSESSMENT_QUESTIONS = 2
 MAX_ASSESSMENT_QUESTIONS = 20
 
-QUESTION_TYPES = ("subjective", "mcq", "msq", "numerical")
+QUESTION_TYPES = ("subjective", "mcq", "msq", "numerical", "coding")
 OBJECTIVE_TYPES = frozenset({"mcq", "msq", "numerical"})
+CODING_TYPE = "coding"
+
+SUPPORTED_CODING_LANGS = ("c", "cpp", "python", "perl", "java", "javascript")
 
 
 def default_time_seconds() -> int:
@@ -127,6 +130,99 @@ def question_tolerance(item: Any) -> float:
     return max(0.0, value)
 
 
+def _normalize_coding_lang(raw: Any) -> str | None:
+    if raw is None:
+        return None
+    key = str(raw).strip().lower()
+    aliases = {
+        "c++": "cpp",
+        "py": "python",
+        "python3": "python",
+        "js": "javascript",
+        "node": "javascript",
+        "nodejs": "javascript",
+    }
+    key = aliases.get(key, key)
+    return key if key in SUPPORTED_CODING_LANGS else None
+
+
+def question_coding_languages(item: Any) -> list[str]:
+    if not isinstance(item, dict):
+        return ["python"]
+    raw = item.get("languages") or item.get("language")
+    langs: list[str] = []
+    if isinstance(raw, list):
+        for value in raw:
+            normalized = _normalize_coding_lang(value)
+            if normalized and normalized not in langs:
+                langs.append(normalized)
+    elif isinstance(raw, str):
+        normalized = _normalize_coding_lang(raw)
+        if normalized:
+            langs.append(normalized)
+    return langs or ["python"]
+
+
+def question_starter_code(item: Any) -> dict[str, str]:
+    if not isinstance(item, dict):
+        return {}
+    raw = item.get("starter_code") or item.get("starter")
+    out: dict[str, str] = {}
+    if isinstance(raw, dict):
+        for key, value in raw.items():
+            lang = _normalize_coding_lang(key)
+            if lang and value is not None:
+                out[lang] = str(value)
+    elif isinstance(raw, str) and raw.strip():
+        langs = question_coding_languages(item)
+        out[langs[0]] = raw
+    return out
+
+
+def _normalize_tests(raw: Any) -> list[dict[str, str]]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        stdin = str(item.get("stdin", item.get("input", "")) or "")
+        expected = str(
+            item.get("expected_stdout", item.get("expected", item.get("output", "")))
+            or ""
+        )
+        out.append({"stdin": stdin, "expected_stdout": expected})
+    return out
+
+
+def question_public_tests(item: Any) -> list[dict[str, str]]:
+    if not isinstance(item, dict):
+        return []
+    return _normalize_tests(item.get("public_tests") or item.get("sample_tests"))
+
+
+def question_hidden_tests(item: Any) -> list[dict[str, str]]:
+    if not isinstance(item, dict):
+        return []
+    return _normalize_tests(item.get("hidden_tests") or item.get("private_tests"))
+
+
+def question_time_limit_ms(item: Any) -> int:
+    if isinstance(item, dict):
+        raw = item.get("time_limit_ms")
+        if isinstance(raw, (int, float)) and raw > 0:
+            return max(500, min(int(raw), 5000))
+    return 2000
+
+
+def question_memory_limit_mb(item: Any) -> int:
+    if isinstance(item, dict):
+        raw = item.get("memory_limit_mb")
+        if isinstance(raw, (int, float)) and raw > 0:
+            return max(32, min(int(raw), 256))
+    return 128
+
+
 def normalize_question(item: Any) -> dict[str, Any]:
     """Normalize to a full question object including type metadata."""
     text = question_text(item)
@@ -150,6 +246,15 @@ def normalize_question(item: Any) -> dict[str, Any]:
     if qtype == "numerical":
         payload["correct_answer"] = correct_answer or ""
         payload["tolerance"] = tolerance
+    if qtype == "coding":
+        payload["languages"] = question_coding_languages(item)
+        payload["starter_code"] = question_starter_code(item)
+        payload["public_tests"] = question_public_tests(item)
+        payload["hidden_tests"] = question_hidden_tests(item)
+        payload["time_limit_ms"] = question_time_limit_ms(item)
+        payload["memory_limit_mb"] = question_memory_limit_mb(item)
+        if isinstance(item, dict) and item.get("rubric_notes"):
+            payload["rubric_notes"] = str(item.get("rubric_notes"))
     return payload
 
 
@@ -181,7 +286,7 @@ def public_question_view(
     *,
     shuffle_seed: str | None = None,
 ) -> dict[str, Any]:
-    """Candidate-safe question payload (no correct answers)."""
+    """Candidate-safe question payload (no correct answers / hidden tests)."""
     q = normalize_question(item)
     view: dict[str, Any] = {
         "text": q["text"],
@@ -194,6 +299,13 @@ def public_question_view(
         view["options"] = shuffle_options(options, seed=shuffle_seed)
     if q["type"] == "numerical":
         view["tolerance"] = float(q.get("tolerance") or 0.0)
+    if q["type"] == "coding":
+        view["languages"] = list(q.get("languages") or ["python"])
+        view["starter_code"] = dict(q.get("starter_code") or {})
+        view["public_tests"] = list(q.get("public_tests") or [])
+        view["time_limit_ms"] = int(q.get("time_limit_ms") or 2000)
+        view["memory_limit_mb"] = int(q.get("memory_limit_mb") or 128)
+        # Never expose hidden_tests
     return view
 
 

@@ -596,6 +596,56 @@ header p {
   font-size: 0.95rem;
 }
 
+.coding-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.coding-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.coding-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.coding-monaco-wrap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 320px;
+}
+
+.coding-sample-tests {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.coding-sample-tests pre,
+.coding-run-results pre {
+  white-space: pre-wrap;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.coding-run-results .pass {
+  color: #1a7f4b;
+}
+
+.coding-run-results .fail {
+  color: #b42318;
+}
+
 .session-id {
   font-family: "JetBrains Mono", monospace;
   font-size: 0.75rem;

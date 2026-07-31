@@ -10,10 +10,22 @@ from app.services.question_utils import (
     MAX_ASSESSMENT_QUESTIONS,
     MIN_ASSESSMENT_QUESTIONS,
     QUESTION_TYPES,
+    SUPPORTED_CODING_LANGS,
     default_time_seconds,
 )
+from app.services.coding_judge import LANGUAGE_STARTERS
 
-QuestionType = Literal["subjective", "mcq", "msq", "numerical"]
+QuestionType = Literal["subjective", "mcq", "msq", "numerical", "coding"]
+
+
+class CodingTestCase(BaseModel):
+    stdin: str = ""
+    expected_stdout: str = ""
+
+    @field_validator("stdin", "expected_stdout", mode="before")
+    @classmethod
+    def coerce_str(cls, v: object) -> str:
+        return "" if v is None else str(v)
 
 
 class AssessmentQuestion(BaseModel):
@@ -23,6 +35,13 @@ class AssessmentQuestion(BaseModel):
     correct_indices: list[int] | None = None
     correct_answer: str | None = None
     tolerance: float | None = None
+    languages: list[str] | None = None
+    starter_code: dict[str, str] | None = None
+    public_tests: list[CodingTestCase] | None = None
+    hidden_tests: list[CodingTestCase] | None = None
+    time_limit_ms: int | None = None
+    memory_limit_mb: int | None = None
+    rubric_notes: str | None = None
     time_seconds: int = Field(default_factory=default_time_seconds)
     marks: float = Field(default=DEFAULT_QUESTION_MARKS)
 
@@ -42,7 +61,7 @@ class AssessmentQuestion(BaseModel):
         normalized = str(v).strip().lower()
         if normalized not in QUESTION_TYPES:
             raise ValueError(
-                "type must be one of: subjective, mcq, msq, numerical"
+                "type must be one of: subjective, mcq, msq, numerical, coding"
             )
         return normalized
 
@@ -96,6 +115,98 @@ class AssessmentQuestion(BaseModel):
             raise ValueError("tolerance must be >= 0")
         return value
 
+    @field_validator("languages", mode="before")
+    @classmethod
+    def clean_languages(cls, v: object) -> list[str] | None:
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            parts = [p.strip().lower() for p in v.split(",") if p.strip()]
+        elif isinstance(v, list):
+            parts = [str(p).strip().lower() for p in v if str(p).strip()]
+        else:
+            raise ValueError("languages must be a list")
+        aliases = {"c++": "cpp", "py": "python", "python3": "python", "js": "javascript"}
+        out: list[str] = []
+        for part in parts:
+            key = aliases.get(part, part)
+            if key not in SUPPORTED_CODING_LANGS:
+                raise ValueError(
+                    f"Unsupported coding language '{part}'. "
+                    f"Allowed: {', '.join(SUPPORTED_CODING_LANGS)}"
+                )
+            if key not in out:
+                out.append(key)
+        return out or None
+
+    @field_validator("starter_code", mode="before")
+    @classmethod
+    def clean_starter_code(cls, v: object) -> dict[str, str] | None:
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return {"python": v} if v.strip() else None
+        if not isinstance(v, dict):
+            raise ValueError("starter_code must be a language→source map")
+        aliases = {"c++": "cpp", "py": "python", "python3": "python", "js": "javascript"}
+        out: dict[str, str] = {}
+        for key, value in v.items():
+            lang = aliases.get(str(key).strip().lower(), str(key).strip().lower())
+            if lang in SUPPORTED_CODING_LANGS and value is not None:
+                out[lang] = str(value)
+        return out or None
+
+    @field_validator("public_tests", "hidden_tests", mode="before")
+    @classmethod
+    def clean_tests(cls, v: object) -> list[dict[str, str]] | None:
+        if v is None:
+            return None
+        if not isinstance(v, list):
+            raise ValueError("tests must be a list")
+        out: list[dict[str, str]] = []
+        for item in v:
+            if not isinstance(item, dict):
+                continue
+            out.append(
+                {
+                    "stdin": str(item.get("stdin", item.get("input", "")) or ""),
+                    "expected_stdout": str(
+                        item.get(
+                            "expected_stdout",
+                            item.get("expected", item.get("output", "")),
+                        )
+                        or ""
+                    ),
+                }
+            )
+        return out
+
+    @field_validator("time_limit_ms", mode="before")
+    @classmethod
+    def clean_time_limit(cls, v: object) -> int | None:
+        if v is None or v == "":
+            return None
+        try:
+            value = int(v)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("time_limit_ms must be an integer") from exc
+        if not (500 <= value <= 5000):
+            raise ValueError("time_limit_ms must be between 500 and 5000")
+        return value
+
+    @field_validator("memory_limit_mb", mode="before")
+    @classmethod
+    def clean_memory_limit(cls, v: object) -> int | None:
+        if v is None or v == "":
+            return None
+        try:
+            value = int(v)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("memory_limit_mb must be an integer") from exc
+        if not (32 <= value <= 256):
+            raise ValueError("memory_limit_mb must be between 32 and 256")
+        return value
+
     @field_validator("time_seconds")
     @classmethod
     def validate_time(cls, v: int) -> int:
@@ -129,6 +240,10 @@ class AssessmentQuestion(BaseModel):
                 raise ValueError("MSQ requires at least one correct index")
             self.correct_answer = None
             self.tolerance = None
+            self.languages = None
+            self.starter_code = None
+            self.public_tests = None
+            self.hidden_tests = None
         elif self.type == "numerical":
             if not self.correct_answer:
                 raise ValueError("Numerical questions require correct_answer")
@@ -142,11 +257,40 @@ class AssessmentQuestion(BaseModel):
             self.correct_indices = None
             if self.tolerance is None:
                 self.tolerance = 0.0
+            self.languages = None
+            self.starter_code = None
+            self.public_tests = None
+            self.hidden_tests = None
+        elif self.type == "coding":
+            langs = self.languages or ["python"]
+            self.languages = langs
+            starters = dict(self.starter_code or {})
+            for lang in langs:
+                if lang not in starters or not str(starters[lang]).strip():
+                    starters[lang] = LANGUAGE_STARTERS.get(lang, "")
+            self.starter_code = starters
+            self.public_tests = self.public_tests or []
+            self.hidden_tests = self.hidden_tests or []
+            if self.time_limit_ms is None:
+                self.time_limit_ms = 2000
+            if self.memory_limit_mb is None:
+                self.memory_limit_mb = 128
+            # Coding questions often need longer timers
+            if self.time_seconds < 300:
+                self.time_seconds = max(self.time_seconds, 600)
+            self.options = None
+            self.correct_indices = None
+            self.correct_answer = None
+            self.tolerance = None
         else:
             self.options = None
             self.correct_indices = None
             self.correct_answer = None
             self.tolerance = None
+            self.languages = None
+            self.starter_code = None
+            self.public_tests = None
+            self.hidden_tests = None
         return self
 
 
@@ -197,7 +341,7 @@ class GenerateQuestionsRequest(BaseModel):
         for part in parts:
             if part not in QUESTION_TYPES:
                 raise ValueError(
-                    "question_types entries must be subjective, mcq, msq, or numerical"
+                    "question_types entries must be subjective, mcq, msq, numerical, or coding"
                 )
             if part not in cleaned:
                 cleaned.append(part)

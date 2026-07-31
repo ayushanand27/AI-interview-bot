@@ -200,3 +200,23 @@ Install (ubuntu user crontab, 03:00 UTC):
 
 Ensure `logs/` exists (`mkdir -p /var/www/ai-interview-bot/logs`). Do not put secrets in the cron line — the script loads `.env` from the app root.
 
+---
+
+## Coding sandbox (Judge0 RapidAPI free)
+
+Demo / pitch coding rounds use **Judge0 CE** via RapidAPI free (~500 runs/day, 1 concurrent). Candidate code never runs on the interview EC2.
+
+1. Create a free RapidAPI account and subscribe to [Judge0 CE](https://rapidapi.com/judge0-official/api/judge0-ce) (Basic $0).
+2. Copy your `X-RapidAPI-Key` into EC2 `.env`:
+
+```bash
+CODING_QUESTIONS_ENABLED=true
+JUDGE0_RAPIDAPI_KEY=your-rapidapi-key
+JUDGE0_RAPIDAPI_HOST=judge0-ce.p.rapidapi.com
+```
+
+3. Restart PM2. Confirm `/api/v1/status` shows `"coding_judge_configured": true`.
+4. In recruiter UI, add a **Coding** question (or include `coding` in generate types). Candidate invite flow shows Monaco + Run public tests + Submit.
+
+Supported languages: C, C++, Python, Perl, Java, JavaScript. Hidden tests grade on final submit; public tests are candidate-visible only.
+

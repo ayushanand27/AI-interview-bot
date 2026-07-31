@@ -23,7 +23,34 @@ const QUESTION_TYPE_OPTIONS: { value: QuestionType; label: string }[] = [
   { value: "mcq", label: "MCQ (single)" },
   { value: "msq", label: "MSQ (multi)" },
   { value: "numerical", label: "Numerical" },
+  { value: "coding", label: "Coding" },
 ];
+
+const CODING_LANGUAGE_OPTIONS: { value: string; label: string }[] = [
+  { value: "python", label: "Python" },
+  { value: "javascript", label: "JavaScript" },
+  { value: "java", label: "Java" },
+  { value: "cpp", label: "C++" },
+  { value: "c", label: "C" },
+  { value: "perl", label: "Perl" },
+];
+
+const DEFAULT_STARTERS: Record<string, string> = {
+  python:
+    "# Read from stdin, write to stdout\ndef solve():\n    pass\n\nif __name__ == '__main__':\n    solve()\n",
+  javascript:
+    "const fs = require('fs');\nconst input = fs.readFileSync(0, 'utf8').trim();\nconsole.log(input);\n",
+  java:
+    "import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n    }\n}\n",
+  cpp:
+    "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    return 0;\n}\n",
+  c: "#include <stdio.h>\n\nint main(void) {\n    return 0;\n}\n",
+  perl: "#!/usr/bin/perl\nuse strict;\nuse warnings;\n\n",
+};
+
+function emptyTestCase() {
+  return { stdin: "", expected_stdout: "" };
+}
 
 function emptyOptions(): string[] {
   return ["", "", "", ""];
@@ -33,8 +60,8 @@ function defaultQuestion(type: QuestionType = "subjective"): AssessmentQuestion 
   const base: AssessmentQuestion = {
     text: "",
     type,
-    time_seconds: DEFAULT_TIME_SECONDS,
-    marks: 10,
+    time_seconds: type === "coding" ? 900 : DEFAULT_TIME_SECONDS,
+    marks: type === "coding" ? 20 : 10,
   };
   if (type === "mcq" || type === "msq") {
     base.options = emptyOptions();
@@ -43,6 +70,17 @@ function defaultQuestion(type: QuestionType = "subjective"): AssessmentQuestion 
   if (type === "numerical") {
     base.correct_answer = "";
     base.tolerance = 0;
+  }
+  if (type === "coding") {
+    base.languages = ["python", "javascript"];
+    base.starter_code = {
+      python: DEFAULT_STARTERS.python,
+      javascript: DEFAULT_STARTERS.javascript,
+    };
+    base.public_tests = [emptyTestCase()];
+    base.hidden_tests = [emptyTestCase(), emptyTestCase()];
+    base.time_limit_ms = 2000;
+    base.memory_limit_mb = 128;
   }
   return base;
 }
@@ -70,6 +108,34 @@ function normalizeEditableQuestion(q: AssessmentQuestion): AssessmentQuestion {
   if (type === "numerical") {
     next.correct_answer = q.correct_answer ?? "";
     next.tolerance = Number(q.tolerance ?? 0);
+  }
+  if (type === "coding") {
+    const languages =
+      q.languages && q.languages.length > 0
+        ? [...q.languages]
+        : ["python", "javascript"];
+    next.languages = languages;
+    const starter: Record<string, string> = { ...(q.starter_code || {}) };
+    for (const lang of languages) {
+      if (!starter[lang]) starter[lang] = DEFAULT_STARTERS[lang] || "";
+    }
+    next.starter_code = starter;
+    next.public_tests =
+      q.public_tests && q.public_tests.length > 0
+        ? q.public_tests.map((t) => ({
+            stdin: t.stdin ?? "",
+            expected_stdout: t.expected_stdout ?? "",
+          }))
+        : [emptyTestCase()];
+    next.hidden_tests =
+      q.hidden_tests && q.hidden_tests.length > 0
+        ? q.hidden_tests.map((t) => ({
+            stdin: t.stdin ?? "",
+            expected_stdout: t.expected_stdout ?? "",
+          }))
+        : [emptyTestCase()];
+    next.time_limit_ms = q.time_limit_ms ?? 2000;
+    next.memory_limit_mb = q.memory_limit_mb ?? 128;
   }
   return next;
 }
@@ -509,8 +575,11 @@ export default function RecruiterDashboard({
         if (i !== index) return q;
         const next = defaultQuestion(type);
         next.text = q.text;
-        next.time_seconds = q.time_seconds;
-        next.marks = q.marks;
+        next.time_seconds =
+          type === "coding"
+            ? Math.max(q.time_seconds || 0, 600)
+            : q.time_seconds;
+        next.marks = type === "coding" ? Math.max(q.marks || 0, 20) : q.marks;
         if ((type === "mcq" || type === "msq") && q.options?.length) {
           next.options = [...q.options];
           next.correct_indices =
@@ -523,6 +592,20 @@ export default function RecruiterDashboard({
         if (type === "numerical") {
           next.correct_answer = q.correct_answer ?? "";
           next.tolerance = q.tolerance ?? 0;
+        }
+        if (type === "coding" && q.type === "coding") {
+          next.languages = q.languages?.length
+            ? [...q.languages]
+            : next.languages;
+          next.starter_code = q.starter_code
+            ? { ...q.starter_code }
+            : next.starter_code;
+          next.public_tests = q.public_tests?.length
+            ? q.public_tests.map((t) => ({ ...t }))
+            : next.public_tests;
+          next.hidden_tests = q.hidden_tests?.length
+            ? q.hidden_tests.map((t) => ({ ...t }))
+            : next.hidden_tests;
         }
         return next;
       }),
@@ -646,6 +729,40 @@ export default function RecruiterDashboard({
         }
         base.correct_answer = correct_answer;
         base.tolerance = Number(q.tolerance ?? 0);
+      }
+      if (type === "coding") {
+        const languages = (q.languages ?? []).filter(Boolean);
+        if (languages.length < 1) {
+          onError("Coding questions need at least one language.");
+          return;
+        }
+        const starter_code: Record<string, string> = {};
+        for (const lang of languages) {
+          starter_code[lang] =
+            q.starter_code?.[lang] || DEFAULT_STARTERS[lang] || "";
+        }
+        const public_tests = (q.public_tests ?? [])
+          .map((t) => ({
+            stdin: t.stdin ?? "",
+            expected_stdout: t.expected_stdout ?? "",
+          }))
+          .filter((t) => t.stdin.length > 0 || t.expected_stdout.length > 0);
+        const hidden_tests = (q.hidden_tests ?? [])
+          .map((t) => ({
+            stdin: t.stdin ?? "",
+            expected_stdout: t.expected_stdout ?? "",
+          }))
+          .filter((t) => t.stdin.length > 0 || t.expected_stdout.length > 0);
+        if (public_tests.length + hidden_tests.length < 1) {
+          onError("Coding questions need at least one public or hidden test.");
+          return;
+        }
+        base.languages = languages;
+        base.starter_code = starter_code;
+        base.public_tests = public_tests;
+        base.hidden_tests = hidden_tests;
+        base.time_limit_ms = Number(q.time_limit_ms) || 2000;
+        base.memory_limit_mb = Number(q.memory_limit_mb) || 128;
       }
       cleaned.push(base);
     }
@@ -1128,6 +1245,155 @@ export default function RecruiterDashboard({
                               disabled={assessmentLoading}
                             />
                           </label>
+                        </div>
+                      )}
+                      {q.type === "coding" && (
+                        <div className="rp-coding-editor">
+                          <p className="rp-muted-small">
+                            Languages (candidate can pick one)
+                          </p>
+                          <div className="rp-type-toggles">
+                            {CODING_LANGUAGE_OPTIONS.map((opt) => {
+                              const checked = (q.languages ?? []).includes(
+                                opt.value,
+                              );
+                              return (
+                                <label key={opt.value} className="rp-check">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={assessmentLoading}
+                                    onChange={() => {
+                                      const current = new Set(
+                                        q.languages ?? [],
+                                      );
+                                      if (current.has(opt.value)) {
+                                        if (current.size <= 1) return;
+                                        current.delete(opt.value);
+                                      } else {
+                                        current.add(opt.value);
+                                      }
+                                      const languages = Array.from(current);
+                                      const starter = {
+                                        ...(q.starter_code || {}),
+                                      };
+                                      for (const lang of languages) {
+                                        if (!starter[lang]) {
+                                          starter[lang] =
+                                            DEFAULT_STARTERS[lang] || "";
+                                        }
+                                      }
+                                      updateQuestion(i, {
+                                        languages,
+                                        starter_code: starter,
+                                      });
+                                    }}
+                                  />
+                                  {opt.label}
+                                </label>
+                              );
+                            })}
+                          </div>
+                          {(q.languages ?? ["python"]).map((lang) => (
+                            <label key={lang} className="rp-coding-starter">
+                              Starter ({lang})
+                              <textarea
+                                rows={5}
+                                value={q.starter_code?.[lang] ?? ""}
+                                disabled={assessmentLoading}
+                                onChange={(e) =>
+                                  updateQuestion(i, {
+                                    starter_code: {
+                                      ...(q.starter_code || {}),
+                                      [lang]: e.target.value,
+                                    },
+                                  })
+                                }
+                                placeholder={`Starter code for ${lang}`}
+                              />
+                            </label>
+                          ))}
+                          {(
+                            [
+                              ["public_tests", "Public tests"],
+                              ["hidden_tests", "Hidden tests"],
+                            ] as const
+                          ).map(([field, label]) => (
+                            <div key={field} className="rp-tests-editor">
+                              <p className="rp-muted-small">{label}</p>
+                              {(q[field] ?? [emptyTestCase()]).map((t, ti) => (
+                                <div key={ti} className="rp-test-row">
+                                  <textarea
+                                    rows={2}
+                                    placeholder="stdin"
+                                    value={t.stdin}
+                                    disabled={assessmentLoading}
+                                    onChange={(e) => {
+                                      const list = [
+                                        ...(q[field] ?? [emptyTestCase()]),
+                                      ];
+                                      list[ti] = {
+                                        ...list[ti],
+                                        stdin: e.target.value,
+                                      };
+                                      updateQuestion(i, { [field]: list });
+                                    }}
+                                  />
+                                  <textarea
+                                    rows={2}
+                                    placeholder="expected stdout"
+                                    value={t.expected_stdout}
+                                    disabled={assessmentLoading}
+                                    onChange={(e) => {
+                                      const list = [
+                                        ...(q[field] ?? [emptyTestCase()]),
+                                      ];
+                                      list[ti] = {
+                                        ...list[ti],
+                                        expected_stdout: e.target.value,
+                                      };
+                                      updateQuestion(i, { [field]: list });
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="rp-secondary rp-btn-compact"
+                                    disabled={
+                                      assessmentLoading ||
+                                      (q[field]?.length ?? 0) <= 1
+                                    }
+                                    onClick={() => {
+                                      const list = [...(q[field] ?? [])];
+                                      list.splice(ti, 1);
+                                      updateQuestion(i, {
+                                        [field]:
+                                          list.length > 0
+                                            ? list
+                                            : [emptyTestCase()],
+                                      });
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                className="rp-secondary rp-btn-compact"
+                                disabled={assessmentLoading}
+                                onClick={() =>
+                                  updateQuestion(i, {
+                                    [field]: [
+                                      ...(q[field] ?? []),
+                                      emptyTestCase(),
+                                    ],
+                                  })
+                                }
+                              >
+                                Add {label.toLowerCase().replace(/s$/, "")}
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       )}
                       <div className="rp-question-meta-row">
@@ -1927,14 +2193,27 @@ export default function RecruiterDashboard({
                       </h3>
                       <p>{item.question}</p>
                       <h3 className="rp-answer-title">Answer</h3>
-                      <p className="answer-text">
+                      <pre className="answer-text rp-code-answer">
                         {item.answer ?? "(not answered)"}
-                      </p>
+                      </pre>
                       {j && !j.error && (
                         <div className="summary-feedback">
                           {j.weighted_total != null && (
                             <p className="summary-question-score">
                               Score: <strong>{j.weighted_total}</strong> / 100
+                            </p>
+                          )}
+                          {j.run_summary && (
+                            <p className="summary-reasoning">
+                              Hidden tests:{" "}
+                              <strong>
+                                {j.run_summary.passed ?? 0}/
+                                {j.run_summary.total ?? 0}
+                              </strong>{" "}
+                              passed
+                              {j.grading_mode
+                                ? ` · ${j.grading_mode}`
+                                : ""}
                             </p>
                           )}
                           {(j.overall_reasoning ?? j.reasoning) && (

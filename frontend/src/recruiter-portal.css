@@ -877,6 +877,46 @@
   width: 100%;
 }
 
+.recruiter-portal .rp-coding-editor {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recruiter-portal .rp-coding-starter textarea,
+.recruiter-portal .rp-test-row textarea {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.recruiter-portal .rp-test-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.5rem;
+  align-items: start;
+  margin-bottom: 0.5rem;
+}
+
+.recruiter-portal .rp-code-answer {
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  max-height: 20rem;
+  overflow: auto;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.75rem;
+  border-radius: 8px;
+}
+
+@media (max-width: 720px) {
+  .recruiter-portal .rp-test-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .recruiter-portal .rp-option-row {
   display: flex;
   align-items: center;

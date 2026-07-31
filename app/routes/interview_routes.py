@@ -21,6 +21,9 @@ from app.models.schemas import (
     AnswerSubmitResponse,
     AudioAnswerResponse,
     AudioTranscribeResponse,
+    CodingAnswerRequest,
+    CodingRunPublicRequest,
+    CodingRunPublicResponse,
     CurrentQuestionResponse,
     EndInterviewResponse,
     FetchJdUrlRequest,
@@ -204,6 +207,55 @@ def submit_answer(
 ) -> AnswerSubmitResponse:
     return interview_service.submit_answer(
         session_id, payload.answer, current_user.id
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/coding/run-public",
+    response_model=CodingRunPublicResponse,
+    summary="Run coding public tests",
+    description=(
+        "Executes candidate source against public sample tests via Judge0. "
+        "Does not advance the interview or score hidden tests."
+    ),
+)
+@limiter.limit(INTERVIEW_LIMIT)
+def run_coding_public_tests(
+    request: Request,
+    session_id: SessionId,
+    payload: CodingRunPublicRequest,
+    current_user: User = Depends(get_current_user),
+) -> CodingRunPublicResponse:
+    result = interview_service.run_coding_public_tests(
+        session_id,
+        current_user.id,
+        language=payload.language,
+        source=payload.source,
+    )
+    return CodingRunPublicResponse(**result)
+
+
+@router.post(
+    "/sessions/{session_id}/coding/answers",
+    response_model=AnswerSubmitResponse,
+    summary="Submit coding answer",
+    description=(
+        "Stores source code, grades against hidden tests via Judge0, "
+        "and advances the interview like POST /answers."
+    ),
+)
+@limiter.limit(INTERVIEW_LIMIT)
+def submit_coding_answer(
+    request: Request,
+    session_id: SessionId,
+    payload: CodingAnswerRequest,
+    current_user: User = Depends(get_current_user),
+) -> AnswerSubmitResponse:
+    return interview_service.submit_coding_answer(
+        session_id,
+        current_user.id,
+        language=payload.language,
+        source=payload.source,
     )
 
 

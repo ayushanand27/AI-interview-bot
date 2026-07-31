@@ -28,6 +28,8 @@ async def api_status() -> dict:
         "s3_configured": settings.s3_enabled,
         "email_configured": settings.email_configured,
         "smtp_host": settings.SMTP_HOST if settings.email_configured else None,
+        "coding_questions_enabled": settings.CODING_QUESTIONS_ENABLED,
+        "coding_judge_configured": settings.coding_judge_configured,
         "proctoring_loaded": is_proctoring_available(),
         "total_sessions": session_count,
         "retention_days": {

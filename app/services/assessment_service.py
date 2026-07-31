@@ -148,6 +148,56 @@ def _fallback_question_dicts(
             "tolerance": 0,
         },
     ]
+    coding_bank = [
+        {
+            "text": (
+                "Read an integer N from stdin, then N integers on the next line. "
+                "Print their sum to stdout."
+            ),
+            "languages": ["python", "javascript", "java", "cpp", "c", "perl"],
+            "starter_code": {
+                "python": (
+                    "n = int(input())\n"
+                    "nums = list(map(int, input().split()))\n"
+                    "print(sum(nums))\n"
+                ),
+                "javascript": (
+                    "const fs = require('fs');\n"
+                    "const lines = fs.readFileSync(0, 'utf8').trim().split('\\n');\n"
+                    "const n = Number(lines[0]);\n"
+                    "const nums = lines[1].split(/\\s+/).map(Number);\n"
+                    "console.log(nums.slice(0, n).reduce((a, b) => a + b, 0));\n"
+                ),
+            },
+            "public_tests": [
+                {"stdin": "3\n1 2 3\n", "expected_stdout": "6"},
+            ],
+            "hidden_tests": [
+                {"stdin": "1\n42\n", "expected_stdout": "42"},
+                {"stdin": "4\n10 -2 5 1\n", "expected_stdout": "14"},
+            ],
+            "time_seconds": 900,
+            "marks": 20,
+        },
+        {
+            "text": (
+                "Read a string from stdin and print it reversed (same characters, reverse order)."
+            ),
+            "languages": ["python", "javascript", "java", "cpp", "c", "perl"],
+            "starter_code": {
+                "python": "s = input().rstrip('\\n')\nprint(s[::-1])\n",
+            },
+            "public_tests": [
+                {"stdin": "hello\n", "expected_stdout": "olleh"},
+            ],
+            "hidden_tests": [
+                {"stdin": "a\n", "expected_stdout": "a"},
+                {"stdin": "Interview\n", "expected_stdout": "weivretnI"},
+            ],
+            "time_seconds": 900,
+            "marks": 20,
+        },
+    ]
 
     out: list[dict] = []
     default_time = default_time_seconds()
@@ -180,6 +230,14 @@ def _fallback_question_dicts(
                     "type": "numerical",
                     "time_seconds": default_time,
                     "marks": 10,
+                }
+            )
+        elif qtype == "coding":
+            base = coding_bank[i % len(coding_bank)]
+            out.append(
+                {
+                    **base,
+                    "type": "coding",
                 }
             )
         else:
@@ -233,6 +291,28 @@ def _coerce_raw_question(item: object, fallback_type: str) -> dict | None:
     if qtype == "numerical":
         payload["correct_answer"] = str(item.get("correct_answer") or "").strip()
         payload["tolerance"] = item.get("tolerance", 0)
+    if qtype == "coding":
+        langs = item.get("languages") or ["python"]
+        if isinstance(langs, str):
+            langs = [langs]
+        payload["languages"] = [str(x).strip().lower() for x in langs if str(x).strip()]
+        starter = item.get("starter_code") or {}
+        if isinstance(starter, dict):
+            payload["starter_code"] = {str(k): str(v) for k, v in starter.items()}
+        elif isinstance(starter, str) and starter.strip():
+            payload["starter_code"] = {"python": starter}
+        payload["public_tests"] = item.get("public_tests") or []
+        payload["hidden_tests"] = item.get("hidden_tests") or []
+        payload["time_limit_ms"] = item.get("time_limit_ms") or 2000
+        payload["memory_limit_mb"] = item.get("memory_limit_mb") or 128
+        if item.get("time_seconds"):
+            payload["time_seconds"] = item.get("time_seconds")
+        else:
+            payload["time_seconds"] = max(default_time_seconds(), 600)
+        if item.get("marks"):
+            payload["marks"] = item.get("marks")
+        else:
+            payload["marks"] = 20
     return payload
 
 
@@ -326,9 +406,14 @@ def generate_questions_from_jd(
         "Generate clear questions based ONLY on the job description. "
         "Do not assume any candidate resume. "
         "Support types: subjective (open-ended), mcq (one correct), "
-        "msq (multi-select), numerical (exact/tolerance answer). "
+        "msq (multi-select), numerical (exact/tolerance answer), "
+        "coding (stdin/stdout programming problem). "
         "For mcq/msq provide 4 plausible options and correct_indices. "
         "For numerical provide correct_answer and optional tolerance. "
+        "For coding provide languages (subset of c, cpp, python, perl, java, javascript), "
+        "starter_code map, public_tests and hidden_tests as "
+        "[{stdin, expected_stdout}] (2-3 public, 2-3 hidden), time_seconds >= 600, marks 20. "
+        "Coding problems must be solvable via stdin/stdout only. "
         "Do not include numbering prefixes in question text."
     )
     user_prompt = (
@@ -346,7 +431,13 @@ def generate_questions_from_jd(
         '    {"text": "...", "type": "msq", "options": ["A","B","C","D"], '
         '"correct_indices": [0,2], "time_seconds": 120, "marks": 10},\n'
         '    {"text": "...", "type": "numerical", "correct_answer": "42", '
-        '"tolerance": 0, "time_seconds": 90, "marks": 10}\n'
+        '"tolerance": 0, "time_seconds": 90, "marks": 10},\n'
+        '    {"text": "Read N and N integers; print the sum.", "type": "coding", '
+        '"languages": ["python", "javascript"], '
+        '"starter_code": {"python": "n=int(input())\\n..."}, '
+        '"public_tests": [{"stdin": "3\\n1 2 3\\n", "expected_stdout": "6"}], '
+        '"hidden_tests": [{"stdin": "1\\n5\\n", "expected_stdout": "5"}], '
+        '"time_seconds": 900, "marks": 20, "time_limit_ms": 2000, "memory_limit_mb": 128}\n'
         "  ]\n"
         "}"
     )

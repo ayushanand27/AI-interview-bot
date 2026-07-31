@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     ADAPTIVE_QUALITY_LOW: float = 55.0
     ADAPTIVE_QUALITY_HIGH: float = 80.0
 
+    # ── Coding sandbox (Judge0 CE via RapidAPI) ───────────
+    CODING_QUESTIONS_ENABLED: bool = True
+    JUDGE0_RAPIDAPI_KEY: str = ""
+    JUDGE0_RAPIDAPI_HOST: str = "judge0-ce.p.rapidapi.com"
+    MAX_CODING_SOURCE_LENGTH: int = 100_000
+
     # ── File Upload ───────────────────────────────────────
     UPLOAD_DIR: str = "uploads"         # Local folder / S3 download cache
     MAX_FILE_SIZE_MB: int = 10
@@ -143,6 +149,14 @@ class Settings(BaseSettings):
     def email_configured(self) -> bool:
         """True when SMTP credentials are present (delivery still may fail at send time)."""
         return bool(self.SMTP_EMAIL.strip() and self.SMTP_PASSWORD.strip())
+
+    @property
+    def coding_judge_configured(self) -> bool:
+        """True when coding questions are enabled and a Judge0 RapidAPI key is set."""
+        return bool(
+            self.CODING_QUESTIONS_ENABLED
+            and self.JUDGE0_RAPIDAPI_KEY.strip()
+        )
 
     @property
     def effective_frontend_url(self) -> str:

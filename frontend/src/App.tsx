@@ -399,6 +399,31 @@ export default function App() {
     }
   }
 
+  async function handleSubmitCodingAnswer(language: string, source: string) {
+    if (!sessionId || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await interviewApi.submitCodingAnswer(
+        sessionId,
+        language,
+        source,
+      );
+      if (result.is_complete) {
+        await finishInterview();
+        return;
+      }
+      const next = await interviewApi.getCurrentQuestion(sessionId);
+      setCurrentQuestion(next);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to submit coding answer",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleEndEarly() {
     if (!sessionId || loading) return;
     const remaining = currentQuestion
@@ -621,6 +646,7 @@ export default function App() {
                   question={currentQuestion}
                   loading={loading}
                   onSubmitAnswer={handleSubmitAnswer}
+                  onSubmitCodingAnswer={handleSubmitCodingAnswer}
                   onEndEarly={handleEndEarly}
                   onIdleTimeout={handleIdleTimeout}
                   candidateEmail={user?.email}

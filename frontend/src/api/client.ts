@@ -912,6 +912,37 @@ export const interviewApi = {
 
   },
 
+  submitCodingAnswer(sessionId: string, language: string, source: string) {
+    return request<AnswerSubmitResponse>(
+      `/api/v1/interviews/sessions/${sessionId}/coding/answers`,
+      {
+        method: "POST",
+        body: JSON.stringify({ language, source }),
+      },
+    );
+  },
+
+  runCodingPublicTests(sessionId: string, language: string, source: string) {
+    return request<{
+      session_id: string;
+      question_index: number;
+      passed: number;
+      total: number;
+      error?: string | null;
+      cases: Array<{
+        passed: boolean;
+        status: string;
+        stdin: string;
+        expected_stdout: string;
+        actual_stdout: string;
+        stderr?: string;
+      }>;
+    }>(`/api/v1/interviews/sessions/${sessionId}/coding/run-public`, {
+      method: "POST",
+      body: JSON.stringify({ language, source }),
+    });
+  },
+
 
 
   transcribeAudio(sessionId: string, audioBlob: Blob, filename = "recording.webm") {

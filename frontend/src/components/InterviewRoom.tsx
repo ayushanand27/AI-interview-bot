@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Editor from "@monaco-editor/react";
 
 import { interviewApi, proctorApi } from "../api/client";
 
@@ -19,6 +20,15 @@ import {
   attachInterviewClipboardGuards,
   wrapQuestionWithCanary,
 } from "../utils/antiCheat";
+
+const MONACO_LANG: Record<string, string> = {
+  python: "python",
+  javascript: "javascript",
+  java: "java",
+  cpp: "cpp",
+  c: "c",
+  perl: "plaintext",
+};
 
 const LOUD_AUDIO_MESSAGE = "Please maintain a quiet environment";
 const TAB_SWITCH_MESSAGE =
@@ -86,6 +96,7 @@ interface InterviewRoomProps {
   question: CurrentQuestionResponse;
   loading: boolean;
   onSubmitAnswer: (answer: string) => void;
+  onSubmitCodingAnswer: (language: string, source: string) => void;
   onEndEarly: () => void;
   onIdleTimeout: () => void;
   candidateEmail?: string | null;
@@ -119,6 +130,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
       question,
       loading,
       onSubmitAnswer,
+      onSubmitCodingAnswer,
       onEndEarly,
       onIdleTimeout,
       candidateEmail,
@@ -127,6 +139,24 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
   ) {
   const [answer, setAnswer] = useState("");
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+  const [codingLanguage, setCodingLanguage] = useState("python");
+  const [codingSource, setCodingSource] = useState("");
+  const [codingRunning, setCodingRunning] = useState(false);
+  const [codingRunResult, setCodingRunResult] = useState<{
+    passed: number;
+    total: number;
+    error?: string | null;
+    cases: Array<{
+      passed: boolean;
+      status: string;
+      stdin: string;
+      expected_stdout: string;
+      actual_stdout: string;
+      stderr?: string;
+    }>;
+  } | null>(null);
+  const codingSourceRef = useRef("");
+  const codingLanguageRef = useRef("python");
   const [contentObscured, setContentObscured] = useState(false);
   const [watermarkClock, setWatermarkClock] = useState(() =>
     new Date().toLocaleString(),
@@ -195,7 +225,12 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
   const integrity = integrityDisplay(penaltyPercent);
   const qType = (question.question_type || "subjective").toLowerCase();
   const isObjective = qType === "mcq" || qType === "msq" || qType === "numerical";
+  const isCoding = qType === "coding";
   const questionOptions = question.options ?? [];
+  const codingLanguages =
+    question.languages && question.languages.length > 0
+      ? question.languages
+      : ["python"];
   const watermarkLine = [
     candidateEmail?.trim() || "candidate",
     `session:${sessionId.slice(0, 8)}`,
@@ -220,6 +255,20 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     setSelectedOptions([]);
     setAudioWarning(null);
     setTranscribeNotice(null);
+    setCodingRunResult(null);
+    const langs =
+      question.languages && question.languages.length > 0
+        ? question.languages
+        : ["python"];
+    const lang = langs[0];
+    setCodingLanguage(lang);
+    const starter =
+      question.starter_code?.[lang] ||
+      question.starter_code?.[langs[0]] ||
+      "";
+    setCodingSource(starter);
+    codingSourceRef.current = starter;
+    codingLanguageRef.current = lang;
     const timerSec =
       question.time_seconds && question.time_seconds > 0
         ? question.time_seconds
@@ -227,7 +276,15 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     setSecondsLeft(timerSec);
     questionTimerExpiredRef.current = false;
     lastActivityRef.current = Date.now();
-  }, [question.question_index, question.time_seconds, question.question_type]);
+  }, [question.question_index, question.time_seconds, question.question_type, question.languages, question.starter_code]);
+
+  useEffect(() => {
+    codingSourceRef.current = codingSource;
+  }, [codingSource]);
+
+  useEffect(() => {
+    codingLanguageRef.current = codingLanguage;
+  }, [codingLanguage]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -854,16 +911,24 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
               payload =
                 selectedOptionsRef.current[0]?.trim() ||
                 "(No answer — time limit reached)";
+              onSubmitAnswer(payload);
             } else if (type === "msq") {
               payload =
                 selectedOptionsRef.current.length > 0
                   ? JSON.stringify([...selectedOptionsRef.current].sort())
                   : "(No answer — time limit reached)";
+              onSubmitAnswer(payload);
+            } else if (type === "coding") {
+              const src = codingSourceRef.current.trim();
+              onSubmitCodingAnswer(
+                codingLanguageRef.current,
+                src || "// No answer — time limit reached\n",
+              );
             } else {
               const trimmed = answerRef.current.trim();
               payload = trimmed || "(No answer — time limit reached)";
+              onSubmitAnswer(payload);
             }
-            onSubmitAnswer(payload);
           }
           return 0;
         }
@@ -872,7 +937,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     }, 1000);
 
     return () => window.clearInterval(timerId);
-  }, [question.question_index, loading, onSubmitAnswer]);
+  }, [question.question_index, loading, onSubmitAnswer, onSubmitCodingAnswer]);
 
   function touchActivity() {
     lastActivityRef.current = Date.now();
@@ -881,10 +946,52 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     touchActivity();
+    if (isCoding) {
+      const src = codingSource.trim();
+      if (!src || loading || codingRunning) return;
+      onSubmitCodingAnswer(codingLanguage, src);
+      return;
+    }
     const payload = resolveSubmitPayload();
     if (!payload || loading) return;
     if (!isObjective && !confirmAnswerSubmit(payload)) return;
     onSubmitAnswer(payload);
+  }
+
+  async function handleRunPublicTests() {
+    touchActivity();
+    const src = codingSource.trim();
+    if (!src || loading || codingRunning) return;
+    setCodingRunning(true);
+    setCodingRunResult(null);
+    try {
+      const result = await interviewApi.runCodingPublicTests(
+        sessionId,
+        codingLanguage,
+        src,
+      );
+      setCodingRunResult(result);
+    } catch (err) {
+      setCodingRunResult({
+        passed: 0,
+        total: question.public_tests?.length ?? 0,
+        error: err instanceof Error ? err.message : "Run failed",
+        cases: [],
+      });
+    } finally {
+      setCodingRunning(false);
+    }
+  }
+
+  function changeCodingLanguage(lang: string) {
+    touchActivity();
+    setCodingLanguage(lang);
+    const starter = question.starter_code?.[lang];
+    if (starter != null && !codingSource.trim()) {
+      setCodingSource(starter);
+    } else if (starter != null && codingSource === (question.starter_code?.[codingLanguage] || "")) {
+      setCodingSource(starter);
+    }
   }
 
   const pipPreview =
@@ -988,6 +1095,9 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
             {isObjective && (
               <span className="question-type-tag"> · {qType.toUpperCase()}</span>
             )}
+            {isCoding && (
+              <span className="question-type-tag"> · CODING</span>
+            )}
           </span>
           <span
             className={`question-timer${secondsLeft <= 30 ? " question-timer-urgent" : ""}`}
@@ -1090,6 +1200,95 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
             </div>
           )}
 
+          {isCoding && (
+            <div className="field coding-editor-field">
+              <div className="coding-toolbar">
+                <label>
+                  Language
+                  <select
+                    value={codingLanguage}
+                    disabled={loading || codingRunning}
+                    onChange={(e) => changeCodingLanguage(e.target.value)}
+                  >
+                    {codingLanguages.map((lang) => (
+                      <option key={lang} value={lang}>
+                        {lang}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={loading || codingRunning || !codingSource.trim()}
+                  onClick={() => void handleRunPublicTests()}
+                >
+                  {codingRunning ? "Running…" : "Run public tests"}
+                </button>
+              </div>
+              {(question.public_tests?.length ?? 0) > 0 && (
+                <details className="coding-sample-tests">
+                  <summary>
+                    Sample tests ({question.public_tests?.length})
+                  </summary>
+                  <ul>
+                    {(question.public_tests ?? []).map((t, idx) => (
+                      <li key={idx}>
+                        <pre>stdin: {t.stdin || "(empty)"}</pre>
+                        <pre>expected: {t.expected_stdout || "(empty)"}</pre>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <div className="coding-monaco-wrap">
+                <Editor
+                  height="320px"
+                  language={MONACO_LANG[codingLanguage] || "plaintext"}
+                  theme="vs-dark"
+                  value={codingSource}
+                  onChange={(value) => {
+                    touchActivity();
+                    setCodingSource(value ?? "");
+                  }}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    tabSize: 2,
+                  }}
+                />
+              </div>
+              {codingRunResult && (
+                <div className="coding-run-results" role="status">
+                  <p>
+                    Public tests:{" "}
+                    <strong>
+                      {codingRunResult.passed}/{codingRunResult.total}
+                    </strong>{" "}
+                    passed
+                    {codingRunResult.error ? ` — ${codingRunResult.error}` : ""}
+                  </p>
+                  <ul>
+                    {codingRunResult.cases.map((c, idx) => (
+                      <li key={idx} className={c.passed ? "pass" : "fail"}>
+                        Case {idx + 1}: {c.passed ? "PASS" : "FAIL"} ({c.status})
+                        {!c.passed && (
+                          <pre>
+                            expected: {c.expected_stdout}
+                            {"\n"}got: {c.actual_stdout}
+                            {c.stderr ? `\nstderr: ${c.stderr}` : ""}
+                          </pre>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
           {qType === "subjective" && (
             <div className="field">
               <label htmlFor="answer">Your answer</label>
@@ -1161,12 +1360,19 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
               className="primary"
               disabled={
                 loading ||
-                !resolveSubmitPayload() ||
+                codingRunning ||
                 isAudioRecording ||
-                transcribing
+                transcribing ||
+                (isCoding
+                  ? !codingSource.trim()
+                  : !resolveSubmitPayload())
               }
             >
-              {loading ? "Submitting…" : "Submit answer"}
+              {loading
+                ? "Submitting…"
+                : isCoding
+                  ? "Submit code"
+                  : "Submit answer"}
             </button>
             {qType === "subjective" &&
               answer.trim() &&

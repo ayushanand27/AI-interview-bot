@@ -1,5 +1,7 @@
 """Core interview flow: Question → Answer → Next Question."""
 
+import hashlib
+import json
 import logging
 import os
 import shutil
@@ -48,9 +50,22 @@ from app.utils.file_validation import validate_document_upload
 from app.services.question_utils import (
     grade_objective_answer,
     public_question_view,
-    question_marks,    question_text as extract_question_text,
+    question_hidden_tests,
+    question_marks,
+    question_memory_limit_mb,
+    question_public_tests,
+    question_text as extract_question_text,
+    question_time_limit_ms,
     question_time_seconds,
     question_type,
+)
+from app.services.coding_judge import (
+    LANGUAGE_EXTENSIONS,
+    CodingJudgeError,
+    coding_judge_configured,
+    judgment_from_run_summary,
+    public_run_payload,
+    run_test_cases,
 )
 from app.services.adaptive_interview import (
     build_blueprint,
@@ -317,6 +332,11 @@ class InterviewService:
             question_type=str(view.get("type") or question_type(raw_question)),
             options=view.get("options"),
             tolerance=view.get("tolerance"),
+            languages=view.get("languages"),
+            starter_code=view.get("starter_code"),
+            public_tests=view.get("public_tests"),
+            time_limit_ms=view.get("time_limit_ms"),
+            memory_limit_mb=view.get("memory_limit_mb"),
             is_adaptive_follow_up=bool(adaptive_flags.get("is_adaptive_follow_up")),
             adaptive_topic=adaptive_flags.get("adaptive_topic"),
             adaptive_difficulty=adaptive_flags.get("adaptive_difficulty"),
@@ -363,19 +383,31 @@ class InterviewService:
 
         session_store.save(session)
 
-        # Objective types graded server-side; subjective uses LLM judge
+        # Objective types graded server-side; coding uses Judge0; subjective uses LLM judge
         raw_question = session.questions[index]
         try:
-            objective = grade_objective_answer(raw_question, answer.strip())
-            if objective is not None:
-                judgment = objective
+            qtype = question_type(raw_question)
+            if qtype == "coding":
+                # Legacy path: treat as unanswered coding if posted via /answers
+                judgment = {
+                    "weighted_total": 0.0,
+                    "overall_reasoning": (
+                        "Coding answers must be submitted via the coding endpoint."
+                    ),
+                    "grading_mode": "coding_judge",
+                    "error": "use_coding_endpoint",
+                }
             else:
-                question_prompt = extract_question_text(raw_question)
-                judgment = judge_answer(
-                    question=question_prompt,
-                    answer=answer.strip(),
-                    job_role=session.role_title,
-                )
+                objective = grade_objective_answer(raw_question, answer.strip())
+                if objective is not None:
+                    judgment = objective
+                else:
+                    question_prompt = extract_question_text(raw_question)
+                    judgment = judge_answer(
+                        question=question_prompt,
+                        answer=answer.strip(),
+                        job_role=session.role_title,
+                    )
         except Exception:
             judgment = {"error": "judging_failed"}
 
@@ -404,6 +436,210 @@ class InterviewService:
             )
         else:
             message = "Final answer saved. Interview complete."
+
+        return AnswerSubmitResponse(
+            session_id=session.session_id,
+            status=session.status,
+            answered_question_index=index,
+            message=message,
+            has_more_questions=has_more,
+            is_complete=not has_more,
+            remaining_questions=remaining,
+        )
+
+    def run_coding_public_tests(
+        self,
+        session_id: UUID,
+        user_id: int,
+        *,
+        language: str,
+        source: str,
+    ) -> dict:
+        """Run candidate code against public tests only (does not advance session)."""
+        session = self._get_session_for_user(session_id, user_id)
+        if not session.questions:
+            raise QuestionsNotGeneratedError()
+        if session.status not in (
+            SessionStatus.IN_PROGRESS,
+            SessionStatus.QUESTIONS_READY,
+        ):
+            raise InvalidSessionStateError(
+                f"Cannot run code when session status is '{session.status.value}'."
+            )
+        index = session.current_question_index
+        if index >= session.total_questions:
+            raise InvalidSessionStateError("No active question to run.")
+        raw_question = session.questions[index]
+        if question_type(raw_question) != "coding":
+            raise InvalidSessionStateError("Current question is not a coding question.")
+        if not coding_judge_configured():
+            raise InvalidSessionStateError(
+                "Coding judge is not configured. Set JUDGE0_RAPIDAPI_KEY."
+            )
+
+        if session.status == SessionStatus.QUESTIONS_READY:
+            session.status = SessionStatus.IN_PROGRESS
+            session_store.save(session)
+
+        tests = question_public_tests(raw_question)
+        try:
+            summary = run_test_cases(
+                source=source,
+                language=language,
+                tests=tests,
+                time_limit_ms=question_time_limit_ms(raw_question),
+                memory_limit_mb=question_memory_limit_mb(raw_question),
+            )
+        except CodingJudgeError as exc:
+            return {
+                "session_id": session.session_id,
+                "question_index": index,
+                "passed": 0,
+                "total": len(tests),
+                "error": str(exc),
+                "cases": [],
+            }
+
+        payload = public_run_payload(summary)
+        return {
+            "session_id": session.session_id,
+            "question_index": index,
+            **payload,
+        }
+
+    def submit_coding_answer(
+        self,
+        session_id: UUID,
+        user_id: int,
+        *,
+        language: str,
+        source: str,
+    ) -> AnswerSubmitResponse:
+        """Store coding source, grade against hidden tests via Judge0, advance index."""
+        session = self._get_session_for_user(session_id, user_id)
+
+        if not session.questions:
+            raise QuestionsNotGeneratedError()
+
+        if session.status not in (
+            SessionStatus.IN_PROGRESS,
+            SessionStatus.QUESTIONS_READY,
+        ):
+            raise InvalidSessionStateError(
+                f"Cannot submit answers when session status is '{session.status.value}'."
+            )
+
+        if session.is_complete:
+            raise InvalidSessionStateError("Interview is already complete.")
+
+        index = session.current_question_index
+        if index >= session.total_questions:
+            raise InvalidSessionStateError("No active question to answer.")
+
+        raw_question = session.questions[index]
+        if question_type(raw_question) != "coding":
+            raise InvalidSessionStateError(
+                "Current question is not a coding question. Use POST /answers."
+            )
+
+        ext = LANGUAGE_EXTENSIONS.get(language, "txt")
+        storage_key = f"sessions/{session.session_id}/coding/q{index}.{ext}"
+        get_object_storage().put_bytes(
+            storage_key,
+            source.encode("utf-8"),
+            content_type="text/plain; charset=utf-8",
+        )
+
+        answer_payload = json.dumps(
+            {
+                "kind": "coding",
+                "language": language,
+                "s3_key": storage_key,
+                "byte_len": len(source.encode("utf-8")),
+                "sha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
+                "preview": source[:500],
+            },
+            ensure_ascii=False,
+        )
+
+        if len(session.answers) <= index:
+            session.answers.append(answer_payload)
+        else:
+            session.answers[index] = answer_payload
+
+        if len(session.answer_judgments) <= index:
+            session.answer_judgments.append(None)
+
+        session.current_question_index += 1
+        has_more = session.current_question_index < session.total_questions
+        if not has_more:
+            session.status = SessionStatus.COMPLETED
+
+        session_store.save(session)
+
+        marks = question_marks(raw_question)
+        hidden = question_hidden_tests(raw_question)
+        # Fall back to public tests if recruiter forgot hidden ones (demo-friendly)
+        tests = hidden if hidden else question_public_tests(raw_question)
+        try:
+            if not coding_judge_configured():
+                judgment = {
+                    "weighted_total": 0.0,
+                    "overall_reasoning": "Coding judge is not configured.",
+                    "grading_mode": "coding_judge",
+                    "error": "judge_not_configured",
+                    "max_marks": float(marks),
+                }
+            else:
+                summary = run_test_cases(
+                    source=source,
+                    language=language,
+                    tests=tests,
+                    time_limit_ms=question_time_limit_ms(raw_question),
+                    memory_limit_mb=question_memory_limit_mb(raw_question),
+                )
+                judgment = judgment_from_run_summary(summary, marks=marks)
+                if not hidden and tests:
+                    judgment["overall_reasoning"] = (
+                        (judgment.get("overall_reasoning") or "")
+                        + " (graded on public tests — no hidden tests configured)."
+                    ).strip()
+        except CodingJudgeError as exc:
+            judgment = {
+                "weighted_total": 0.0,
+                "overall_reasoning": str(exc),
+                "grading_mode": "coding_judge",
+                "error": "judge_unavailable",
+                "max_marks": float(marks),
+            }
+        except Exception:
+            logger.exception("Coding judgment failed for session %s", session_id)
+            judgment = {"error": "judging_failed", "grading_mode": "coding_judge"}
+
+        session.answer_judgments[index] = judgment
+
+        # Do not adapt coding answers into follow-ups for invite banks (adaptive skips invites).
+        if has_more:
+            maybe_adapt_next_question(
+                session,
+                answered_index=index,
+                judgment=judgment if isinstance(judgment, dict) else None,
+                generate_follow_up=get_llm_service().generate_follow_up_question,
+            )
+
+        if session.current_question_index >= session.total_questions:
+            self._compute_and_save_final_score(session)
+
+        session_store.save(session)
+
+        remaining = max(session.total_questions - session.current_question_index, 0)
+        if has_more:
+            message = (
+                f"Coding answer saved for question {index + 1} of {session.total_questions}. "
+                f"Call GET /current-question next ({remaining} question(s) remaining)."
+            )
+        else:
+            message = "Final coding answer saved. Interview complete."
 
         return AnswerSubmitResponse(
             session_id=session.session_id,

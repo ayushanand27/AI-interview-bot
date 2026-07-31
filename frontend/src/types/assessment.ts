@@ -1,4 +1,22 @@
-export type QuestionType = "subjective" | "mcq" | "msq" | "numerical";
+export type QuestionType =
+  | "subjective"
+  | "mcq"
+  | "msq"
+  | "numerical"
+  | "coding";
+
+export type CodingLanguage =
+  | "c"
+  | "cpp"
+  | "python"
+  | "perl"
+  | "java"
+  | "javascript";
+
+export interface CodingTestCase {
+  stdin: string;
+  expected_stdout: string;
+}
 
 export interface AssessmentQuestion {
   text: string;
@@ -7,6 +25,13 @@ export interface AssessmentQuestion {
   correct_indices?: number[] | null;
   correct_answer?: string | null;
   tolerance?: number | null;
+  languages?: CodingLanguage[] | string[] | null;
+  starter_code?: Record<string, string> | null;
+  public_tests?: CodingTestCase[] | null;
+  hidden_tests?: CodingTestCase[] | null;
+  time_limit_ms?: number | null;
+  memory_limit_mb?: number | null;
+  rubric_notes?: string | null;
   time_seconds: number;
   marks: number;
 }

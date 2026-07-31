@@ -101,7 +101,7 @@ class CurrentQuestionResponse(BaseModel):
     )
     question_type: Optional[str] = Field(
         "subjective",
-        description="subjective | mcq | msq | numerical",
+        description="subjective | mcq | msq | numerical | coding",
     )
     options: Optional[list[str]] = Field(
         None,
@@ -110,6 +110,26 @@ class CurrentQuestionResponse(BaseModel):
     tolerance: Optional[float] = Field(
         None,
         description="Allowed absolute error for numerical questions (hint only).",
+    )
+    languages: Optional[list[str]] = Field(
+        None,
+        description="Allowed languages for coding questions.",
+    )
+    starter_code: Optional[dict[str, str]] = Field(
+        None,
+        description="Starter templates keyed by language for coding questions.",
+    )
+    public_tests: Optional[list[dict[str, str]]] = Field(
+        None,
+        description="Candidate-visible sample tests (stdin / expected_stdout).",
+    )
+    time_limit_ms: Optional[int] = Field(
+        None,
+        description="Per-test CPU time limit for coding questions (ms).",
+    )
+    memory_limit_mb: Optional[int] = Field(
+        None,
+        description="Per-test memory limit for coding questions (MB).",
     )
     is_adaptive_follow_up: bool = Field(
         False,
@@ -143,6 +163,67 @@ class AnswerSubmitRequest(BaseModel):
         if len(stripped) > 2000:
             raise ValueError("Answer exceeds the 2000 character limit.")
         return stripped
+
+
+class CodingAnswerRequest(BaseModel):
+    language: str = Field(..., min_length=1, max_length=32)
+    source: str = Field(..., min_length=1, max_length=100_000)
+
+    @field_validator("language")
+    @classmethod
+    def normalize_language(cls, v: str) -> str:
+        from app.services.coding_judge import normalize_coding_language
+
+        normalized = normalize_coding_language(v)
+        if not normalized:
+            raise ValueError(
+                "language must be one of: c, cpp, python, perl, java, javascript"
+            )
+        return normalized
+
+    @field_validator("source")
+    @classmethod
+    def normalize_source(cls, v: str) -> str:
+        if not v or not str(v).strip():
+            raise ValueError("source cannot be empty.")
+        if len(v) > 100_000:
+            raise ValueError("source exceeds the 100000 character limit.")
+        return v
+
+
+class CodingRunPublicRequest(BaseModel):
+    language: str = Field(..., min_length=1, max_length=32)
+    source: str = Field(..., min_length=1, max_length=100_000)
+
+    @field_validator("language")
+    @classmethod
+    def normalize_language(cls, v: str) -> str:
+        from app.services.coding_judge import normalize_coding_language
+
+        normalized = normalize_coding_language(v)
+        if not normalized:
+            raise ValueError(
+                "language must be one of: c, cpp, python, perl, java, javascript"
+            )
+        return normalized
+
+    @field_validator("source")
+    @classmethod
+    def normalize_source(cls, v: str) -> str:
+        if not v or not str(v).strip():
+            raise ValueError("source cannot be empty.")
+        if len(v) > 100_000:
+            raise ValueError("source exceeds the 100000 character limit.")
+        return v
+
+
+class CodingRunPublicResponse(BaseModel):
+    session_id: UUID
+    question_index: int
+    passed: int
+    total: int
+    error: Optional[str] = None
+    cases: list[dict] = Field(default_factory=list)
 
 
 class AnswerSubmitResponse(BaseModel):

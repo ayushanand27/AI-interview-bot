@@ -29,6 +29,40 @@ from app.services.adaptive_interview import (
     adaptive_summary_for_recruiter,
     question_adaptive_meta,
 )
+from app.services.object_storage import get_object_storage
+
+
+def _format_transcript_answer(answer: Any) -> str | None:
+    """Expand coding JSON pointers into readable source for recruiter review."""
+    if answer is None:
+        return None
+    if not isinstance(answer, str):
+        return str(answer)
+    text = answer.strip()
+    if not text.startswith("{"):
+        return answer
+    try:
+        import json
+
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return answer
+    if not isinstance(payload, dict) or payload.get("kind") != "coding":
+        return answer
+    language = payload.get("language") or "unknown"
+    key = payload.get("s3_key") or payload.get("storage_key")
+    source = ""
+    if key:
+        try:
+            source = get_object_storage().get_bytes(str(key)).decode("utf-8", errors="replace")
+        except Exception:
+            source = str(payload.get("preview") or "")
+    else:
+        source = str(payload.get("preview") or "")
+    header = f"[{language}]\n"
+    if len(source) > 8000:
+        source = source[:8000] + "\n… (truncated)"
+    return header + source
 from app.services.report_service import generate_session_report_pdf, report_filename
 from app.services.session_persistence import (
     get_session_review_state,
@@ -295,11 +329,12 @@ def _session_to_detail(
         judgment = judgment_raw if isinstance(judgment_raw, dict) else None
         adaptive_meta = question_adaptive_meta(question)
         source = str(adaptive_meta.get("source") or "") or None
+        display_answer = _format_transcript_answer(answer)
         transcript.append(
             TranscriptItem(
                 index=i + 1,
                 question=question_text(question),
-                answer=answer,
+                answer=display_answer,
                 judgment=judgment,
                 is_adaptive_follow_up=source == "adaptive_follow_up",
                 adaptive_topic=adaptive_meta.get("topic"),

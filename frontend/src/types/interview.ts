@@ -22,7 +22,17 @@ export interface InterviewSessionResponse {
   created_at: string;
 }
 
-export type QuestionType = "subjective" | "mcq" | "msq" | "numerical";
+export type QuestionType =
+  | "subjective"
+  | "mcq"
+  | "msq"
+  | "numerical"
+  | "coding";
+
+export interface CodingTestCase {
+  stdin: string;
+  expected_stdout: string;
+}
 
 export interface CurrentQuestionResponse {
   session_id: string;
@@ -38,6 +48,11 @@ export interface CurrentQuestionResponse {
   question_type?: QuestionType | string | null;
   options?: string[] | null;
   tolerance?: number | null;
+  languages?: string[] | null;
+  starter_code?: Record<string, string> | null;
+  public_tests?: CodingTestCase[] | null;
+  time_limit_ms?: number | null;
+  memory_limit_mb?: number | null;
   is_adaptive_follow_up?: boolean;
   adaptive_topic?: string | null;
   adaptive_difficulty?: string | null;
@@ -84,6 +99,18 @@ export interface AnswerJudgment {
   strengths?: string[];
   improvements?: string[];
   criteria_scores?: Record<string, { score?: number; reasoning?: string }>;
+  grading_mode?: string;
+  run_summary?: {
+    passed?: number;
+    total?: number;
+    error?: string | null;
+    cases?: Array<{
+      passed?: boolean;
+      status?: string;
+      stdin_preview?: string;
+      stderr_preview?: string;
+    }>;
+  } | null;
   error?: string;
 }
 
