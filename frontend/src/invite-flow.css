@@ -23,6 +23,21 @@
   font-size: 0.92rem;
 }
 
+.invite-flow .invite-details-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.invite-flow .invite-details-form .field {
+  margin-bottom: 1rem;
+}
+
+.invite-flow .invite-details-form .primary {
+  margin-top: 0.35rem;
+  width: 100%;
+}
+
 .invite-identity-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

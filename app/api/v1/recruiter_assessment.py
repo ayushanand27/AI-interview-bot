@@ -18,6 +18,8 @@ from app.schemas.recruiter_assessment import (
     GenerateQuestionsRequest,
     GenerateQuestionsResponse,
     ParseJdPdfResponse,
+    SendAssessmentInvitesRequest,
+    SendAssessmentInvitesResponse,
     UpdateAssessmentRequest,
 )
 from app.services.assessment_service import AssessmentService
@@ -227,3 +229,22 @@ async def update_assessment(
         message="Assessment updated",
         data=updated,
     )
+
+
+@router.post(
+    "/assessments/{token}/send-invites",
+    response_model=BaseResponse[SendAssessmentInvitesResponse],
+    summary="Email assessment invite link to candidates or institutions",
+)
+async def send_assessment_invites(
+    token: str,
+    body: SendAssessmentInvitesRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    service = AssessmentService(db)
+    result = await service.send_assessment_invites(current_user.id, token, body)
+    msg = f"Sent {result.sent} invite email(s)"
+    if result.failed:
+        msg += f"; {len(result.failed)} failed"
+    return BaseResponse(success=True, message=msg, data=result)

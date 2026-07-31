@@ -164,6 +164,54 @@ def send_invite_welcome_password_email(to_email: str, name: str, token: str) -> 
     return sent
 
 
+def send_assessment_invite_email(
+    to_email: str,
+    *,
+    invite_url: str,
+    role_preview: str,
+    recruiter_note: str | None = None,
+) -> bool:
+    """Send a candidate/institution the assessment invite link (recruiter-initiated)."""
+    note_html = ""
+    if recruiter_note and recruiter_note.strip():
+        safe = (
+            recruiter_note.strip()
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
+        note_html = f'<p style="margin-top: 12px; color: #444;">{safe}</p>'
+
+    subject = f"You're invited to take an assessment — {role_preview}"
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">Assessment invitation</h2>
+        <p>Hello,</p>
+        <p>
+            You have been invited to complete an assessment for
+            <strong>{role_preview}</strong> on {settings.APP_NAME}.
+        </p>
+        {note_html}
+        <a href="{invite_url}"
+           style="background: #0d9488; color: white; padding: 12px 24px;
+                  text-decoration: none; border-radius: 6px; display: inline-block;
+                  margin-top: 8px;">
+            Open assessment invite
+        </a>
+        <p style="margin-top: 16px; color: #666; font-size: 14px;">
+            Or copy this link: {invite_url}
+        </p>
+        <p style="color: #666; font-size: 14px;">
+            Please complete the assessment before the invite expires.
+        </p>
+    </div>
+    """
+    sent = _send_email(to_email, subject, html)
+    if not sent:
+        _log_console_fallback("Assessment invite link", to_email, invite_url)
+    return sent
+
+
 def send_password_reset_email(to_email: str, name: str, token: str) -> str:
     link = f"{settings.effective_frontend_url}/reset-password?token={token}"
 

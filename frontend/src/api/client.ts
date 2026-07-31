@@ -667,15 +667,24 @@ export const recruiterApi = {
       `/api/v1/recruiter/assessments/${token}`,
 
       {
-
         method: "PATCH",
-
         body: JSON.stringify({ expiry_hours: expiryHours }),
-
       },
 
     );
 
+  },
+
+  sendAssessmentInvites(
+    token: string,
+    payload: { emails: string[]; message?: string },
+  ) {
+    return request<
+      ApiEnvelope<{ sent: number; failed: string[]; invite_link: string }>
+    >(`/api/v1/recruiter/assessments/${token}/send-invites`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
 
 

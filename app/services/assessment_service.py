@@ -19,8 +19,11 @@ from app.schemas.recruiter_assessment import (
     CreateAssessmentResponse,
     GenerateQuestionsRequest,
     GenerateQuestionsResponse,
+    SendAssessmentInvitesRequest,
+    SendAssessmentInvitesResponse,
     UpdateAssessmentRequest,
 )
+from app.services.email_service import send_assessment_invite_email
 from app.services.groq_client import get_groq_client
 from app.services.question_utils import (
     QUESTION_TYPES,
@@ -151,51 +154,95 @@ def _fallback_question_dicts(
     coding_bank = [
         {
             "text": (
-                "Read an integer N from stdin, then N integers on the next line. "
-                "Print their sum to stdout."
+                "Two Sum (interview classic).\n"
+                "Input:\n"
+                "  Line 1: integer N (2 <= N <= 1e5)\n"
+                "  Line 2: N integers A[i] (|A[i]| <= 1e9)\n"
+                "  Line 3: integer target\n"
+                "Output: two 0-based indices i j (i < j) such that A[i] + A[j] == target.\n"
+                "If multiple answers exist, print any. Guaranteed that exactly one valid pair exists.\n"
+                "Target complexity: O(N) time preferred."
             ),
-            "languages": ["python", "javascript", "java", "cpp", "c", "perl"],
+            "languages": ["python", "javascript", "java", "cpp", "c"],
             "starter_code": {
                 "python": (
                     "n = int(input())\n"
-                    "nums = list(map(int, input().split()))\n"
-                    "print(sum(nums))\n"
-                ),
-                "javascript": (
-                    "const fs = require('fs');\n"
-                    "const lines = fs.readFileSync(0, 'utf8').trim().split('\\n');\n"
-                    "const n = Number(lines[0]);\n"
-                    "const nums = lines[1].split(/\\s+/).map(Number);\n"
-                    "console.log(nums.slice(0, n).reduce((a, b) => a + b, 0));\n"
+                    "arr = list(map(int, input().split()))\n"
+                    "target = int(input())\n"
+                    "# print two indices i j\n"
                 ),
             },
             "public_tests": [
-                {"stdin": "3\n1 2 3\n", "expected_stdout": "6"},
+                {"stdin": "4\n2 7 11 15\n9\n", "expected_stdout": "0 1"},
+                {"stdin": "3\n3 2 4\n6\n", "expected_stdout": "1 2"},
             ],
             "hidden_tests": [
-                {"stdin": "1\n42\n", "expected_stdout": "42"},
-                {"stdin": "4\n10 -2 5 1\n", "expected_stdout": "14"},
+                {"stdin": "2\n1 1\n2\n", "expected_stdout": "0 1"},
+                {"stdin": "5\n-1 0 5 3 8\n7\n", "expected_stdout": "2 3"},
+                {"stdin": "6\n10 20 30 40 50 60\n90\n", "expected_stdout": "2 5"},
             ],
-            "time_seconds": 900,
-            "marks": 20,
+            "time_seconds": 1200,
+            "marks": 25,
+            "time_limit_ms": 2000,
+            "memory_limit_mb": 128,
         },
         {
             "text": (
-                "Read a string from stdin and print it reversed (same characters, reverse order)."
+                "Valid Parentheses.\n"
+                "Input: a single string S consisting only of characters ()[]{} (1 <= |S| <= 1e5).\n"
+                "Output: YES if S is a valid bracket sequence, otherwise NO.\n"
+                "A sequence is valid if brackets close in the correct order (stack matching)."
             ),
-            "languages": ["python", "javascript", "java", "cpp", "c", "perl"],
+            "languages": ["python", "javascript", "java", "cpp", "c"],
             "starter_code": {
-                "python": "s = input().rstrip('\\n')\nprint(s[::-1])\n",
+                "python": (
+                    "s = input().strip()\n"
+                    "# print YES or NO\n"
+                ),
             },
             "public_tests": [
-                {"stdin": "hello\n", "expected_stdout": "olleh"},
+                {"stdin": "()\n", "expected_stdout": "YES"},
+                {"stdin": "([)]\n", "expected_stdout": "NO"},
+                {"stdin": "{[]}\n", "expected_stdout": "YES"},
             ],
             "hidden_tests": [
-                {"stdin": "a\n", "expected_stdout": "a"},
-                {"stdin": "Interview\n", "expected_stdout": "weivretnI"},
+                {"stdin": "(((((((((()\n", "expected_stdout": "NO"},
+                {"stdin": "([]{})\n", "expected_stdout": "YES"},
+                {"stdin": "]\n", "expected_stdout": "NO"},
             ],
             "time_seconds": 900,
             "marks": 20,
+            "time_limit_ms": 2000,
+            "memory_limit_mb": 128,
+        },
+        {
+            "text": (
+                "Longest Unique Substring length.\n"
+                "Input: a string S of lowercase letters (1 <= |S| <= 1e5).\n"
+                "Output: length of the longest substring without repeating characters.\n"
+                "Example: abcabcbb -> 3 (abc)."
+            ),
+            "languages": ["python", "javascript", "java", "cpp"],
+            "starter_code": {
+                "python": (
+                    "s = input().strip()\n"
+                    "# print an integer\n"
+                ),
+            },
+            "public_tests": [
+                {"stdin": "abcabcbb\n", "expected_stdout": "3"},
+                {"stdin": "bbbbb\n", "expected_stdout": "1"},
+                {"stdin": "pwwkew\n", "expected_stdout": "3"},
+            ],
+            "hidden_tests": [
+                {"stdin": "a\n", "expected_stdout": "1"},
+                {"stdin": "abcdef\n", "expected_stdout": "6"},
+                {"stdin": "abba\n", "expected_stdout": "2"},
+            ],
+            "time_seconds": 1200,
+            "marks": 25,
+            "time_limit_ms": 2000,
+            "memory_limit_mb": 128,
         },
     ]
 
@@ -410,10 +457,15 @@ def generate_questions_from_jd(
         "coding (stdin/stdout programming problem). "
         "For mcq/msq provide 4 plausible options and correct_indices. "
         "For numerical provide correct_answer and optional tolerance. "
-        "For coding provide languages (subset of c, cpp, python, perl, java, javascript), "
-        "starter_code map, public_tests and hidden_tests as "
-        "[{stdin, expected_stdout}] (2-3 public, 2-3 hidden), time_seconds >= 600, marks 20. "
+        "For coding: create REAL interview-style DSA problems (HackerRank/LeetCode Easy–Medium), "
+        "NOT trivial sum/reverse tasks. Prefer hash maps, stacks, two pointers, sliding window, "
+        "prefix sums, or sorting. Include clear Input/Output format, constraints, "
+        "languages subset of [c, cpp, python, java, javascript] (omit perl), "
+        "minimal starter_code stubs (do NOT give the full solution), "
+        "public_tests (2-3) and hidden_tests (3-4) as [{stdin, expected_stdout}], "
+        "time_seconds 900-1500, marks 20-30. "
         "Coding problems must be solvable via stdin/stdout only. "
+        "Match difficulty: Easy = Easy DSA, Medium = LeetCode Easy/Medium, Hard = Medium DSA. "
         "Do not include numbering prefixes in question text."
     )
     user_prompt = (
@@ -432,12 +484,12 @@ def generate_questions_from_jd(
         '"correct_indices": [0,2], "time_seconds": 120, "marks": 10},\n'
         '    {"text": "...", "type": "numerical", "correct_answer": "42", '
         '"tolerance": 0, "time_seconds": 90, "marks": 10},\n'
-        '    {"text": "Read N and N integers; print the sum.", "type": "coding", '
-        '"languages": ["python", "javascript"], '
-        '"starter_code": {"python": "n=int(input())\\n..."}, '
-        '"public_tests": [{"stdin": "3\\n1 2 3\\n", "expected_stdout": "6"}], '
-        '"hidden_tests": [{"stdin": "1\\n5\\n", "expected_stdout": "5"}], '
-        '"time_seconds": 900, "marks": 20, "time_limit_ms": 2000, "memory_limit_mb": 128}\n'
+        '    {"text": "Two Sum...\\nInput:\\n...\\nOutput:...", "type": "coding", '
+        '"languages": ["python", "javascript", "java", "cpp"], '
+        '"starter_code": {"python": "n=int(input())\\n# ..."}, '
+        '"public_tests": [{"stdin": "4\\n2 7 11 15\\n9\\n", "expected_stdout": "0 1"}], '
+        '"hidden_tests": [{"stdin": "2\\n1 1\\n2\\n", "expected_stdout": "0 1"}], '
+        '"time_seconds": 1200, "marks": 25, "time_limit_ms": 2000, "memory_limit_mb": 128}\n'
         "  ]\n"
         "}"
     )
@@ -618,3 +670,41 @@ class AssessmentService:
         await self.db.refresh(invite)
         now = datetime.now(timezone.utc)
         return _summary_from_invite(invite, now)
+
+    async def send_assessment_invites(
+        self,
+        recruiter_id: int,
+        token: str,
+        data: SendAssessmentInvitesRequest,
+    ) -> SendAssessmentInvitesResponse:
+        result = await self.db.execute(
+            select(InterviewInvite).where(InterviewInvite.token == token)
+        )
+        invite = result.scalar_one_or_none()
+        if invite is None or invite.recruiter_id != recruiter_id:
+            raise NotFoundException("Assessment not found")
+        now = datetime.now(timezone.utc)
+        summary = _summary_from_invite(invite, now)
+        if summary.is_expired:
+            raise ConflictException("This assessment invite has expired.")
+
+        invite_path = summary.invite_link
+        invite_url = f"{settings.effective_frontend_url}{invite_path}"
+        failed: list[str] = []
+        sent = 0
+        for email in data.emails:
+            ok = send_assessment_invite_email(
+                email,
+                invite_url=invite_url,
+                role_preview=summary.role_preview,
+                recruiter_note=data.message,
+            )
+            if ok:
+                sent += 1
+            else:
+                failed.append(email)
+        return SendAssessmentInvitesResponse(
+            sent=sent,
+            failed=failed,
+            invite_link=invite_path,
+        )

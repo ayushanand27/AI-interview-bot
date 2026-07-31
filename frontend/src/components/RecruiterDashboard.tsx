@@ -274,7 +274,12 @@ export default function RecruiterDashboard({
   );
   const [draftJdText, setDraftJdText] = useState("");
   const [approvedInviteLink, setApprovedInviteLink] = useState<string | null>(null);
+  const [approvedInviteToken, setApprovedInviteToken] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [inviteEmailsText, setInviteEmailsText] = useState("");
+  const [inviteNote, setInviteNote] = useState("");
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteSendMessage, setInviteSendMessage] = useState<string | null>(null);
 
   const [assessments, setAssessments] = useState<AssessmentSummary[]>([]);
   const [assessmentsLoading, setAssessmentsLoading] = useState(false);
@@ -786,6 +791,10 @@ export default function RecruiterDashboard({
         questions: cleaned,
       });
       setApprovedInviteLink(res.data.invite_link);
+      setApprovedInviteToken(res.data.token);
+      setInviteEmailsText("");
+      setInviteNote("");
+      setInviteSendMessage(null);
       setEditableQuestions(
         (res.data.questions_preview ?? cleaned).map((q) =>
           normalizeEditableQuestion(q),
@@ -807,6 +816,42 @@ export default function RecruiterDashboard({
       setCopyMessage("Link copied to clipboard.");
     } catch {
       setCopyMessage("Could not copy — select and copy the link manually.");
+    }
+  }
+
+  async function handleSendInviteEmails() {
+    if (!approvedInviteToken) return;
+    const emails = inviteEmailsText
+      .split(/[,;\n]+/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+    if (emails.length === 0) {
+      onError("Add at least one email address to send invites.");
+      return;
+    }
+    setInviteSending(true);
+    setInviteSendMessage(null);
+    onError(null);
+    try {
+      const res = await recruiterApi.sendAssessmentInvites(
+        approvedInviteToken,
+        {
+          emails,
+          message: inviteNote.trim() || undefined,
+        },
+      );
+      const failed = res.data.failed?.length ?? 0;
+      setInviteSendMessage(
+        failed > 0
+          ? `Sent ${res.data.sent}. Failed: ${res.data.failed.join(", ")}`
+          : `Sent ${res.data.sent} invite email(s).`,
+      );
+    } catch (err) {
+      onError(
+        err instanceof Error ? err.message : "Failed to send invite emails",
+      );
+    } finally {
+      setInviteSending(false);
     }
   }
 
@@ -1482,6 +1527,44 @@ export default function RecruiterDashboard({
                 {copyMessage && (
                   <p className="rp-copy-success">{copyMessage}</p>
                 )}
+                <div className="rp-send-invites" style={{ marginTop: "1rem" }}>
+                  <p className="rp-invite-hint">
+                    Email invite to candidates / institutions (industry-standard)
+                  </p>
+                  <label className="rp-muted-small">
+                    Emails (comma or new line)
+                    <textarea
+                      rows={3}
+                      value={inviteEmailsText}
+                      onChange={(e) => setInviteEmailsText(e.target.value)}
+                      placeholder="candidate@college.edu, hr@company.com"
+                      disabled={inviteSending}
+                    />
+                  </label>
+                  <label className="rp-muted-small" style={{ display: "block", marginTop: "0.5rem" }}>
+                    Optional note
+                    <input
+                      type="text"
+                      value={inviteNote}
+                      onChange={(e) => setInviteNote(e.target.value)}
+                      placeholder="Complete within 48 hours"
+                      disabled={inviteSending}
+                    />
+                  </label>
+                  <div className="rp-actions" style={{ marginTop: "0.75rem" }}>
+                    <button
+                      type="button"
+                      className="rp-primary"
+                      disabled={inviteSending || !approvedInviteToken}
+                      onClick={() => void handleSendInviteEmails()}
+                    >
+                      {inviteSending ? "Sending…" : "Send invite emails"}
+                    </button>
+                  </div>
+                  {inviteSendMessage && (
+                    <p className="rp-copy-success">{inviteSendMessage}</p>
+                  )}
+                </div>
               </div>
             )}
           </div>

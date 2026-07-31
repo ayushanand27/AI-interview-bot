@@ -1,5 +1,6 @@
 """Schemas for recruiter JD-based assessment creation."""
 
+import re
 from datetime import datetime
 from typing import Literal
 
@@ -449,3 +450,44 @@ class UpdateAssessmentRequest(BaseModel):
         if v not in (24, 48, 72, 168):
             raise ValueError("expiry_hours must be 24, 48, 72, or 168")
         return v
+
+
+class SendAssessmentInvitesRequest(BaseModel):
+    emails: list[str] = Field(..., min_length=1, max_length=50)
+    message: str | None = Field(None, max_length=1000)
+
+    @field_validator("emails", mode="before")
+    @classmethod
+    def normalize_emails(cls, v: object) -> list[str]:
+        if isinstance(v, str):
+            parts = [p.strip() for p in re.split(r"[,;\n]+", v) if p.strip()]
+        elif isinstance(v, list):
+            parts = [str(p).strip() for p in v if str(p).strip()]
+        else:
+            raise ValueError("emails must be a list or comma/newline-separated string")
+        cleaned: list[str] = []
+        for email in parts:
+            lower = email.lower()
+            if "@" not in lower or "." not in lower.split("@")[-1]:
+                raise ValueError(f"Invalid email: {email}")
+            if lower not in cleaned:
+                cleaned.append(lower)
+        if not cleaned:
+            raise ValueError("At least one email is required")
+        if len(cleaned) > 50:
+            raise ValueError("At most 50 emails per send")
+        return cleaned
+
+    @field_validator("message", mode="before")
+    @classmethod
+    def clean_message(cls, v: object) -> str | None:
+        if v is None:
+            return None
+        text = str(v).strip()
+        return text or None
+
+
+class SendAssessmentInvitesResponse(BaseModel):
+    sent: int
+    failed: list[str] = Field(default_factory=list)
+    invite_link: str

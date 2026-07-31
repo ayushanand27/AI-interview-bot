@@ -160,6 +160,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
         selfieStreamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          void videoRef.current.play().catch(() => {});
         }
       } catch (err) {
         if (!cancelled) {
@@ -181,6 +182,19 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
       selfieStreamRef.current = null;
     };
   }, [step]);
+
+  // Keep live preview attached whenever the video element is present.
+  useEffect(() => {
+    if (step !== "identity") return;
+    const video = videoRef.current;
+    const stream = selfieStreamRef.current;
+    if (video && stream) {
+      if (video.srcObject !== stream) {
+        video.srcObject = stream;
+      }
+      void video.play().catch(() => {});
+    }
+  }, [step, livenessStepIndex, selfieSequence.length]);
 
   function releaseInterviewMediaStream() {
     setInterviewMediaStream((current) => {
@@ -265,7 +279,10 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
 
   function captureSelfie() {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || video.readyState < 2) {
+      setError("Camera is not ready yet — wait a moment and try again.");
+      return;
+    }
     const w = video.videoWidth || 640;
     const h = video.videoHeight || 480;
     const canvas = document.createElement("canvas");
@@ -288,6 +305,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
     if (livenessStepIndex < LIVENESS_STEPS.length - 1) {
       setLivenessStepIndex((current) => current + 1);
     }
+    setError(null);
     setIdentityVerified(false);
     setVerifyMessage(null);
     setVerifyWarnings([]);
@@ -301,6 +319,15 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
     setIdentityVerified(false);
     setVerifyMessage(null);
     setVerifyWarnings([]);
+    // Re-bind stream on next paint when video remounts.
+    window.setTimeout(() => {
+      const video = videoRef.current;
+      const stream = selfieStreamRef.current;
+      if (video && stream) {
+        video.srcObject = stream;
+        void video.play().catch(() => {});
+      }
+    }, 0);
   }
 
   async function handleVerifyIdentity() {
@@ -498,44 +525,56 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
         <div className="card auth-panel">
           <h2>{detailsMode === "register" ? "Your details" : "Log in"}</h2>
           {detailsMode === "register" ? (
-            <form onSubmit={handleRegister}>
-              <label htmlFor="invite-name">Full Name</label>
-              <input id="invite-name" name="name" required />
-              <label htmlFor="invite-email">Email</label>
-              <input
-                id="invite-email"
-                name="email"
-                type="email"
-                required
-                defaultValue={prefilledEmail}
-              />
-              <label htmlFor="invite-phone">Phone Number</label>
-              <input id="invite-phone" name="phone" type="tel" required />
+            <form onSubmit={handleRegister} className="invite-details-form">
+              <div className="field">
+                <label htmlFor="invite-name">Full Name</label>
+                <input id="invite-name" name="name" required />
+              </div>
+              <div className="field">
+                <label htmlFor="invite-email">Email</label>
+                <input
+                  id="invite-email"
+                  name="email"
+                  type="email"
+                  required
+                  defaultValue={prefilledEmail}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="invite-phone">Phone Number</label>
+                <input id="invite-phone" name="phone" type="tel" required />
+              </div>
               <button type="submit" className="primary" disabled={loading}>
                 {loading ? "Please wait…" : "Continue"}
               </button>
             </form>
           ) : (
-            <form onSubmit={handleLogin}>
-              <label htmlFor="invite-login-email">Email</label>
-              <input
-                id="invite-login-email"
-                name="email"
-                type="email"
-                required
-                defaultValue={prefilledEmail}
-                key={prefilledEmail || "login-email"}
-              />
-              <label htmlFor="invite-login-password">Password</label>
-              <input
-                id="invite-login-password"
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-              />
-              <label htmlFor="invite-login-phone">Phone Number (optional)</label>
-              <input id="invite-login-phone" name="phone" type="tel" />
+            <form onSubmit={handleLogin} className="invite-details-form">
+              <div className="field">
+                <label htmlFor="invite-login-email">Email</label>
+                <input
+                  id="invite-login-email"
+                  name="email"
+                  type="email"
+                  required
+                  defaultValue={prefilledEmail}
+                  key={prefilledEmail || "login-email"}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="invite-login-password">Password</label>
+                <input
+                  id="invite-login-password"
+                  name="password"
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="invite-login-phone">Phone Number (optional)</label>
+                <input id="invite-login-phone" name="phone" type="tel" />
+              </div>
               <button type="submit" className="primary" disabled={loading}>
                 {loading ? "Please wait…" : "Continue"}
               </button>
@@ -615,11 +654,13 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
               <h3>Live selfie</h3>
               <p>Complete the 4-step liveness sequence.</p>
               <div className="invite-liveness-step">
-                <strong>Step {LIVENESS_STEPS[livenessStepIndex].title}</strong>
+                <strong>
+                  Step {LIVENESS_STEPS[livenessStepIndex].title}
+                </strong>
                 {" — "}
                 {LIVENESS_STEPS[livenessStepIndex].hint}
               </div>
-              {!selfiePreview ? (
+              {selfieSequence.filter(Boolean).length < LIVENESS_STEPS.length ? (
                 <>
                   <video
                     ref={videoRef}
@@ -628,29 +669,14 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
                     playsInline
                     muted
                   />
-                  <button
-                    type="button"
-                    className="secondary"
-                    style={{ marginTop: "0.75rem" }}
-                    onClick={captureSelfie}
-                  >
-                    Capture
-                  </button>
-                </>
-              ) : (
-                <>
-                  <img
-                    className="invite-preview"
-                    src={selfiePreview}
-                    alt="Selfie preview"
-                  />
                   <p className="invite-check">
-                    ✓ {selfieSequence.filter(Boolean).length}/{LIVENESS_STEPS.length} captured
+                    ✓ {selfieSequence.filter(Boolean).length}/{LIVENESS_STEPS.length}{" "}
+                    captured
                   </p>
                   <div className="invite-liveness-progress">
-                    {LIVENESS_STEPS.map((step, index) => (
+                    {LIVENESS_STEPS.map((stepItem, index) => (
                       <span
-                        key={step.action}
+                        key={stepItem.action}
                         className={
                           selfieSequence[index]
                             ? "invite-liveness-pill is-complete"
@@ -659,7 +685,48 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
                               : "invite-liveness-pill"
                         }
                       >
-                        {step.title}
+                        {stepItem.title}
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="secondary"
+                    style={{ marginTop: "0.75rem" }}
+                    onClick={captureSelfie}
+                  >
+                    {selfieSequence.filter(Boolean).length === 0
+                      ? "Capture"
+                      : "Next capture"}
+                  </button>
+                  {selfieSequence.filter(Boolean).length > 0 && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      style={{ marginTop: "0.5rem", marginLeft: "0.5rem" }}
+                      onClick={retakeSelfie}
+                    >
+                      Restart
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <img
+                    className="invite-preview"
+                    src={selfiePreview || selfieDataUrl || undefined}
+                    alt="Selfie preview"
+                  />
+                  <p className="invite-check">
+                    ✓ {LIVENESS_STEPS.length}/{LIVENESS_STEPS.length} captured
+                  </p>
+                  <div className="invite-liveness-progress">
+                    {LIVENESS_STEPS.map((stepItem) => (
+                      <span
+                        key={stepItem.action}
+                        className="invite-liveness-pill is-complete"
+                      >
+                        {stepItem.title}
                       </span>
                     ))}
                   </div>
@@ -667,15 +734,9 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
                     type="button"
                     className="secondary"
                     style={{ marginTop: "0.5rem" }}
-                    onClick={
-                      selfieSequence.filter(Boolean).length >= LIVENESS_STEPS.length
-                        ? retakeSelfie
-                        : captureSelfie
-                    }
+                    onClick={retakeSelfie}
                   >
-                    {selfieSequence.filter(Boolean).length >= LIVENESS_STEPS.length
-                      ? "Restart"
-                      : "Next capture"}
+                    Restart
                   </button>
                 </>
               )}
