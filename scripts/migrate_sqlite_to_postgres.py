@@ -39,6 +39,29 @@ COPY_ORDER = [
     "invite_funnel_events",
 ]
 
+# SQLite stores booleans as 0/1; Postgres Boolean columns need real bools.
+_BOOL_COLUMNS: dict[str, frozenset[str]] = {
+    "users": frozenset({"is_active", "is_verified"}),
+    "sessions": frozenset({"human_review_flag"}),
+    "candidate_verifications": frozenset({"verified"}),
+    "identity_verification_attempts": frozenset(
+        {"verified", "low_identity_confidence"}
+    ),
+    "session_review_states": frozenset({"human_review_required"}),
+}
+
+
+def _coerce_row(table: str, row: dict) -> dict:
+    """Coerce SQLite 0/1 integers to Python bool for known Boolean columns."""
+    bool_cols = _BOOL_COLUMNS.get(table)
+    if not bool_cols:
+        return row
+    out = dict(row)
+    for col in bool_cols:
+        if col in out and isinstance(out[col], int) and not isinstance(out[col], bool):
+            out[col] = bool(out[col])
+    return out
+
 
 def _sync_url(url: str) -> str:
     if url.startswith("sqlite+aiosqlite"):
@@ -117,7 +140,7 @@ def main() -> int:
             )
             try:
                 for row in rows:
-                    dconn.execute(insert_sql, dict(row))
+                    dconn.execute(insert_sql, _coerce_row(table, dict(row)))
                 print(f"  {table}: copied {len(rows)} rows")
             except Exception as exc:
                 errors.append(f"{table}: {exc}")

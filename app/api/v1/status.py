@@ -26,6 +26,8 @@ async def api_status() -> dict:
         "database_backend": "postgres" if settings.is_postgres else "sqlite",
         "storage_backend": storage.backend,
         "s3_configured": settings.s3_enabled,
+        "email_configured": settings.email_configured,
+        "smtp_host": settings.SMTP_HOST if settings.email_configured else None,
         "proctoring_loaded": is_proctoring_available(),
         "total_sessions": session_count,
         "retention_days": {

@@ -24,6 +24,7 @@ from app.services.assessment_service import AssessmentService
 from app.services.interview_service import resolve_job_description
 from app.services.resume_parser import extract_text_from_document
 from app.utils.file_validation import validate_document_upload
+from app.utils.validation_errors import serializable_validation_errors
 
 router = APIRouter(prefix="/recruiter", tags=["Recruiter Assessment"])
 
@@ -40,7 +41,9 @@ def _parse_questions_form(questions_json: str | None) -> list[AssessmentQuestion
     try:
         return [AssessmentQuestion.model_validate(item) for item in payload]
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+        raise HTTPException(
+            status_code=422, detail=serializable_validation_errors(exc)
+        ) from exc
 
 
 @router.post(
@@ -85,7 +88,9 @@ async def generate_questions(
             question_types=parsed_types,
         )
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+        raise HTTPException(
+            status_code=422, detail=serializable_validation_errors(exc)
+        ) from exc
 
     result = AssessmentService.generate_questions_preview(data)
     return BaseResponse(
@@ -137,7 +142,9 @@ async def create_assessment(
             questions=custom_questions,
         )
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+        raise HTTPException(
+            status_code=422, detail=serializable_validation_errors(exc)
+        ) from exc
 
     service = AssessmentService(db)
     result = await service.create_assessment(current_user.id, data)

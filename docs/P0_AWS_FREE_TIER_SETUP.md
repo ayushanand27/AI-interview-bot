@@ -175,3 +175,28 @@ python scripts/migrate_sqlite_to_postgres.py \
 - Postgres pool hardening + docker-compose Postgres for EC2/dev if RDS not ready  
 
 **Phased features 1–5 stay intact** — none of the above requires wiping the live DB.
+
+---
+
+## Retention cleanup cron (EC2)
+
+`scripts/cleanup_retention.py` should run daily so artifacts / identity / recordings
+respect `ARTIFACT_RETENTION_DAYS`, `IDENTITY_RETENTION_DAYS`, and
+`RECORDING_RETENTION_DAYS` from `.env`.
+
+Dry-run once:
+
+```bash
+cd /var/www/ai-interview-bot
+source .venv/bin/activate
+python scripts/cleanup_retention.py
+```
+
+Install (ubuntu user crontab, 03:00 UTC):
+
+```cron
+0 3 * * * cd /var/www/ai-interview-bot && .venv/bin/python scripts/cleanup_retention.py --execute >> /var/www/ai-interview-bot/logs/retention_cleanup.log 2>&1
+```
+
+Ensure `logs/` exists (`mkdir -p /var/www/ai-interview-bot/logs`). Do not put secrets in the cron line — the script loads `.env` from the app root.
+

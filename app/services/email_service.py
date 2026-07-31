@@ -10,6 +10,25 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _log_console_fallback(kind: str, to_email: str, link: str | None = None) -> None:
+    """Log a usable recovery path in non-prod; avoid printing tokens in production."""
+    if settings.is_production:
+        logger.error(
+            "[EMAIL] %s not delivered to %s — SMTP missing or send failed. "
+            "Set SMTP_EMAIL + SMTP_PASSWORD (and SMTP_HOST/SMTP_PORT) in .env, "
+            "then restart PM2. Check /api/v1/status email_configured.",
+            kind,
+            to_email,
+        )
+        return
+    if link:
+        logger.warning("[EMAIL FALLBACK] %s for %s: %s", kind, to_email, link)
+        print(f"\n[EMAIL] {kind} for {to_email}:")
+        print(f"[EMAIL] {link}\n")
+    else:
+        logger.warning("[EMAIL FALLBACK] %s for %s (see subject/body in logs)", kind, to_email)
+
+
 def _send_email(to_email: str, subject: str, html_body: str) -> bool:
     return _send_email_with_attachment(
         to_email,
@@ -28,10 +47,11 @@ def _send_email_with_attachment(
     attachment_bytes: bytes | None,
     attachment_filename: str | None,
 ) -> bool:
-    if not settings.SMTP_EMAIL or not settings.SMTP_PASSWORD:
-        logger.warning("[EMAIL FALLBACK] SMTP not configured.")
-        logger.warning(f"[EMAIL FALLBACK] To: {to_email}")
-        logger.warning(f"[EMAIL FALLBACK] Subject: {subject}")
+    if not settings.email_configured:
+        logger.warning(
+            "[EMAIL FALLBACK] SMTP not configured (SMTP_EMAIL / SMTP_PASSWORD empty)."
+        )
+        logger.warning(f"[EMAIL FALLBACK] To: {to_email} | Subject: {subject}")
         return False
 
     try:
@@ -53,7 +73,7 @@ def _send_email_with_attachment(
 
         context = ssl.create_default_context()
 
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30) as server:
             server.ehlo()
             server.starttls(context=context)
             server.ehlo()
@@ -76,21 +96,16 @@ def _send_email_with_attachment(
         logger.error("[EMAIL] Check: 2) 2FA enabled on Gmail account")
         logger.error("[EMAIL] Check: 3) No spaces in SMTP_PASSWORD in .env")
         logger.warning(f"[EMAIL FALLBACK] To: {to_email} | Subject: {subject}")
-        logger.warning(f"[EMAIL FALLBACK] Body preview: {html_body[:500]}")
         return False
 
     except Exception as e:
         logger.error(f"[EMAIL] Failed to send: {e}")
         logger.warning(f"[EMAIL FALLBACK] To: {to_email} | Subject: {subject}")
-        logger.warning(f"[EMAIL FALLBACK] Body preview: {html_body[:500]}")
         return False
 
 
 def send_verification_email(to_email: str, name: str, token: str) -> str:
     link = f"{settings.effective_frontend_url}/verify-email?token={token}"
-
-    print(f"\n[EMAIL] Verification link for {to_email}:")
-    print(f"[EMAIL] {link}\n")
 
     subject = f"Verify your {settings.APP_NAME} account"
     html = f"""
@@ -111,16 +126,15 @@ def send_verification_email(to_email: str, name: str, token: str) -> str:
         </p>
     </div>
     """
-    _send_email(to_email, subject, html)
+    sent = _send_email(to_email, subject, html)
+    if not sent:
+        _log_console_fallback("Verification link", to_email, link)
     return link
 
 
 def send_invite_welcome_password_email(to_email: str, name: str, token: str) -> bool:
     """Send invite candidates a link to set their password after auto-registration."""
     link = f"{settings.effective_frontend_url}/reset-password?token={token}"
-
-    print(f"\n[EMAIL] Invite welcome / set-password link for {to_email}:")
-    print(f"[EMAIL] {link}\n")
 
     subject = "Your interview account is ready — set your password"
     html = f"""
@@ -144,14 +158,14 @@ def send_invite_welcome_password_email(to_email: str, name: str, token: str) -> 
         </p>
     </div>
     """
-    return _send_email(to_email, subject, html)
+    sent = _send_email(to_email, subject, html)
+    if not sent:
+        _log_console_fallback("Invite set-password link", to_email, link)
+    return sent
 
 
 def send_password_reset_email(to_email: str, name: str, token: str) -> str:
     link = f"{settings.effective_frontend_url}/reset-password?token={token}"
-
-    print(f"\n[EMAIL] Password reset link for {to_email}:")
-    print(f"[EMAIL] {link}\n")
 
     subject = f"Reset your {settings.APP_NAME} password"
     html = f"""
@@ -174,9 +188,11 @@ def send_password_reset_email(to_email: str, name: str, token: str) -> str:
     """
     sent = _send_email(to_email, subject, html)
     if not sent:
-        logger.warning(
-            "[EMAIL] Password reset SMTP send failed — use console/UI link in local dev."
-        )
+        _log_console_fallback("Password reset link", to_email, link)
+        if not settings.is_production:
+            logger.warning(
+                "[EMAIL] Password reset SMTP send failed — use console/UI link in local dev."
+            )
     return link
 
 
@@ -222,12 +238,13 @@ def send_interview_report_email(
     </div>
     """
 
-    print(f"\n[EMAIL] Interview report for {to_email} ({role_title})\n")
-
-    return _send_email_with_attachment(
+    sent = _send_email_with_attachment(
         to_email,
         subject,
         html,
         attachment_bytes=pdf_bytes,
         attachment_filename=pdf_filename,
     )
+    if not sent:
+        _log_console_fallback(f"Interview report ({role_title})", to_email, link=None)
+    return sent
