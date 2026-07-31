@@ -54,10 +54,12 @@ class Settings(BaseSettings):
     ADAPTIVE_QUALITY_LOW: float = 55.0
     ADAPTIVE_QUALITY_HIGH: float = 80.0
 
-    # ── Coding sandbox (Judge0 CE via RapidAPI) ───────────
+    # ── Coding sandbox (SandboxAPI via RapidAPI free) ─────
     CODING_QUESTIONS_ENABLED: bool = True
-    JUDGE0_RAPIDAPI_KEY: str = ""
-    JUDGE0_RAPIDAPI_HOST: str = "judge0-ce.p.rapidapi.com"
+    CODING_RAPIDAPI_KEY: str = ""  # preferred
+    JUDGE0_RAPIDAPI_KEY: str = ""  # legacy alias (same RapidAPI key works)
+    CODING_JUDGE_HOST: str = "sandboxapi.p.rapidapi.com"
+    JUDGE0_RAPIDAPI_HOST: str = "sandboxapi.p.rapidapi.com"
     MAX_CODING_SOURCE_LENGTH: int = 100_000
 
     # ── File Upload ───────────────────────────────────────
@@ -152,11 +154,9 @@ class Settings(BaseSettings):
 
     @property
     def coding_judge_configured(self) -> bool:
-        """True when coding questions are enabled and a Judge0 RapidAPI key is set."""
-        return bool(
-            self.CODING_QUESTIONS_ENABLED
-            and self.JUDGE0_RAPIDAPI_KEY.strip()
-        )
+        """True when coding questions are enabled and a RapidAPI key is set."""
+        key = self.CODING_RAPIDAPI_KEY.strip() or self.JUDGE0_RAPIDAPI_KEY.strip()
+        return bool(self.CODING_QUESTIONS_ENABLED and key)
 
     @property
     def effective_frontend_url(self) -> str:

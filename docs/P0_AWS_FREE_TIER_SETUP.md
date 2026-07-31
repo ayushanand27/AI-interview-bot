@@ -202,21 +202,23 @@ Ensure `logs/` exists (`mkdir -p /var/www/ai-interview-bot/logs`). Do not put se
 
 ---
 
-## Coding sandbox (Judge0 RapidAPI free)
+## Coding sandbox (SandboxAPI RapidAPI free)
 
-Demo / pitch coding rounds use **Judge0 CE** via RapidAPI free (~500 runs/day, 1 concurrent). Candidate code never runs on the interview EC2.
+Demo / pitch coding rounds use **SandboxAPI Basic (Free)** via RapidAPI
+(~500 executions/month). Candidate code never runs on the interview EC2.
+Perl can appear in the UI but is **not executable** on this free plan.
 
-1. Create a free RapidAPI account and subscribe to [Judge0 CE](https://rapidapi.com/judge0-official/api/judge0-ce) (Basic $0).
-2. Copy your `X-RapidAPI-Key` into EC2 `.env`:
+1. Subscribe free to [SandboxAPI](https://rapidapi.com/sandboxapidev/api/sandboxapi) (Basic $0).
+2. Copy `X-RapidAPI-Key` into EC2 `.env`:
 
 ```bash
 CODING_QUESTIONS_ENABLED=true
-JUDGE0_RAPIDAPI_KEY=your-rapidapi-key
-JUDGE0_RAPIDAPI_HOST=judge0-ce.p.rapidapi.com
+CODING_RAPIDAPI_KEY=your-rapidapi-key
+CODING_JUDGE_HOST=sandboxapi.p.rapidapi.com
 ```
 
 3. Restart PM2. Confirm `/api/v1/status` shows `"coding_judge_configured": true`.
-4. In recruiter UI, add a **Coding** question (or include `coding` in generate types). Candidate invite flow shows Monaco + Run public tests + Submit.
+4. Recruiter → add **Coding** (C/C++/Python/Java/JS). Candidate gets Monaco + Run public + Submit.
 
-Supported languages: C, C++, Python, Perl, Java, JavaScript. Hidden tests grade on final submit; public tests are candidate-visible only.
+Supported executable languages: C, C++, Python, Java, JavaScript.
 

@@ -1,4 +1,4 @@
-"""Unit tests for coding judge helpers (mocked HTTP)."""
+"""Unit tests for coding judge helpers (mocked HTTP — SandboxAPI)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from app.services.coding_judge import (
     CodingJudgeError,
     RunSummary,
     CaseResult,
+    sandboxapi_language_id,
 )
 
 
@@ -22,6 +23,11 @@ def test_normalize_coding_language_aliases():
     assert normalize_coding_language("c++") == "cpp"
     assert normalize_coding_language("js") == "javascript"
     assert normalize_coding_language("fortran") is None
+
+
+def test_perl_not_executable():
+    with pytest.raises(CodingJudgeError):
+        sandboxapi_language_id("perl")
 
 
 def test_judgment_from_run_summary_scores():
@@ -61,11 +67,12 @@ def test_run_test_cases_compares_stdout(mock_client_cls, _configured):
     response = MagicMock()
     response.status_code = 200
     response.json.return_value = {
-        "status": {"id": 3, "description": "Accepted"},
+        "status": "completed",
         "stdout": "6\n",
-        "stderr": None,
-        "time": "0.01",
-        "memory": 1024,
+        "stderr": "",
+        "exit_code": 0,
+        "execution_time_ms": 12,
+        "memory_used_kb": 1024,
     }
     client.post.return_value = response
 

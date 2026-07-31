@@ -32,7 +32,7 @@ const CODING_LANGUAGE_OPTIONS: { value: string; label: string }[] = [
   { value: "java", label: "Java" },
   { value: "cpp", label: "C++" },
   { value: "c", label: "C" },
-  { value: "perl", label: "Perl" },
+  { value: "perl", label: "Perl (view-only — not runnable)" },
 ];
 
 const DEFAULT_STARTERS: Record<string, string> = {

@@ -1,6 +1,7 @@
-"""Judge0 CE (RapidAPI) client for sandboxed coding test execution.
+"""SandboxAPI (RapidAPI free) client for sandboxed coding test execution.
 
-Never executes candidate code on the interview host — all runs go through Judge0.
+Never executes candidate code on the interview host.
+Perl is accepted in question metadata but is not executable on the free SandboxAPI plan.
 """
 
 from __future__ import annotations
@@ -16,20 +17,20 @@ from app.core.config import settings
 
 logger = logging.getLogger("app.services.coding_judge")
 
-# Judge0 CE language IDs (https://ce.judge0.com)
-CODING_LANGUAGES: dict[str, int] = {
-    "c": 50,
-    "cpp": 54,
-    "c++": 54,
-    "java": 62,
-    "javascript": 63,
-    "js": 63,
-    "python": 71,
-    "python3": 71,
-    "perl": 85,
-}
-
+# Languages shown in recruiter/candidate UI
 SUPPORTED_CODING_LANGUAGES = ("c", "cpp", "python", "perl", "java", "javascript")
+
+# Languages SandboxAPI free tier can actually run
+EXECUTABLE_CODING_LANGUAGES = ("c", "cpp", "python", "java", "javascript")
+
+# SandboxAPI language ids
+SANDBOXAPI_LANGUAGE_IDS: dict[str, str] = {
+    "c": "c",
+    "cpp": "cpp",
+    "python": "python3",
+    "java": "java",
+    "javascript": "javascript",
+}
 
 LANGUAGE_EXTENSIONS: dict[str, str] = {
     "c": "c",
@@ -69,7 +70,8 @@ LANGUAGE_STARTERS: dict[str, str] = {
         "#!/usr/bin/perl\n"
         "use strict;\n"
         "use warnings;\n\n"
-        "# Read from STDIN, write to STDOUT\n"
+        "# Perl is not executable on the current free judge.\n"
+        "# Prefer Python / Java / JavaScript / C / C++ for demos.\n"
     ),
     "java": (
         "import java.util.*;\n\n"
@@ -90,7 +92,7 @@ LANGUAGE_STARTERS: dict[str, str] = {
 
 
 class CodingJudgeError(Exception):
-    """Raised when Judge0 is unavailable or rejects a submission."""
+    """Raised when the remote judge is unavailable or rejects a submission."""
 
     def __init__(self, message: str, *, retryable: bool = True) -> None:
         super().__init__(message)
@@ -141,67 +143,81 @@ def normalize_coding_language(raw: str | None) -> str | None:
     return None
 
 
-def judge0_language_id(language: str) -> int:
+def sandboxapi_language_id(language: str) -> str:
     normalized = normalize_coding_language(language)
     if not normalized:
         raise CodingJudgeError(f"Unsupported language: {language}", retryable=False)
-    return CODING_LANGUAGES[normalized]
+    if normalized not in EXECUTABLE_CODING_LANGUAGES:
+        raise CodingJudgeError(
+            f"{normalized} is not executable on the free SandboxAPI judge. "
+            "Use C, C++, Python, Java, or JavaScript.",
+            retryable=False,
+        )
+    return SANDBOXAPI_LANGUAGE_IDS[normalized]
 
 
 def _normalize_stdout(value: str | None) -> str:
     text = value or ""
-    # Judge0 often appends a trailing newline; compare line-trimmed.
     lines = [line.rstrip() for line in text.replace("\r\n", "\n").split("\n")]
     while lines and lines[-1] == "":
         lines.pop()
     return "\n".join(lines)
 
 
-def coding_judge_configured() -> bool:
-    return bool(
-        settings.CODING_QUESTIONS_ENABLED
-        and settings.JUDGE0_RAPIDAPI_KEY.strip()
+def _rapidapi_key() -> str:
+    return (
+        settings.CODING_RAPIDAPI_KEY.strip()
+        or settings.JUDGE0_RAPIDAPI_KEY.strip()
     )
 
 
+def coding_judge_configured() -> bool:
+    return bool(settings.CODING_QUESTIONS_ENABLED and _rapidapi_key())
+
+
 def _headers() -> dict[str, str]:
+    host = (
+        settings.CODING_JUDGE_HOST.strip()
+        or settings.JUDGE0_RAPIDAPI_HOST.strip()
+        or "sandboxapi.p.rapidapi.com"
+    )
     return {
         "Content-Type": "application/json",
-        "X-RapidAPI-Key": settings.JUDGE0_RAPIDAPI_KEY.strip(),
-        "X-RapidAPI-Host": settings.JUDGE0_RAPIDAPI_HOST.strip(),
+        "X-RapidAPI-Key": _rapidapi_key(),
+        "X-RapidAPI-Host": host,
     }
 
 
 def _base_url() -> str:
-    host = settings.JUDGE0_RAPIDAPI_HOST.strip() or "judge0-ce.p.rapidapi.com"
+    host = (
+        settings.CODING_JUDGE_HOST.strip()
+        or settings.JUDGE0_RAPIDAPI_HOST.strip()
+        or "sandboxapi.p.rapidapi.com"
+    )
     return f"https://{host}"
 
 
-def _create_submission(
+def _execute_once(
     client: httpx.Client,
     *,
     source: str,
-    language_id: int,
+    language_id: str,
     stdin: str,
-    cpu_time_limit: float,
-    memory_limit_kb: int,
+    timeout_sec: int,
 ) -> dict[str, Any]:
     payload = {
-        "source_code": source,
-        "language_id": language_id,
+        "language": language_id,
+        "code": source,
         "stdin": stdin if stdin is not None else "",
-        "cpu_time_limit": cpu_time_limit,
-        "wall_time_limit": max(cpu_time_limit * 2, 5.0),
-        "memory_limit": memory_limit_kb,
+        "timeout": timeout_sec,
     }
-    url = f"{_base_url()}/submissions"
+    url = f"{_base_url()}/v1/execute"
     try:
         response = client.post(
             url,
-            params={"base64_encoded": "false", "wait": "true"},
             headers=_headers(),
             json=payload,
-            timeout=max(30.0, cpu_time_limit + 25.0),
+            timeout=max(35.0, float(timeout_sec) + 20.0),
         )
     except httpx.TimeoutException as exc:
         raise CodingJudgeError(
@@ -214,14 +230,18 @@ def _create_submission(
 
     if response.status_code == 429:
         raise CodingJudgeError(
-            "Judge temporarily unavailable — daily or concurrency limit reached. Try again shortly."
+            "Judge temporarily unavailable — free monthly quota reached. Try again later."
+        )
+    if response.status_code == 401 or response.status_code == 403:
+        logger.warning("SandboxAPI auth error %s: %s", response.status_code, response.text[:200])
+        raise CodingJudgeError(
+            "Judge auth failed — subscribe to SandboxAPI Basic (Free) on RapidAPI and check the key.",
+            retryable=False,
         )
     if response.status_code >= 400:
         detail = response.text[:300]
-        logger.warning("Judge0 error %s: %s", response.status_code, detail)
-        raise CodingJudgeError(
-            "Judge temporarily unavailable — try again."
-        )
+        logger.warning("SandboxAPI error %s: %s", response.status_code, detail)
+        raise CodingJudgeError("Judge temporarily unavailable — try again.")
 
     data = response.json()
     if not isinstance(data, dict):
@@ -237,10 +257,12 @@ def run_test_cases(
     time_limit_ms: int | None = None,
     memory_limit_mb: int | None = None,
 ) -> RunSummary:
-    """Execute source against stdin/expected_stdout pairs via Judge0."""
+    """Execute source against stdin/expected_stdout pairs via SandboxAPI."""
+    del memory_limit_mb  # SandboxAPI free plan uses its own memory caps
     if not coding_judge_configured():
         raise CodingJudgeError(
-            "Coding judge is not configured. Set JUDGE0_RAPIDAPI_KEY and CODING_QUESTIONS_ENABLED.",
+            "Coding judge is not configured. Set CODING_RAPIDAPI_KEY (or JUDGE0_RAPIDAPI_KEY) "
+            "and CODING_QUESTIONS_ENABLED.",
             retryable=False,
         )
     if not source or not str(source).strip():
@@ -248,9 +270,8 @@ def run_test_cases(
     if not tests:
         return RunSummary(passed=0, total=0, error="No test cases provided.")
 
-    language_id = judge0_language_id(language)
-    cpu_time = max(0.5, min((time_limit_ms or 2000) / 1000.0, 5.0))
-    memory_kb = max(16_000, min((memory_limit_mb or 128) * 1000, 256_000))
+    language_id = sandboxapi_language_id(language)
+    timeout_sec = max(1, min(int((time_limit_ms or 2000) / 1000) or 2, 30))
 
     summary = RunSummary(total=len(tests))
     with httpx.Client() as client:
@@ -262,49 +283,51 @@ def run_test_cases(
             )
             case = CaseResult(stdin=stdin, expected_stdout=expected)
             try:
-                result = _create_submission(
+                result = _execute_once(
                     client,
                     source=source,
                     language_id=language_id,
                     stdin=stdin,
-                    cpu_time_limit=cpu_time,
-                    memory_limit_kb=memory_kb,
+                    timeout_sec=timeout_sec,
                 )
             except CodingJudgeError as exc:
                 case.status = "judge_error"
                 case.stderr = str(exc)
                 summary.cases.append(case)
                 summary.error = str(exc)
-                # Stop early on judge outage so demos fail fast.
                 break
 
-            status_obj = result.get("status") or {}
-            status_desc = (
-                status_obj.get("description")
-                if isinstance(status_obj, dict)
-                else str(status_obj or "")
-            )
+            status = str(result.get("status") or "")
             actual = _normalize_stdout(result.get("stdout"))
             expected_norm = _normalize_stdout(expected)
+            # Some SandboxAPI plans also set expected_output comparison server-side
+            if result.get("expected_output") is not None and status == "wrong_answer":
+                actual = _normalize_stdout(result.get("stdout"))
+
             case.actual_stdout = actual
-            case.status = str(status_desc or "")
+            case.status = status or ("Accepted" if actual == expected_norm else "Wrong Answer")
             case.stderr = str(result.get("stderr") or result.get("compile_output") or "")[:500]
-            case.time = str(result.get("time")) if result.get("time") is not None else None
+            if result.get("execution_time_ms") is not None:
+                case.time = str(result.get("execution_time_ms"))
             try:
-                case.memory = int(result["memory"]) if result.get("memory") is not None else None
+                case.memory = (
+                    int(result["memory_used_kb"])
+                    if result.get("memory_used_kb") is not None
+                    else None
+                )
             except (TypeError, ValueError):
                 case.memory = None
 
-            status_id = status_obj.get("id") if isinstance(status_obj, dict) else None
-            # 3 = Accepted
-            if status_id == 3 and actual == expected_norm:
+            exit_code = result.get("exit_code")
+            ok_status = status in ("", "completed", "Accepted", "accepted")
+            if ok_status and (exit_code in (None, 0)) and actual == expected_norm:
                 case.passed = True
+                case.status = "Accepted"
                 summary.passed += 1
-            elif status_id == 3 and actual != expected_norm:
+            elif actual != expected_norm and ok_status and exit_code in (None, 0):
                 case.status = "Wrong Answer"
             summary.cases.append(case)
-            # Small pause to respect free-tier concurrency=1
-            time.sleep(0.15)
+            time.sleep(0.1)
 
     return summary
 
