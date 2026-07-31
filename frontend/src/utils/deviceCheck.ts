@@ -1,4 +1,4 @@
-/** Detect phones/tablets — enterprise proctoring platforms require desktop. */
+/** Detect phones/tablets — proctored interviews require desktop. */
 
 export function isMobileDevice(): boolean {
   if (typeof navigator === "undefined") return false;

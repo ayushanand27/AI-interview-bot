@@ -7,7 +7,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -131,7 +131,7 @@ class InviteService:
         result = await self.db.execute(
             select(CandidateVerification).where(
                 CandidateVerification.token == token,
-                CandidateVerification.email == str(email),
+                func.lower(CandidateVerification.email) == email.strip().lower(),
             )
         )
         verification = result.scalar_one_or_none()
@@ -139,7 +139,7 @@ class InviteService:
             return None
 
         user_result = await self.db.execute(
-            select(User).where(User.email == email)
+            select(User).where(func.lower(User.email) == email.strip().lower())
         )
         user = user_result.scalar_one_or_none()
         if user is None:
@@ -242,17 +242,28 @@ class InviteService:
         if existing_registration is not None:
             return existing_registration
 
+        email_lower = str(data.email).strip().lower()
         existing_user = await self.db.execute(
-            select(User).where(User.email == data.email)
+            select(User).where(func.lower(User.email) == email_lower)
         )
         if existing_user.scalar_one_or_none() is not None:
             raise ConflictException(
                 "An account with this email already exists. Log in below to continue this interview."
             )
 
-        password = secrets.token_urlsafe(16)
-        reset_token = str(uuid4())
-        reset_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
+        chosen_password = (data.password or "").strip()
+        if chosen_password:
+            if len(chosen_password) < 8:
+                raise BadRequestException("Password must be at least 8 characters.")
+            password = chosen_password
+            reset_token = None
+            reset_expiry = None
+        else:
+            # Backward compat for older clients without a password field.
+            password = secrets.token_urlsafe(16)
+            reset_token = str(uuid4())
+            reset_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
+
         user = User(
             full_name=data.name.strip(),
             email=data.email,
@@ -274,11 +285,12 @@ class InviteService:
             email=str(data.email),
             phone=data.phone,
         )
-        send_invite_welcome_password_email(
-            str(data.email),
-            data.name.strip(),
-            reset_token,
-        )
+        if reset_token is not None:
+            send_invite_welcome_password_email(
+                str(data.email),
+                data.name.strip(),
+                reset_token,
+            )
         return response
 
     async def login_candidate(
@@ -291,10 +303,15 @@ class InviteService:
 
         assert invite is not None
 
-        result = await self.db.execute(select(User).where(User.email == data.email))
+        result = await self.db.execute(
+            select(User).where(func.lower(User.email) == str(data.email).strip().lower())
+        )
         user = result.scalar_one_or_none()
         if user is None or not verify_password(data.password, user.hashed_password):
-            raise UnauthorizedException("Invalid email or password")
+            raise UnauthorizedException(
+                "Invalid email or password. If you just registered, use the password you set — "
+                "or tap Forgot password to reset it."
+            )
 
         if not user.is_active:
             raise UnauthorizedException("Your account has been deactivated")

@@ -26,6 +26,7 @@ class InviteRegisterRequest(BaseModel):
     name: str = Field(..., min_length=1)
     email: EmailStr
     phone: str = Field(default="")
+    password: Optional[str] = Field(default=None, min_length=8)
 
 
 class InviteRegisterResponse(BaseModel):

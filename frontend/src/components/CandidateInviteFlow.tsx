@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  authApi,
   interviewApi,
   inviteApi,
   setAccessToken,
@@ -218,19 +219,37 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
     const name = String(form.get("name") || "").trim();
     const email = String(form.get("email") || "").trim();
     const phone = String(form.get("phone") || "").trim();
+    const password = String(form.get("password") || "");
+    const confirmPassword = String(form.get("confirmPassword") || "");
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
     setInfo(null);
     try {
-      const res = await inviteApi.registerWithStatus(token, { name, email, phone });
+      const res = await inviteApi.registerWithStatus(token, {
+        name,
+        email,
+        phone,
+        password,
+      });
       setCandidateEmail(email);
       await attachToInterview(res);
     } catch (err) {
       if (err instanceof InviteFlowError && err.status === 409) {
         setPrefilledEmail(email);
         setDetailsMode("login");
-        setInfo("Account exists — log in to continue.");
+        setInfo(
+          "An account with this email already exists. Log in with your password to continue.",
+        );
         setError(null);
       } else {
         setError(err instanceof Error ? err.message : "Registration failed");
@@ -255,7 +274,37 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
       setCandidateEmail(email);
       await attachToInterview(res);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Login failed. Check your email and password, or use Forgot password.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    const emailInput = document.getElementById(
+      "invite-login-email",
+    ) as HTMLInputElement | null;
+    const email = (emailInput?.value || prefilledEmail || "").trim();
+    if (!email) {
+      setError("Enter your email above, then tap Forgot password.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setInfo(null);
+    try {
+      await authApi.forgotPassword(email);
+      setInfo(
+        "If an account exists for that email, a password reset link has been sent. Check your inbox and spam folder.",
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not send password reset email.",
+      );
     } finally {
       setLoading(false);
     }
@@ -528,7 +577,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
             <form onSubmit={handleRegister} className="invite-details-form">
               <div className="field">
                 <label htmlFor="invite-name">Full Name</label>
-                <input id="invite-name" name="name" required />
+                <input id="invite-name" name="name" required autoComplete="name" />
               </div>
               <div className="field">
                 <label htmlFor="invite-email">Email</label>
@@ -537,12 +586,35 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
                   name="email"
                   type="email"
                   required
+                  autoComplete="email"
                   defaultValue={prefilledEmail}
                 />
               </div>
               <div className="field">
                 <label htmlFor="invite-phone">Phone Number</label>
                 <input id="invite-phone" name="phone" type="tel" required />
+              </div>
+              <div className="field">
+                <label htmlFor="invite-password">Password</label>
+                <input
+                  id="invite-password"
+                  name="password"
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="invite-confirm-password">Confirm password</label>
+                <input
+                  id="invite-confirm-password"
+                  name="confirmPassword"
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                />
               </div>
               <button type="submit" className="primary" disabled={loading}>
                 {loading ? "Please wait…" : "Continue"}
@@ -557,6 +629,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
                   name="email"
                   type="email"
                   required
+                  autoComplete="email"
                   defaultValue={prefilledEmail}
                   key={prefilledEmail || "login-email"}
                 />
@@ -578,6 +651,16 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
               <button type="submit" className="primary" disabled={loading}>
                 {loading ? "Please wait…" : "Continue"}
               </button>
+              <p className="invite-meta" style={{ marginTop: "0.75rem" }}>
+                <button
+                  type="button"
+                  className="link-button"
+                  disabled={loading}
+                  onClick={() => void handleForgotPassword()}
+                >
+                  Forgot password?
+                </button>
+              </p>
             </form>
           )}
           <p className="invite-meta" style={{ marginTop: "1rem" }}>

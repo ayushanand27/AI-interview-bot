@@ -877,6 +877,26 @@
   width: 100%;
 }
 
+.recruiter-portal .rp-coding-prompt-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--rp-text, #e2e8f0);
+}
+
+.recruiter-portal .rp-coding-prompt {
+  width: 100%;
+  min-height: 14rem;
+  resize: vertical;
+  font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
 .recruiter-portal .rp-coding-editor {
   margin-top: 0.75rem;
   display: flex;

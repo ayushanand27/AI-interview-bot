@@ -1248,7 +1248,7 @@ export const inviteApi = {
 
     token: string,
 
-    payload: { name: string; email: string; phone: string },
+    payload: { name: string; email: string; phone: string; password: string },
 
   ) {
 
@@ -1318,7 +1318,7 @@ export const inviteApi = {
 
     token: string,
 
-    payload: { name: string; email: string; phone: string },
+    payload: { name: string; email: string; phone: string; password: string },
 
   ): Promise<ApiEnvelope<InviteRegisterResponse>> {
 

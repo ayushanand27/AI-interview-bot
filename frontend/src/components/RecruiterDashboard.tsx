@@ -1198,15 +1198,31 @@ export default function RecruiterDashboard({
                           Remove
                         </button>
                       </div>
-                      <textarea
-                        value={q.text}
-                        onChange={(e) =>
-                          updateQuestion(i, { text: e.target.value })
-                        }
-                        rows={3}
-                        disabled={assessmentLoading}
-                        placeholder="Question text"
-                      />
+                      {q.type === "coding" ? (
+                        <label className="rp-coding-prompt-label">
+                          Problem statement
+                          <textarea
+                            className="rp-coding-prompt"
+                            value={q.text}
+                            onChange={(e) =>
+                              updateQuestion(i, { text: e.target.value })
+                            }
+                            rows={14}
+                            disabled={assessmentLoading}
+                            placeholder="Describe the coding problem clearly: input/output format, constraints, and examples…"
+                          />
+                        </label>
+                      ) : (
+                        <textarea
+                          value={q.text}
+                          onChange={(e) =>
+                            updateQuestion(i, { text: e.target.value })
+                          }
+                          rows={3}
+                          disabled={assessmentLoading}
+                          placeholder="Question text"
+                        />
+                      )}
                       {(q.type === "mcq" || q.type === "msq") && (
                         <div className="rp-options-editor">
                           <p className="rp-muted-small">
@@ -1529,7 +1545,7 @@ export default function RecruiterDashboard({
                 )}
                 <div className="rp-send-invites" style={{ marginTop: "1rem" }}>
                   <p className="rp-invite-hint">
-                    Email invite to candidates / institutions (industry-standard)
+                    Email invite to candidates
                   </p>
                   <label className="rp-muted-small">
                     Emails (comma or new line)
