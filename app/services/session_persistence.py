@@ -6,7 +6,6 @@ Keeps the same function signatures used by `SessionStore` so callers stay unchan
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures
 import json
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -31,8 +30,6 @@ from app.models.session import InterviewSession
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SESSIONS_DIR = PROJECT_ROOT / "data" / "sessions"
-
-_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
 
 def _utc_now() -> datetime:
@@ -110,12 +107,11 @@ def _load_session_sync(session_id: UUID) -> Optional[InterviewSession]:
 
 
 def _run_async(coro):
-    """Run an async coroutine from sync code when no event loop is active.
+    """Legacy helper — do not use under FastAPI + Postgres.
 
-    Under Postgres/asyncpg, NEVER call ``asyncio.run()`` while FastAPI's loop is
-    already running — that binds pooled connections to another loop and breaks
-    subsequent requests (``Future attached to a different loop``). Sync callers
-    must use ``_get_sync_session_local()`` instead.
+    Sync persistence must call ``_get_sync_session_local()`` (psycopg2). Nested
+    ``asyncio.run()`` while the app loop is running poisons the asyncpg pool
+    (``Future attached to a different loop``).
     """
     try:
         asyncio.get_running_loop()
@@ -126,15 +122,12 @@ def _run_async(coro):
     if not has_running_loop:
         return asyncio.run(coro)
 
-    if settings.is_postgres:
-        coro.close()
-        raise RuntimeError(
-            "asyncpg cannot nest via asyncio.run while the app loop is running; "
-            "use _get_sync_session_local() for sync persistence helpers"
-        )
-
-    # aiosqlite is more forgiving across loops (legacy SQLite path).
-    return _executor.submit(asyncio.run, coro).result()
+    # Always refuse nesting — even on SQLite — so we never reintroduce loop poisoning.
+    coro.close()
+    raise RuntimeError(
+        "Cannot nest asyncio.run while an event loop is running; "
+        "use _get_sync_session_local() for sync persistence helpers"
+    )
 
 
 def ensure_sessions_dir() -> Path:

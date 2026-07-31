@@ -31,7 +31,9 @@ def _sync_database_url() -> str:
     if url.startswith("sqlite+aiosqlite"):
         return url.replace("sqlite+aiosqlite", "sqlite", 1)
     if url.startswith("postgresql+asyncpg"):
-        return url.replace("postgresql+asyncpg", "postgresql", 1)
+        return url.replace("postgresql+asyncpg", "postgresql+psycopg2", 1)
+    if url.startswith("postgresql://") and "+psycopg" not in url:
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
     return url
 
 

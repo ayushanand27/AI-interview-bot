@@ -140,6 +140,11 @@ class Settings(BaseSettings):
         )
 
     @property
+    def email_configured(self) -> bool:
+        """True when SMTP credentials are present (delivery still may fail at send time)."""
+        return bool(self.SMTP_EMAIL.strip() and self.SMTP_PASSWORD.strip())
+
+    @property
     def effective_frontend_url(self) -> str:
         """Frontend base URL for email links — loopback in local dev."""
         url = self.FRONTEND_URL.rstrip("/")
