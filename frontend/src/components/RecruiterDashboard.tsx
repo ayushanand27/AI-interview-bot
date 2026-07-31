@@ -857,12 +857,18 @@ export default function RecruiterDashboard({
 
   async function handleDeleteAssessment(token: string, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!window.confirm("Delete this unused assessment invite?")) return;
+    if (
+      !window.confirm(
+        "Delete this assessment? Candidates will no longer be able to use the invite link. Existing interview results stay in your sessions list.",
+      )
+    )
+      return;
     setDeletingToken(token);
     onError(null);
     try {
       await recruiterApi.deleteAssessment(token);
       setAssessments((prev) => prev.filter((a) => a.token !== token));
+      loadAnalytics(buildFilters());
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to delete assessment");
     } finally {
@@ -1649,14 +1655,8 @@ export default function RecruiterDashboard({
                             <button
                               type="button"
                               className="rp-secondary rp-btn-compact"
-                              disabled={
-                                deletingToken === a.token || a.used_count > 0
-                              }
-                              title={
-                                a.used_count > 0
-                                  ? "Cannot delete after a candidate has started"
-                                  : "Delete unused invite"
-                              }
+                              disabled={deletingToken === a.token}
+                              title="Delete assessment"
                               onClick={(e) =>
                                 void handleDeleteAssessment(a.token, e)
                               }

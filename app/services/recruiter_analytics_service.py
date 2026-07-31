@@ -121,12 +121,16 @@ class RecruiterAnalyticsService:
     async def _owned_invites(self, recruiter_id: int) -> list[InterviewInvite]:
         result = await self.db.execute(
             select(InterviewInvite)
-            .where(InterviewInvite.recruiter_id == recruiter_id)
+            .where(
+                InterviewInvite.recruiter_id == recruiter_id,
+                InterviewInvite.deleted_at.is_(None),
+            )
             .order_by(InterviewInvite.created_at.desc())
         )
         return list(result.scalars().all())
 
     async def _owned_sessions(self, recruiter_id: int) -> list[DBSession]:
+        # Include soft-deleted invites so past sessions remain visible after delete.
         owned_tokens = select(InterviewInvite.token).where(
             InterviewInvite.recruiter_id == recruiter_id
         )

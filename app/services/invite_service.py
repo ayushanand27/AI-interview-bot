@@ -92,6 +92,9 @@ class InviteService:
         if invite is None:
             return InviteInvalidResponse(reason="This invite link is invalid.")
 
+        if getattr(invite, "deleted_at", None) is not None:
+            return InviteInvalidResponse(reason="This invite link is no longer available.")
+
         now = datetime.now(timezone.utc)
         expiry = invite.expiry_at
         if expiry.tzinfo is None:

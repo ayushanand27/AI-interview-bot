@@ -199,7 +199,7 @@ async def list_assessments(
 @router.delete(
     "/assessments/{token}",
     response_model=BaseResponse[None],
-    summary="Delete an unused assessment invite",
+    summary="Delete an assessment invite (soft-delete)",
 )
 async def delete_assessment(
     token: str,

@@ -630,24 +630,31 @@ class AssessmentService:
     async def list_assessments(self, recruiter_id: int) -> list[AssessmentSummary]:
         result = await self.db.execute(
             select(InterviewInvite)
-            .where(InterviewInvite.recruiter_id == recruiter_id)
+            .where(
+                InterviewInvite.recruiter_id == recruiter_id,
+                InterviewInvite.deleted_at.is_(None),
+            )
             .order_by(InterviewInvite.created_at.desc())
         )
         now = datetime.now(timezone.utc)
         return [_summary_from_invite(row, now) for row in result.scalars().all()]
 
     async def delete_assessment(self, recruiter_id: int, token: str) -> None:
+        """Soft-delete an assessment owned by the recruiter.
+
+        Soft-delete avoids FK failures from invite_funnel_events /
+        candidate_verifications / identity_verification_attempts, and keeps the
+        invite row so recruiter session ownership (via invite_token) still works.
+        """
         result = await self.db.execute(
             select(InterviewInvite).where(InterviewInvite.token == token)
         )
         invite = result.scalar_one_or_none()
         if invite is None or invite.recruiter_id != recruiter_id:
             raise NotFoundException("Assessment not found")
-        if invite.used_count > 0:
-            raise ConflictException(
-                "Cannot delete an assessment that has already been used by a candidate."
-            )
-        await self.db.delete(invite)
+        if invite.deleted_at is not None:
+            raise NotFoundException("Assessment not found")
+        invite.deleted_at = datetime.now(timezone.utc)
         await self.db.commit()
 
     async def update_assessment(
@@ -660,7 +667,11 @@ class AssessmentService:
             select(InterviewInvite).where(InterviewInvite.token == token)
         )
         invite = result.scalar_one_or_none()
-        if invite is None or invite.recruiter_id != recruiter_id:
+        if (
+            invite is None
+            or invite.recruiter_id != recruiter_id
+            or invite.deleted_at is not None
+        ):
             raise NotFoundException("Assessment not found")
         if data.expiry_hours is not None:
             invite.expiry_at = datetime.now(timezone.utc) + timedelta(
@@ -681,7 +692,11 @@ class AssessmentService:
             select(InterviewInvite).where(InterviewInvite.token == token)
         )
         invite = result.scalar_one_or_none()
-        if invite is None or invite.recruiter_id != recruiter_id:
+        if (
+            invite is None
+            or invite.recruiter_id != recruiter_id
+            or invite.deleted_at is not None
+        ):
             raise NotFoundException("Assessment not found")
         now = datetime.now(timezone.utc)
         summary = _summary_from_invite(invite, now)

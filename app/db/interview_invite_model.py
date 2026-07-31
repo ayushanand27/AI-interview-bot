@@ -27,3 +27,6 @@ class InterviewInvite(Base):
     max_uses: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     used_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
