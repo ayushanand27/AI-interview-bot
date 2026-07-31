@@ -110,11 +110,30 @@ def _load_session_sync(session_id: UUID) -> Optional[InterviewSession]:
 
 
 def _run_async(coro):
-    """Run an async coroutine from sync code (including inside FastAPI's event loop)."""
+    """Run an async coroutine from sync code when no event loop is active.
+
+    Under Postgres/asyncpg, NEVER call ``asyncio.run()`` while FastAPI's loop is
+    already running — that binds pooled connections to another loop and breaks
+    subsequent requests (``Future attached to a different loop``). Sync callers
+    must use ``_get_sync_session_local()`` instead.
+    """
     try:
         asyncio.get_running_loop()
+        has_running_loop = True
     except RuntimeError:
+        has_running_loop = False
+
+    if not has_running_loop:
         return asyncio.run(coro)
+
+    if settings.is_postgres:
+        coro.close()
+        raise RuntimeError(
+            "asyncpg cannot nest via asyncio.run while the app loop is running; "
+            "use _get_sync_session_local() for sync persistence helpers"
+        )
+
+    # aiosqlite is more forgiving across loops (legacy SQLite path).
     return _executor.submit(asyncio.run, coro).result()
 
 
@@ -299,7 +318,10 @@ def load_session_from_disk(session_id: UUID) -> Optional[InterviewSession]:
 
 
 def list_saved_session_ids() -> list[str]:
-    return _run_async(_list_session_ids_async())
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        result = db.execute(select(DBSess.session_id))
+        return [str(row[0]) for row in result.all()]
 
 
 async def _replace_proctor_events_async(
@@ -384,7 +406,25 @@ def list_proctor_events(session_id: UUID | str) -> list[dict[str, Any]]:
     session_uuid = _coerce_uuid(session_id)
     if session_uuid is None:
         return []
-    return _run_async(_list_proctor_events_async(session_uuid))
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        result = db.execute(
+            select(ProctorEvent)
+            .where(ProctorEvent.session_id == session_uuid)
+            .order_by(ProctorEvent.event_timestamp.asc(), ProctorEvent.id.asc())
+        )
+        rows = result.scalars().all()
+        return [
+            {
+                "type": row.event_type,
+                "severity": row.severity,
+                "time": _ensure_utc(row.event_timestamp).timestamp(),
+                "penalty_percent": float(row.penalty_percent or 0.0),
+                "message": row.message,
+                "evidence_metadata": row.evidence_metadata or None,
+            }
+            for row in rows
+        ]
 
 
 async def _upsert_session_artifact_async(
@@ -437,19 +477,36 @@ def upsert_session_artifact(
     file_size_bytes: int | None = None,
     metadata_json: dict[str, Any] | None = None,
 ) -> int:
-    return int(
-        _run_async(
-            _upsert_session_artifact_async(
+    now = _utc_now()
+    session_uuid = _coerce_uuid(session_id)
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        query = select(SessionArtifact).where(
+            SessionArtifact.artifact_type == artifact_type,
+            SessionArtifact.session_id == session_uuid,
+            SessionArtifact.candidate_verification_id == candidate_verification_id,
+            SessionArtifact.storage_path == storage_path,
+        )
+        existing = db.execute(query).scalar_one_or_none()
+        if existing is None:
+            existing = SessionArtifact(
                 artifact_type=artifact_type,
-                session_id=_coerce_uuid(session_id),
+                session_id=session_uuid,
                 candidate_verification_id=candidate_verification_id,
                 storage_path=storage_path,
                 mime_type=mime_type,
                 file_size_bytes=file_size_bytes,
                 metadata_json=metadata_json,
+                created_at=now,
             )
-        )
-    )
+            db.add(existing)
+        else:
+            existing.mime_type = mime_type
+            existing.file_size_bytes = file_size_bytes
+            existing.metadata_json = metadata_json
+        db.commit()
+        db.refresh(existing)
+        return int(existing.id)
 
 
 async def _list_session_artifacts_async(
@@ -479,13 +536,21 @@ def list_session_artifacts(
     candidate_verification_id: int | None = None,
     artifact_type: str | None = None,
 ) -> list[SessionArtifact]:
-    return _run_async(
-        _list_session_artifacts_async(
-            session_id=_coerce_uuid(session_id),
-            candidate_verification_id=candidate_verification_id,
-            artifact_type=artifact_type,
-        )
-    )
+    session_uuid = _coerce_uuid(session_id)
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        query = select(SessionArtifact)
+        if session_uuid is not None:
+            query = query.where(SessionArtifact.session_id == session_uuid)
+        if candidate_verification_id is not None:
+            query = query.where(
+                SessionArtifact.candidate_verification_id == candidate_verification_id
+            )
+        if artifact_type is not None:
+            query = query.where(SessionArtifact.artifact_type == artifact_type)
+        query = query.order_by(SessionArtifact.created_at.desc(), SessionArtifact.id.desc())
+        result = db.execute(query)
+        return list(result.scalars().all())
 
 
 async def _upsert_session_review_state_async(
@@ -542,26 +607,46 @@ def upsert_session_review_state(
     session_uuid = _coerce_uuid(session_id)
     if session_uuid is None:
         return False
-    return bool(
-        _run_async(
-            _upsert_session_review_state_async(
-                session_uuid,
+    now = _utc_now()
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        existing = db.execute(
+            select(SessionReviewState).where(SessionReviewState.session_id == session_uuid)
+        ).scalar_one_or_none()
+        if existing is None:
+            existing = SessionReviewState(
+                session_id=session_uuid,
                 human_review_required=human_review_required,
-                review_status=review_status,
+                review_status=review_status or _review_status_for_flag(human_review_required),
                 review_notes=review_notes,
+                reviewed_at=_ensure_utc(reviewed_at) if reviewed_at else None,
                 reviewed_by_user_id=reviewed_by_user_id,
-                reviewed_at=reviewed_at,
+                created_at=now,
+                updated_at=now,
             )
-        )
-    )
+            db.add(existing)
+        else:
+            existing.human_review_required = human_review_required
+            existing.review_status = review_status or _review_status_for_flag(
+                human_review_required
+            )
+            if review_notes is not None:
+                existing.review_notes = review_notes
+            existing.reviewed_at = _ensure_utc(reviewed_at) if reviewed_at else None
+            existing.reviewed_by_user_id = reviewed_by_user_id
+            existing.updated_at = now
+        db.commit()
+        return True
 
 
-async def _get_session_review_state_async(session_id: UUID) -> dict[str, Any] | None:
-    async with AsyncSessionLocal() as db:
-        existing = (
-            await db.execute(
-                select(SessionReviewState).where(SessionReviewState.session_id == session_id)
-            )
+def get_session_review_state(session_id: UUID | str) -> dict[str, Any] | None:
+    session_uuid = _coerce_uuid(session_id)
+    if session_uuid is None:
+        return None
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        existing = db.execute(
+            select(SessionReviewState).where(SessionReviewState.session_id == session_uuid)
         ).scalar_one_or_none()
         if existing is None:
             return None
@@ -572,13 +657,6 @@ async def _get_session_review_state_async(session_id: UUID) -> dict[str, Any] | 
             "reviewed_at": existing.reviewed_at,
             "reviewed_by_user_id": existing.reviewed_by_user_id,
         }
-
-
-def get_session_review_state(session_id: UUID | str) -> dict[str, Any] | None:
-    session_uuid = _coerce_uuid(session_id)
-    if session_uuid is None:
-        return None
-    return _run_async(_get_session_review_state_async(session_uuid))
 
 
 async def _record_identity_verification_attempt_async(
@@ -628,22 +706,66 @@ def record_identity_verification_attempt(
     id_artifact_id: int | None,
     selfie_artifact_id: int | None,
 ) -> int:
-    return int(
-        _run_async(
-            _record_identity_verification_attempt_async(
-                candidate_verification_id=candidate_verification_id,
-                token=token,
-                session_id=session_id,
-                verified=verified,
-                confidence_score=confidence_score,
-                low_identity_confidence=low_identity_confidence,
-                similarity_score=similarity_score,
-                message=message,
-                id_artifact_id=id_artifact_id,
-                selfie_artifact_id=selfie_artifact_id,
-            )
+    now = _utc_now()
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        attempt = IdentityVerificationAttempt(
+            candidate_verification_id=candidate_verification_id,
+            token=token,
+            session_id=session_id,
+            verified=verified,
+            confidence_score=confidence_score,
+            low_identity_confidence=low_identity_confidence,
+            similarity_score=similarity_score,
+            message=message,
+            id_artifact_id=id_artifact_id,
+            selfie_artifact_id=selfie_artifact_id,
+            created_at=now,
         )
-    )
+        db.add(attempt)
+        db.commit()
+        db.refresh(attempt)
+        return int(attempt.id)
+
+
+def _replace_proctor_events_sync(session_id: UUID, summary_dict: dict[str, Any]) -> None:
+    warnings = summary_dict.get("violations") or summary_dict.get("warnings") or []
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        db.execute(delete(ProctorEvent).where(ProctorEvent.session_id == session_id))
+        now = _utc_now()
+        for idx, item in enumerate(warnings):
+            if not isinstance(item, dict):
+                continue
+            event_type = str(item.get("type") or item.get("gaze") or "unknown")
+            severity = str(item.get("severity") or item.get("level") or "minor")
+            timestamp = item.get("time", item.get("timestamp"))
+            event_dt = _timestamp_to_datetime(timestamp)
+            message = str(item.get("message") or item.get("reason") or event_type)
+            penalty = item.get("penalty_percent", 0.0)
+            try:
+                penalty_value = float(penalty)
+            except (TypeError, ValueError):
+                penalty_value = 0.0
+
+            metadata = {"source": "summary_backfill", "ordinal": idx}
+            for key in ("gaze", "level", "reason"):
+                if item.get(key) is not None:
+                    metadata[key] = item.get(key)
+
+            db.add(
+                ProctorEvent(
+                    session_id=session_id,
+                    event_type=event_type,
+                    severity=severity,
+                    message=message,
+                    penalty_percent=penalty_value,
+                    event_timestamp=event_dt,
+                    evidence_metadata=metadata,
+                    created_at=now,
+                )
+            )
+        db.commit()
 
 
 async def _update_proctoring_summary_async(
@@ -676,23 +798,19 @@ def update_proctoring_summary(session_id: UUID | str, summary_dict: dict[str, An
             session_id = UUID(session_id)
         except ValueError:
             return False
-    return bool(_run_async(_update_proctoring_summary_async(session_id, summary_dict)))
-
-
-async def _update_recording_filename_async(
-    session_id: UUID, filename: str
-) -> bool:
-    now = datetime.now(timezone.utc)
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
+    now = _utc_now()
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        result = db.execute(
             update(DBSess)
             .where(DBSess.session_id == session_id)
-            .values(recording_filename=filename, updated_at=now)
+            .values(proctoring_summary=summary_dict, updated_at=now)
         )
         if result.rowcount == 0:
             return False
-        await db.commit()
-        return True
+        db.commit()
+    _replace_proctor_events_sync(session_id, summary_dict)
+    return True
 
 
 def update_recording_filename(session_id: UUID | str, filename: str) -> bool:
@@ -701,31 +819,30 @@ def update_recording_filename(session_id: UUID | str, filename: str) -> bool:
             session_id = UUID(session_id)
         except ValueError:
             return False
-    return bool(_run_async(_update_recording_filename_async(session_id, filename)))
-
-
-async def _get_recording_filename_async(session_id: UUID) -> Optional[str]:
-    async with AsyncSessionLocal() as db:
-        obj = await db.get(DBSess, session_id)
-        if obj is None:
-            return None
-        return obj.recording_filename
-
-
-async def _update_recording_mp4_filename_async(
-    session_id: UUID, filename: str
-) -> bool:
     now = datetime.now(timezone.utc)
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        result = db.execute(
             update(DBSess)
             .where(DBSess.session_id == session_id)
-            .values(recording_mp4_filename=filename, updated_at=now)
+            .values(recording_filename=filename, updated_at=now)
         )
         if result.rowcount == 0:
             return False
-        await db.commit()
+        db.commit()
         return True
+
+
+def get_recording_filename(session_id: UUID | str) -> Optional[str]:
+    session_uuid = _coerce_uuid(session_id)
+    if session_uuid is None:
+        return None
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        obj = db.get(DBSess, session_uuid)
+        if obj is None:
+            return None
+        return obj.recording_filename
 
 
 def update_recording_mp4_filename(session_id: UUID | str, filename: str) -> bool:
@@ -734,15 +851,33 @@ def update_recording_mp4_filename(session_id: UUID | str, filename: str) -> bool
             session_id = UUID(session_id)
         except ValueError:
             return False
-    return bool(_run_async(_update_recording_mp4_filename_async(session_id, filename)))
+    now = datetime.now(timezone.utc)
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        result = db.execute(
+            update(DBSess)
+            .where(DBSess.session_id == session_id)
+            .values(recording_mp4_filename=filename, updated_at=now)
+        )
+        if result.rowcount == 0:
+            return False
+        db.commit()
+        return True
 
 
-async def _get_recording_mp4_filename_async(session_id: UUID) -> Optional[str]:
-    async with AsyncSessionLocal() as db:
-        obj = await db.get(DBSess, session_id)
+def get_recording_mp4_filename(session_id: UUID | str) -> Optional[str]:
+    session_uuid = _coerce_uuid(session_id)
+    if session_uuid is None:
+        return None
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        obj = db.get(DBSess, session_uuid)
         if obj is None:
             return None
         return obj.recording_mp4_filename
+
+
+ACTIVE_SESSION_STATUSES = ("created", "questions_ready", "in_progress")
 
 
 async def check_database_connected_async() -> bool:
@@ -760,28 +895,6 @@ async def count_sessions_async() -> int:
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(func.count()).select_from(DBSess))
         return int(result.scalar_one())
-
-
-ACTIVE_SESSION_STATUSES = ("created", "questions_ready", "in_progress")
-
-
-async def _find_active_session_async(user_id: int) -> Optional[UUID]:
-    """Return the most recent active session for a user, if any."""
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(DBSess.session_id)
-            .where(
-                DBSess.user_id == user_id,
-                DBSess.status.in_(ACTIVE_SESSION_STATUSES),
-            )
-            .order_by(DBSess.updated_at.desc())
-            .limit(1)
-        )
-        return result.scalar_one_or_none()
-
-
-def find_active_session_for_user(user_id: int) -> Optional[UUID]:
-    return _run_async(_find_active_session_async(user_id))
 
 
 async def _abandon_active_sessions_async(user_id: int) -> list[UUID]:
@@ -803,39 +916,6 @@ async def _abandon_active_sessions_async(user_id: int) -> list[UUID]:
         return abandoned_ids
 
 
-def mark_candidate_report_email_sent(session_id: UUID) -> bool:
-    """Record that the candidate report email was sent for this session."""
-    return bool(_run_async(_mark_candidate_report_email_sent_async(session_id)))
-
-
-async def _candidate_report_email_sent_async(session_id: UUID) -> bool:
-    async with AsyncSessionLocal() as db:
-        obj = await db.get(DBSess, session_id)
-        return obj is not None and obj.candidate_report_email_sent_at is not None
-
-
-def candidate_report_email_already_sent(session_id: UUID) -> bool:
-    """Return True if the candidate report email was already sent."""
-    return bool(_run_async(_candidate_report_email_sent_async(session_id)))
-
-
-async def _mark_candidate_report_email_sent_async(session_id: UUID) -> bool:
-    now = datetime.now(timezone.utc)
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            update(DBSess)
-            .where(
-                DBSess.session_id == session_id,
-                DBSess.candidate_report_email_sent_at.is_(None),
-            )
-            .values(candidate_report_email_sent_at=now, updated_at=now)
-        )
-        if result.rowcount == 0:
-            return False
-        await db.commit()
-        return True
-
-
 async def abandon_active_sessions_for_user_async(user_id: int) -> int:
     """Abandon stale sessions in DB and sync the in-memory session cache (async-safe)."""
     from app.services.session_store import session_store
@@ -849,11 +929,68 @@ async def abandon_active_sessions_for_user_async(user_id: int) -> int:
     return len(abandoned_ids)
 
 
+def find_active_session_for_user(user_id: int) -> Optional[UUID]:
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        result = db.execute(
+            select(DBSess.session_id)
+            .where(
+                DBSess.user_id == user_id,
+                DBSess.status.in_(ACTIVE_SESSION_STATUSES),
+            )
+            .order_by(DBSess.updated_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+
+def mark_candidate_report_email_sent(session_id: UUID) -> bool:
+    """Record that the candidate report email was sent for this session."""
+    now = datetime.now(timezone.utc)
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        result = db.execute(
+            update(DBSess)
+            .where(
+                DBSess.session_id == session_id,
+                DBSess.candidate_report_email_sent_at.is_(None),
+            )
+            .values(candidate_report_email_sent_at=now, updated_at=now)
+        )
+        if result.rowcount == 0:
+            return False
+        db.commit()
+        return True
+
+
+def candidate_report_email_already_sent(session_id: UUID) -> bool:
+    """Return True if the candidate report email was already sent."""
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        obj = db.get(DBSess, session_id)
+        return obj is not None and obj.candidate_report_email_sent_at is not None
+
+
 def abandon_active_sessions_for_user(user_id: int) -> int:
     """Abandon stale sessions in DB and sync the in-memory session cache."""
     from app.services.session_store import session_store
 
-    abandoned_ids = _run_async(_abandon_active_sessions_async(user_id))
+    now = datetime.now(timezone.utc)
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        result = db.execute(
+            select(DBSess).where(
+                DBSess.user_id == user_id,
+                DBSess.status.in_(ACTIVE_SESSION_STATUSES),
+            )
+        )
+        stale_sessions = result.scalars().all()
+        abandoned_ids = [s.session_id for s in stale_sessions]
+        for row in stale_sessions:
+            row.status = SessionStatus.ABANDONED.value
+            row.updated_at = now
+        db.commit()
+
     for session_id in abandoned_ids:
         session = session_store.get(session_id)
         if session is not None:

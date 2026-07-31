@@ -629,14 +629,13 @@ class InterviewService:
     def resolve_recording_file(self, session_id: UUID) -> tuple[Path, str, str]:
         """Return recording path, media type, and download filename (MP4 then WebM)."""
         from app.services.session_persistence import (
-            _get_recording_filename_async,
-            _get_recording_mp4_filename_async,
-            _run_async,
+            get_recording_filename,
+            get_recording_mp4_filename,
         )
 
         storage = get_object_storage()
 
-        mp4_filename = _run_async(_get_recording_mp4_filename_async(session_id))
+        mp4_filename = get_recording_mp4_filename(session_id)
         if mp4_filename:
             try:
                 mp4_path = storage.resolve_local_path(mp4_filename)
@@ -644,7 +643,7 @@ class InterviewService:
             except FileNotFoundError:
                 pass
 
-        filename = _run_async(_get_recording_filename_async(session_id))
+        filename = get_recording_filename(session_id)
         if filename:
             try:
                 webm_path = storage.resolve_local_path(filename)
