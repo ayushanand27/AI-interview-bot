@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Optional
+from typing import Any, Optional
 
 from groq import APIConnectionError, APIError, RateLimitError
 
@@ -30,7 +30,7 @@ class LLMService:
         topic_focus: Optional[str] = None,
         resume_text: Optional[str] = None,
         job_description: Optional[str] = None,
-    ) -> list[str]:
+    ) -> list[dict[str, Any]]:
         focus_line = (
             f"Focus topics: {topic_focus}."
             if topic_focus
@@ -92,11 +92,14 @@ class LLMService:
             raise AIException("Question generation returned no questions. Please try again.")
 
         jd_hint = job_description or resume_text or role_title
+        # Mock/candidate interviews are oral/subjective; recruiter assessments
+        # pass their own question_types via assessment_service.
         questions = _parse_questions_from_llm_text(
             content,
             question_count,
             jd_hint,
             experience_level,
+            ["subjective"],
         )
 
         if not questions:

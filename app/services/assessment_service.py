@@ -259,7 +259,7 @@ def _parse_questions_from_llm_text(
     question_count: int,
     jd_text: str,
     difficulty: str,
-    question_types: list[str] | None,
+    question_types: list[str] | None = None,
 ) -> list[dict]:
     text = _strip_markdown_code_block(content)
     type_plan = _distribute_types(question_count, question_types or ["subjective"])
