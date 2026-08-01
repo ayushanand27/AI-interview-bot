@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { jobsLiveApi } from "../api/client";
+import { jobsLiveApi, recruiterApi } from "../api/client";
 
 type JobRow = {
   token: string;
@@ -44,6 +44,9 @@ export default function JobsLivePanel({
   const [apps, setApps] = useState<AppRow[]>([]);
   const [jobTitle, setJobTitle] = useState("");
   const [jobJd, setJobJd] = useState("");
+  const [jdMode, setJdMode] = useState<"paste" | "upload">("paste");
+  const [jdFile, setJdFile] = useState<File | null>(null);
+  const [parsingJd, setParsingJd] = useState(false);
   const [meetUrl, setMeetUrl] = useState("");
   const [liveTitle, setLiveTitle] = useState("Live technical interview");
   const [liveRooms, setLiveRooms] = useState<LiveRow[]>([]);
@@ -86,16 +89,43 @@ export default function JobsLivePanel({
       );
   }, [selectedJob]);
 
+  async function resolveJdText(): Promise<string> {
+    if (jdMode === "upload") {
+      if (!jdFile) {
+        throw new Error("Upload a JD file (PDF, Word, or TXT).");
+      }
+      setParsingJd(true);
+      try {
+        const parsed = await recruiterApi.parseJdPdf(jdFile);
+        const text = (parsed.data?.jd_text || "").trim();
+        if (text.length < 20) {
+          throw new Error("Could not extract enough text from the JD file.");
+        }
+        setJobJd(text);
+        return text;
+      } finally {
+        setParsingJd(false);
+      }
+    }
+    const text = jobJd.trim();
+    if (text.length < 20) {
+      throw new Error("Paste a job description (at least 20 characters) or upload a file.");
+    }
+    return text;
+  }
+
   async function createJob() {
     setBusy(true);
     onError(null);
     try {
+      const jdText = await resolveJdText();
       const res = await jobsLiveApi.createJob({
         title: jobTitle,
-        jd_text: jobJd,
+        jd_text: jdText,
       });
       setJobTitle("");
       setJobJd("");
+      setJdFile(null);
       refreshJobs();
       setSelectedJob(res.data.token);
       setCopyMsg(absoluteLink(res.data.apply_link));
@@ -157,21 +187,67 @@ export default function JobsLivePanel({
             onChange={(e) => setJobTitle(e.target.value)}
             placeholder="Backend Engineer"
           />
-          <label htmlFor="job-jd">Job description</label>
-          <textarea
-            id="job-jd"
-            rows={6}
-            value={jobJd}
-            onChange={(e) => setJobJd(e.target.value)}
-            placeholder="Paste JD (skills, requirements…)"
-          />
+          <div className="rp-tabs rp-tabs-spaced" style={{ marginBottom: "0.5rem" }}>
+            <button
+              type="button"
+              className={jdMode === "paste" ? "rp-tab rp-tab-active" : "rp-tab"}
+              onClick={() => setJdMode("paste")}
+              disabled={busy || parsingJd}
+            >
+              Paste JD
+            </button>
+            <button
+              type="button"
+              className={jdMode === "upload" ? "rp-tab rp-tab-active" : "rp-tab"}
+              onClick={() => setJdMode("upload")}
+              disabled={busy || parsingJd}
+            >
+              Upload JD file
+            </button>
+          </div>
+          {jdMode === "paste" ? (
+            <>
+              <label htmlFor="job-jd">Job description</label>
+              <textarea
+                id="job-jd"
+                rows={6}
+                value={jobJd}
+                onChange={(e) => setJobJd(e.target.value)}
+                placeholder="Paste JD (skills, requirements…)"
+                disabled={busy}
+              />
+            </>
+          ) : (
+            <>
+              <label htmlFor="job-jd-file">JD file (PDF, Word, TXT)</label>
+              <input
+                id="job-jd-file"
+                type="file"
+                accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                disabled={busy || parsingJd}
+                onChange={(e) => setJdFile(e.target.files?.[0] ?? null)}
+              />
+              {jdFile && (
+                <p className="rp-file-name rp-muted-small">{jdFile.name}</p>
+              )}
+              {jobJd.trim().length >= 20 && (
+                <p className="rp-muted-small">
+                  Extracted {jobJd.trim().length} characters — ready to create.
+                </p>
+              )}
+            </>
+          )}
           <button
             type="button"
             className="rp-primary"
-            disabled={busy}
+            disabled={busy || parsingJd}
             onClick={() => void createJob()}
           >
-            Create job + apply link
+            {parsingJd
+              ? "Reading JD file…"
+              : busy
+                ? "Creating…"
+                : "Create job + apply link"}
           </button>
         </div>
         <div style={{ flex: 1 }}>
