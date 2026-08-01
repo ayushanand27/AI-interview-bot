@@ -24,6 +24,7 @@ import app.db.candidate_verification_model  # noqa: F401, E402
 import app.db.evidence_model  # noqa: F401, E402
 import app.db.invite_funnel_model  # noqa: F401, E402
 import app.db.interview_invite_model  # noqa: F401, E402
+import app.db.question_bank_model  # noqa: F401, E402
 import app.db.session_model  # noqa: F401, E402
 import app.models.user  # noqa: F401, E402
 

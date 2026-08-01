@@ -45,6 +45,8 @@ class AssessmentQuestion(BaseModel):
     rubric_notes: str | None = None
     time_seconds: int = Field(default_factory=default_time_seconds)
     marks: float = Field(default=DEFAULT_QUESTION_MARKS)
+    bank_id: int | None = None
+    origin: Literal["library", "ai"] | None = None
 
     @field_validator("text")
     @classmethod
@@ -300,6 +302,7 @@ class GenerateQuestionsRequest(BaseModel):
     question_count: int
     difficulty: str
     question_types: list[QuestionType] | None = None
+    use_question_bank: bool = True
 
     @field_validator("question_count")
     @classmethod

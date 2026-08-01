@@ -738,11 +738,16 @@ export const recruiterApi = {
     question_count: number;
     difficulty: string;
     question_types?: string[];
+    use_question_bank?: boolean;
   }) {
     const form = new FormData();
     form.append("jd_text", payload.jd_text ?? "");
     form.append("question_count", String(payload.question_count));
     form.append("difficulty", payload.difficulty);
+    form.append(
+      "use_question_bank",
+      payload.use_question_bank === false ? "false" : "true",
+    );
     if (payload.question_types && payload.question_types.length > 0) {
       form.append("question_types", JSON.stringify(payload.question_types));
     }

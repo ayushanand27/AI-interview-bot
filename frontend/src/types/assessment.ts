@@ -34,6 +34,8 @@ export interface AssessmentQuestion {
   rubric_notes?: string | null;
   time_seconds: number;
   marks: number;
+  bank_id?: number | null;
+  origin?: "library" | "ai" | null;
 }
 
 export interface CreateAssessmentResponse {

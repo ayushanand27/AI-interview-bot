@@ -965,6 +965,28 @@
   border-radius: 8px;
 }
 
+.recruiter-portal .rp-origin-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--rp-border);
+}
+
+.recruiter-portal .rp-origin-library {
+  color: #86efac;
+  border-color: rgba(134, 239, 172, 0.35);
+  background: rgba(22, 101, 52, 0.25);
+}
+
+.recruiter-portal .rp-origin-ai {
+  color: #93c5fd;
+  border-color: rgba(147, 197, 253, 0.35);
+  background: rgba(30, 64, 175, 0.25);
+}
+
 @media (max-width: 720px) {
   .recruiter-portal .rp-test-row {
     grid-template-columns: 1fr;

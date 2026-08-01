@@ -775,13 +775,188 @@ def _parse_questions_from_llm_text(
     return _dedupe_questions(validated)[:question_count]
 
 
+def _mark_origin(item: dict, origin: str) -> dict:
+    out = dict(item)
+    out["origin"] = origin
+    if origin == "ai":
+        out.pop("bank_id", None)
+    return out
+
+
+def _compose_from_question_bank(
+    jd_text: str,
+    question_count: int,
+    difficulty: str,
+    question_types: list[str] | None,
+    recruiter_id: int | None,
+) -> list[dict]:
+    from app.services.question_bank_service import (
+        extract_skill_tags,
+        retrieve_bank_questions,
+    )
+
+    types = question_types or ["subjective"]
+    type_plan = _distribute_types(question_count, types)
+    skills = extract_skill_tags(jd_text)
+    needed_types = list(dict.fromkeys(type_plan))
+    pools = retrieve_bank_questions(
+        question_types=needed_types,
+        difficulty=difficulty,
+        skill_tags=skills,
+        limit_per_type=max(question_count, 8),
+        recruiter_id=recruiter_id,
+    )
+    cursors: dict[str, int] = {t: 0 for t in needed_types}
+    chosen: list[dict] = []
+    seen: set[str] = set()
+
+    for qtype in type_plan:
+        pool = pools.get(qtype) or []
+        idx = cursors.get(qtype, 0)
+        picked = None
+        while idx < len(pool):
+            candidate = pool[idx]
+            idx += 1
+            key = _question_fingerprint(candidate)
+            if not key or key in seen:
+                continue
+            picked = candidate
+            seen.add(key)
+            break
+        cursors[qtype] = idx
+        if picked is not None:
+            chosen.append(_mark_origin(picked, "library"))
+
+    return chosen
+
+
+def _llm_fill_gaps(
+    jd_text: str,
+    gap_count: int,
+    difficulty: str,
+    gap_types: list[str],
+    examples: list[dict],
+) -> list[dict]:
+    if gap_count <= 0:
+        return []
+    type_counts: dict[str, int] = {}
+    for t in gap_types:
+        type_counts[t] = type_counts.get(t, 0) + 1
+    mix_desc = ", ".join(f"{count} {name}" for name, count in type_counts.items())
+    example_blob = json.dumps(examples[:4], ensure_ascii=True)[:3500]
+
+    system_prompt = (
+        "You are a senior technical interviewer creating assessment questions. "
+        "Generate clear, NON-REPETITIVE questions based ONLY on the job description. "
+        "Use the style of the provided library examples but create NEW distinct questions. "
+        "Support types: subjective, mcq, msq, numerical, coding. "
+        "For coding include Example 1/Example 2 I/O, public_tests and hidden_tests. "
+        'Return ONLY valid JSON {"questions": [...]}.'
+    )
+    user_prompt = (
+        f"Difficulty level: {difficulty}\n"
+        f"Number of NEW questions: {gap_count}\n"
+        f"Requested mix: {mix_desc}\n"
+        f"Preferred type order: {gap_types}\n\n"
+        f"Library style examples (do not copy):\n{example_blob}\n\n"
+        f"Job Description:\n{jd_text.strip()}\n"
+    )
+    try:
+        response = get_groq_client().chat.completions.create(
+            model=settings.GROQ_MODEL,
+            temperature=0.7,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        content = response.choices[0].message.content or ""
+    except Exception:
+        return [
+            _mark_origin(q, "ai")
+            for q in _fallback_question_dicts(
+                jd_text, gap_count, difficulty, list(dict.fromkeys(gap_types))
+            )[:gap_count]
+        ]
+
+    if not content.strip():
+        return [
+            _mark_origin(q, "ai")
+            for q in _fallback_question_dicts(
+                jd_text, gap_count, difficulty, list(dict.fromkeys(gap_types))
+            )[:gap_count]
+        ]
+
+    parsed = _parse_questions_from_llm_text(
+        content, gap_count, jd_text, difficulty, list(dict.fromkeys(gap_types)) or None
+    )
+    return [_mark_origin(q, "ai") for q in parsed]
+
+
 def generate_questions_from_jd(
     jd_text: str,
     question_count: int,
     difficulty: str,
     question_types: list[str] | None = None,
+    *,
+    use_question_bank: bool = True,
+    recruiter_id: int | None = None,
 ) -> list[dict]:
-    """Generate interview questions from a job description only."""
+    """Generate interview questions from a job description (library-first by default)."""
+    types = question_types or ["subjective"]
+    type_plan = _distribute_types(question_count, types)
+
+    composed: list[dict] = []
+    if use_question_bank:
+        composed = _compose_from_question_bank(
+            jd_text, question_count, difficulty, question_types, recruiter_id
+        )
+
+    if len(composed) >= question_count:
+        return _dedupe_questions(composed)[:question_count]
+
+    remaining_types = type_plan[len(composed) :]
+    gap = question_count - len(composed)
+    llm_extra = _llm_fill_gaps(
+        jd_text,
+        gap,
+        difficulty,
+        remaining_types,
+        examples=composed[:6],
+    )
+    seen = {_question_fingerprint(q) for q in composed}
+    for item in llm_extra:
+        key = _question_fingerprint(item)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        composed.append(item)
+        if len(composed) >= question_count:
+            break
+
+    if len(composed) < question_count:
+        fallback = _fallback_question_dicts(
+            jd_text, question_count * 2, difficulty, question_types
+        )
+        for item in fallback:
+            key = _question_fingerprint(item)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            composed.append(_mark_origin(item, "ai"))
+            if len(composed) >= question_count:
+                break
+
+    return _dedupe_questions(composed)[:question_count]
+
+
+def generate_questions_from_jd_ai_only(
+    jd_text: str,
+    question_count: int,
+    difficulty: str,
+    question_types: list[str] | None = None,
+) -> list[dict]:
+    """Legacy Groq-first generation path (AI-only mode)."""
     types = question_types or ["subjective"]
     type_plan = _distribute_types(question_count, types)
     type_counts: dict[str, int] = {}
@@ -804,14 +979,11 @@ def generate_questions_from_jd(
         "NOT trivial sum/reverse/hello-world tasks. Prefer hash maps, stacks, heaps, two pointers, "
         "sliding window, prefix sums, intervals, binary search, or greedy. "
         "Each coding question text MUST include clear Input/Output format, constraints, and "
-        "exactly two worked examples formatted as:\n"
-        "Example 1:\nInput:\n...\nOutput:\n...\n\nExample 2:\nInput:\n...\nOutput:\n...\n"
+        "exactly two worked examples. "
         "languages subset of [c, cpp, python, java, javascript] (omit perl), "
         "minimal starter_code stubs (do NOT give the full solution), "
-        "public_tests (2-3) and hidden_tests (3-4) as [{stdin, expected_stdout}] matching the examples, "
+        "public_tests and hidden_tests as [{stdin, expected_stdout}], "
         "time_seconds 900-1500, marks 20-30, time_limit_ms around 5000. "
-        "Coding problems must be solvable via stdin/stdout only. "
-        "Match difficulty: Easy = Easy DSA, Medium = LeetCode Easy/Medium, Hard = Medium/Hard DSA. "
         "Do not include numbering prefixes in question text."
     )
     user_prompt = (
@@ -820,24 +992,7 @@ def generate_questions_from_jd(
         f"Requested mix: {mix_desc}\n"
         f"Preferred type order (one per question): {type_plan}\n\n"
         f"Job Description:\n{jd_text.strip()}\n\n"
-        "Return ONLY valid JSON in this shape:\n"
-        "{\n"
-        '  "questions": [\n'
-        '    {"text": "...", "type": "subjective", "time_seconds": 180, "marks": 10},\n'
-        '    {"text": "...", "type": "mcq", "options": ["A","B","C","D"], '
-        '"correct_indices": [0], "time_seconds": 120, "marks": 10},\n'
-        '    {"text": "...", "type": "msq", "options": ["A","B","C","D"], '
-        '"correct_indices": [0,2], "time_seconds": 120, "marks": 10},\n'
-        '    {"text": "...", "type": "numerical", "correct_answer": "42", '
-        '"tolerance": 0, "time_seconds": 90, "marks": 10},\n'
-        '    {"text": "Two Sum...\\nInput:\\n...\\nOutput:...", "type": "coding", '
-        '"languages": ["python", "javascript", "java", "cpp"], '
-        '"starter_code": {"python": "n=int(input())\\n# ..."}, '
-        '"public_tests": [{"stdin": "4\\n2 7 11 15\\n9\\n", "expected_stdout": "0 1"}], '
-        '"hidden_tests": [{"stdin": "2\\n1 1\\n2\\n", "expected_stdout": "0 1"}], '
-        '"time_seconds": 1200, "marks": 25, "time_limit_ms": 2000, "memory_limit_mb": 128}\n'
-        "  ]\n"
-        "}"
+        "Return ONLY valid JSON with a questions array."
     )
 
     content = ""
@@ -852,22 +1007,29 @@ def generate_questions_from_jd(
         )
         content = response.choices[0].message.content or ""
     except Exception:
-        return _dedupe_questions(
-            _fallback_question_dicts(
-                jd_text, question_count, difficulty, question_types
-            )
-        )[:question_count]
+        return [
+            _mark_origin(q, "ai")
+            for q in _dedupe_questions(
+                _fallback_question_dicts(
+                    jd_text, question_count, difficulty, question_types
+                )
+            )[:question_count]
+        ]
 
     if not content.strip():
-        return _dedupe_questions(
-            _fallback_question_dicts(
-                jd_text, question_count, difficulty, question_types
-            )
-        )[:question_count]
+        return [
+            _mark_origin(q, "ai")
+            for q in _dedupe_questions(
+                _fallback_question_dicts(
+                    jd_text, question_count, difficulty, question_types
+                )
+            )[:question_count]
+        ]
 
-    return _parse_questions_from_llm_text(
+    parsed = _parse_questions_from_llm_text(
         content, question_count, jd_text, difficulty, question_types
     )
+    return [_mark_origin(q, "ai") for q in parsed]
 
 
 def _to_assessment_questions(raw: list) -> list[AssessmentQuestion]:
@@ -882,6 +1044,8 @@ def _to_assessment_questions(raw: list) -> list[AssessmentQuestion]:
                     type="subjective",
                     time_seconds=int(item.get("time_seconds") or default_time_seconds()),
                     marks=float(item.get("marks") or 10),
+                    origin=item.get("origin"),
+                    bank_id=item.get("bank_id"),
                 )
             )
     return questions
@@ -918,13 +1082,24 @@ class AssessmentService:
     @staticmethod
     def generate_questions_preview(
         data: GenerateQuestionsRequest,
+        recruiter_id: int | None = None,
     ) -> GenerateQuestionsResponse:
-        raw = generate_questions_from_jd(
-            data.jd_text,
-            data.question_count,
-            data.difficulty,
-            data.question_types,
-        )
+        if data.use_question_bank:
+            raw = generate_questions_from_jd(
+                data.jd_text,
+                data.question_count,
+                data.difficulty,
+                data.question_types,
+                use_question_bank=True,
+                recruiter_id=recruiter_id,
+            )
+        else:
+            raw = generate_questions_from_jd_ai_only(
+                data.jd_text,
+                data.question_count,
+                data.difficulty,
+                data.question_types,
+            )
         questions = _to_assessment_questions(raw)
         return GenerateQuestionsResponse(questions=questions, jd_text=data.jd_text)
 
@@ -941,6 +1116,8 @@ class AssessmentService:
                 data.question_count,
                 data.difficulty,
                 data.question_types,
+                use_question_bank=True,
+                recruiter_id=recruiter_id,
             )
             questions = _to_assessment_questions(raw)
 
@@ -962,6 +1139,16 @@ class AssessmentService:
         self.db.add(invite)
         await self.db.commit()
 
+        bank_ids = [int(q.bank_id) for q in questions if q.bank_id]
+        if bank_ids:
+            from app.services.question_bank_service import record_question_bank_usage
+
+            record_question_bank_usage(
+                recruiter_id=recruiter_id,
+                invite_token=token,
+                bank_ids=bank_ids,
+            )
+
         from app.services.invite_funnel import record_invite_funnel_event
 
         record_invite_funnel_event(
@@ -976,6 +1163,7 @@ class AssessmentService:
             invite_link=invite_link,
             questions_preview=questions,
         )
+
 
     async def list_assessments(self, recruiter_id: int) -> list[AssessmentSummary]:
         result = await self.db.execute(

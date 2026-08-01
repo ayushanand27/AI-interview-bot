@@ -1,0 +1,4461 @@
+[
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Pair Sum Indices",
+    "prompt_text": "Two Sum\nGiven an array of integers and a target, return two 0-based indices that sum to target.\n\nInput:\n  Line 1: integer N (2 <= N <= 1e5)\n  Line 2: N integers A[i] (|A[i]| <= 1e9)\n  Line 3: integer target\nOutput: two indices i j (i < j) with A[i] + A[j] == target. Any valid pair is accepted.\n\nExample 1:\nInput:\n4\n2 7 11 15\n9\nOutput:\n0 1\n\nExample 2:\nInput:\n3\n3 2 4\n6\nOutput:\n1 2\n",
+    "skill_tags": [
+      "arrays",
+      "hashmap"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Two Sum\nGiven an array of integers and a target, return two 0-based indices that sum to target.\n\nInput:\n  Line 1: integer N (2 <= N <= 1e5)\n  Line 2: N integers A[i] (|A[i]| <= 1e9)\n  Line 3: integer target\nOutput: two indices i j (i < j) with A[i] + A[j] == target. Any valid pair is accepted.\n\nExample 1:\nInput:\n4\n2 7 11 15\n9\nOutput:\n0 1\n\nExample 2:\nInput:\n3\n3 2 4\n6\nOutput:\n1 2\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n = int(input())\narr = list(map(int, input().split()))\ntarget = int(input())\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "4\n2 7 11 15\n9\n",
+          "expected_stdout": "0 1"
+        },
+        {
+          "stdin": "3\n3 2 4\n6\n",
+          "expected_stdout": "1 2"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "2\n1 1\n2\n",
+          "expected_stdout": "0 1"
+        },
+        {
+          "stdin": "5\n-1 0 5 3 8\n7\n",
+          "expected_stdout": "2 3"
+        },
+        {
+          "stdin": "6\n10 20 30 40 50 60\n90\n",
+          "expected_stdout": "2 5"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 25,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-pair-sum-indices-80e935bc"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Bracket Validity",
+    "prompt_text": "Valid Parentheses\nCheck whether a bracket string is valid.\n\nInput: one string S of ()[]{} only (1 <= |S| <= 1e5)\nOutput: YES if valid, otherwise NO\n\nExample 1:\nInput:\n()\nOutput:\nYES\n\nExample 2:\nInput:\n([)]\nOutput:\nNO\n",
+    "skill_tags": [
+      "stack",
+      "strings"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Valid Parentheses\nCheck whether a bracket string is valid.\n\nInput: one string S of ()[]{} only (1 <= |S| <= 1e5)\nOutput: YES if valid, otherwise NO\n\nExample 1:\nInput:\n()\nOutput:\nYES\n\nExample 2:\nInput:\n([)]\nOutput:\nNO\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "s = input().strip()\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "()\n",
+          "expected_stdout": "YES"
+        },
+        {
+          "stdin": "([)]\n",
+          "expected_stdout": "NO"
+        },
+        {
+          "stdin": "{[]}\n",
+          "expected_stdout": "YES"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "(((((((((()\n",
+          "expected_stdout": "NO"
+        },
+        {
+          "stdin": "([]{})\n",
+          "expected_stdout": "YES"
+        },
+        {
+          "stdin": "]\n",
+          "expected_stdout": "NO"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-bracket-validity-1f94dc99"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Unique Window Length",
+    "prompt_text": "Longest Substring Without Repeating Characters\nFind the length of the longest substring with all unique characters.\n\nInput: string S of lowercase letters (1 <= |S| <= 1e5)\nOutput: a single integer\n\nExample 1:\nInput:\nabcabcbb\nOutput:\n3\n\nExample 2:\nInput:\npwwkew\nOutput:\n3\n",
+    "skill_tags": [
+      "strings",
+      "two-pointers"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Longest Substring Without Repeating Characters\nFind the length of the longest substring with all unique characters.\n\nInput: string S of lowercase letters (1 <= |S| <= 1e5)\nOutput: a single integer\n\nExample 1:\nInput:\nabcabcbb\nOutput:\n3\n\nExample 2:\nInput:\npwwkew\nOutput:\n3\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "s = input().strip()\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "abcabcbb\n",
+          "expected_stdout": "3"
+        },
+        {
+          "stdin": "bbbbb\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "pwwkew\n",
+          "expected_stdout": "3"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "a\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "abcdef\n",
+          "expected_stdout": "6"
+        },
+        {
+          "stdin": "abba\n",
+          "expected_stdout": "2"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 25,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-unique-window-length-3ff622d8"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Kadane Maximum",
+    "prompt_text": "Maximum Subarray Sum (Kadane)\nFind the contiguous subarray with the largest sum.\n\nInput:\n  Line 1: N (1 <= N <= 1e5)\n  Line 2: N integers A[i] (|A[i]| <= 1e9)\nOutput: the maximum subarray sum\n\nExample 1:\nInput:\n9\n-2 1 -3 4 -1 2 1 -5 4\nOutput:\n6\n\nExample 2:\nInput:\n1\n-3\nOutput:\n-3\n",
+    "skill_tags": [
+      "arrays",
+      "dp"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Maximum Subarray Sum (Kadane)\nFind the contiguous subarray with the largest sum.\n\nInput:\n  Line 1: N (1 <= N <= 1e5)\n  Line 2: N integers A[i] (|A[i]| <= 1e9)\nOutput: the maximum subarray sum\n\nExample 1:\nInput:\n9\n-2 1 -3 4 -1 2 1 -5 4\nOutput:\n6\n\nExample 2:\nInput:\n1\n-3\nOutput:\n-3\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n = int(input())\narr = list(map(int, input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "9\n-2 1 -3 4 -1 2 1 -5 4\n",
+          "expected_stdout": "6"
+        },
+        {
+          "stdin": "1\n-3\n",
+          "expected_stdout": "-3"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "5\n1 2 3 4 5\n",
+          "expected_stdout": "15"
+        },
+        {
+          "stdin": "4\n-1 -2 -3 -4\n",
+          "expected_stdout": "-1"
+        },
+        {
+          "stdin": "3\n5 -1 5\n",
+          "expected_stdout": "9"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 25,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-kadane-maximum-5ada6f55"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Hard",
+    "title": "Interval Merge",
+    "prompt_text": "Merge Intervals\nMerge all overlapping intervals.\n\nInput:\n  Line 1: N (1 <= N <= 1e4)\n  Next N lines: L R\nOutput: merged intervals, one per line as L R, sorted by L\n\nExample 1:\nInput:\n4\n1 3\n2 6\n8 10\n15 18\nOutput:\n1 6\n8 10\n15 18\n\nExample 2:\nInput:\n2\n1 4\n4 5\nOutput:\n1 5\n",
+    "skill_tags": [
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Merge Intervals\nMerge all overlapping intervals.\n\nInput:\n  Line 1: N (1 <= N <= 1e4)\n  Next N lines: L R\nOutput: merged intervals, one per line as L R, sorted by L\n\nExample 1:\nInput:\n4\n1 3\n2 6\n8 10\n15 18\nOutput:\n1 6\n8 10\n15 18\n\nExample 2:\nInput:\n2\n1 4\n4 5\nOutput:\n1 5\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n = int(input())\nintervals = [tuple(map(int, input().split())) for _ in range(n)]\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "4\n1 3\n2 6\n8 10\n15 18\n",
+          "expected_stdout": "1 6\n8 10\n15 18"
+        },
+        {
+          "stdin": "2\n1 4\n4 5\n",
+          "expected_stdout": "1 5"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1\n5 5\n",
+          "expected_stdout": "5 5"
+        },
+        {
+          "stdin": "3\n1 10\n2 3\n4 8\n",
+          "expected_stdout": "1 10"
+        },
+        {
+          "stdin": "3\n1 2\n3 4\n5 6\n",
+          "expected_stdout": "1 2\n3 4\n5 6"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-interval-merge-fc844657"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Top Frequency K",
+    "prompt_text": "Top K Frequent Elements\nReturn the K most frequent integers sorted ascending.\n\nInput:\n  Line 1: N K\n  Line 2: N integers\nOutput: K integers ascending\n\nExample 1:\nInput:\n6 2\n1 1 1 2 2 3\nOutput:\n1 2\n\nExample 2:\nInput:\n1 1\n1\nOutput:\n1\n",
+    "skill_tags": [
+      "heap",
+      "hashmap"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Top K Frequent Elements\nReturn the K most frequent integers sorted ascending.\n\nInput:\n  Line 1: N K\n  Line 2: N integers\nOutput: K integers ascending\n\nExample 1:\nInput:\n6 2\n1 1 1 2 2 3\nOutput:\n1 2\n\nExample 2:\nInput:\n1 1\n1\nOutput:\n1\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n, k = map(int, input().split())\narr = list(map(int, input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "6 2\n1 1 1 2 2 3\n",
+          "expected_stdout": "1 2"
+        },
+        {
+          "stdin": "1 1\n1\n",
+          "expected_stdout": "1"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "4 1\n4 4 4 4\n",
+          "expected_stdout": "4"
+        },
+        {
+          "stdin": "5 2\n5 5 3 3 1\n",
+          "expected_stdout": "3 5"
+        },
+        {
+          "stdin": "3 3\n7 8 9\n",
+          "expected_stdout": "7 8 9"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-top-frequency-k-df985408"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Hard",
+    "title": "Except Self Product",
+    "prompt_text": "Product of Array Except Self\nFor each index i, output product of all elements except A[i]. No division.\n\nInput:\n  Line 1: N (2 <= N <= 1e5)\n  Line 2: N integers\nOutput: N integers\n\nExample 1:\nInput:\n4\n1 2 3 4\nOutput:\n24 12 8 6\n\nExample 2:\nInput:\n5\n-1 1 0 -3 3\nOutput:\n0 0 9 0 0\n",
+    "skill_tags": [
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Product of Array Except Self\nFor each index i, output product of all elements except A[i]. No division.\n\nInput:\n  Line 1: N (2 <= N <= 1e5)\n  Line 2: N integers\nOutput: N integers\n\nExample 1:\nInput:\n4\n1 2 3 4\nOutput:\n24 12 8 6\n\nExample 2:\nInput:\n5\n-1 1 0 -3 3\nOutput:\n0 0 9 0 0\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n = int(input())\narr = list(map(int, input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "4\n1 2 3 4\n",
+          "expected_stdout": "24 12 8 6"
+        },
+        {
+          "stdin": "5\n-1 1 0 -3 3\n",
+          "expected_stdout": "0 0 9 0 0"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "2\n2 3\n",
+          "expected_stdout": "3 2"
+        },
+        {
+          "stdin": "3\n0 0 2\n",
+          "expected_stdout": "0 0 0"
+        },
+        {
+          "stdin": "3\n1 1 1\n",
+          "expected_stdout": "1 1 1"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-except-self-product-efee2c04"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "First Occurrence Search",
+    "prompt_text": "Binary Search First Occurrence\nFind first index of target in sorted array, else -1.\n\nInput:\n  Line 1: N target\n  Line 2: N sorted integers\nOutput: index or -1\n\nExample 1:\nInput:\n6 2\n1 2 2 2 3 4\nOutput:\n1\n\nExample 2:\nInput:\n4 5\n1 2 3 4\nOutput:\n-1\n",
+    "skill_tags": [
+      "binary-search",
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Binary Search First Occurrence\nFind first index of target in sorted array, else -1.\n\nInput:\n  Line 1: N target\n  Line 2: N sorted integers\nOutput: index or -1\n\nExample 1:\nInput:\n6 2\n1 2 2 2 3 4\nOutput:\n1\n\nExample 2:\nInput:\n4 5\n1 2 3 4\nOutput:\n-1\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n, target = map(int, input().split())\narr = list(map(int, input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "6 2\n1 2 2 2 3 4\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "4 5\n1 2 3 4\n",
+          "expected_stdout": "-1"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1 7\n7\n",
+          "expected_stdout": "0"
+        },
+        {
+          "stdin": "5 1\n1 1 1 1 1\n",
+          "expected_stdout": "0"
+        },
+        {
+          "stdin": "5 9\n1 3 5 7 9\n",
+          "expected_stdout": "4"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-first-occurrence-search-c6a7d5ef"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Next Greater Right",
+    "prompt_text": "Next Greater Element\nFor each element, next greater to its right, else -1.\n\nInput:\n  Line 1: N\n  Line 2: N integers\nOutput: N integers\n\nExample 1:\nInput:\n4\n2 1 2 4\nOutput:\n4 2 4 -1\n\nExample 2:\nInput:\n3\n3 2 1\nOutput:\n-1 -1 -1\n",
+    "skill_tags": [
+      "stack",
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Next Greater Element\nFor each element, next greater to its right, else -1.\n\nInput:\n  Line 1: N\n  Line 2: N integers\nOutput: N integers\n\nExample 1:\nInput:\n4\n2 1 2 4\nOutput:\n4 2 4 -1\n\nExample 2:\nInput:\n3\n3 2 1\nOutput:\n-1 -1 -1\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n = int(input())\narr = list(map(int, input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "4\n2 1 2 4\n",
+          "expected_stdout": "4 2 4 -1"
+        },
+        {
+          "stdin": "3\n3 2 1\n",
+          "expected_stdout": "-1 -1 -1"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1\n10\n",
+          "expected_stdout": "-1"
+        },
+        {
+          "stdin": "5\n1 2 3 4 5\n",
+          "expected_stdout": "2 3 4 5 -1"
+        },
+        {
+          "stdin": "4\n5 4 3 10\n",
+          "expected_stdout": "10 10 10 -1"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-next-greater-right-b0ece29b"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Anagram Group Count",
+    "prompt_text": "Group Anagram Keys Count\nCount distinct anagram groups.\n\nInput:\n  Line 1: N\n  Next N lines: words\nOutput: group count\n\nExample 1:\nInput:\n6\neat\ntea\ntan\nate\nnat\nbat\nOutput:\n3\n\nExample 2:\nInput:\n1\na\nOutput:\n1\n",
+    "skill_tags": [
+      "strings",
+      "hashmap"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Group Anagram Keys Count\nCount distinct anagram groups.\n\nInput:\n  Line 1: N\n  Next N lines: words\nOutput: group count\n\nExample 1:\nInput:\n6\neat\ntea\ntan\nate\nnat\nbat\nOutput:\n3\n\nExample 2:\nInput:\n1\na\nOutput:\n1\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n = int(input())\nwords = [input().strip() for _ in range(n)]\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "6\neat\ntea\ntan\nate\nnat\nbat\n",
+          "expected_stdout": "3"
+        },
+        {
+          "stdin": "1\na\n",
+          "expected_stdout": "1"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "3\nabc\nbca\ncab\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "4\nab\nba\ncd\ndc\n",
+          "expected_stdout": "2"
+        },
+        {
+          "stdin": "2\nxx\nyy\n",
+          "expected_stdout": "2"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 25,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-anagram-group-count-7453a3f1"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Right Rotate K",
+    "prompt_text": "Rotate Array Right by K\nRotate array right by K.\n\nInput:\n  Line 1: N K\n  Line 2: N integers\nOutput: rotated array\n\nExample 1:\nInput:\n7 3\n1 2 3 4 5 6 7\nOutput:\n5 6 7 1 2 3 4\n\nExample 2:\nInput:\n4 2\n-1 -100 3 99\nOutput:\n3 99 -1 -100\n",
+    "skill_tags": [
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Rotate Array Right by K\nRotate array right by K.\n\nInput:\n  Line 1: N K\n  Line 2: N integers\nOutput: rotated array\n\nExample 1:\nInput:\n7 3\n1 2 3 4 5 6 7\nOutput:\n5 6 7 1 2 3 4\n\nExample 2:\nInput:\n4 2\n-1 -100 3 99\nOutput:\n3 99 -1 -100\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n, k = map(int, input().split())\narr = list(map(int, input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "7 3\n1 2 3 4 5 6 7\n",
+          "expected_stdout": "5 6 7 1 2 3 4"
+        },
+        {
+          "stdin": "4 2\n-1 -100 3 99\n",
+          "expected_stdout": "3 99 -1 -100"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1 0\n5\n",
+          "expected_stdout": "5"
+        },
+        {
+          "stdin": "3 3\n1 2 3\n",
+          "expected_stdout": "1 2 3"
+        },
+        {
+          "stdin": "5 1\n9 8 7 6 5\n",
+          "expected_stdout": "5 9 8 7 6"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-right-rotate-k-120f487a"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Hard",
+    "title": "Min Stack Ops",
+    "prompt_text": "Min Stack Operations Simulation\nOps: PUSH x | POP | TOP | MIN\n\nInput:\n  Line 1: Q\n  Next Q lines: ops\nOutput: TOP/MIN values each on a line\n\nExample 1:\nInput:\n7\nPUSH 3\nPUSH 1\nMIN\nPUSH 2\nTOP\nPOP\nMIN\nOutput:\n1\n2\n1\n\nExample 2:\nInput:\n4\nPUSH 5\nTOP\nMIN\nPOP\nOutput:\n5\n5\n",
+    "skill_tags": [
+      "stack"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Min Stack Operations Simulation\nOps: PUSH x | POP | TOP | MIN\n\nInput:\n  Line 1: Q\n  Next Q lines: ops\nOutput: TOP/MIN values each on a line\n\nExample 1:\nInput:\n7\nPUSH 3\nPUSH 1\nMIN\nPUSH 2\nTOP\nPOP\nMIN\nOutput:\n1\n2\n1\n\nExample 2:\nInput:\n4\nPUSH 5\nTOP\nMIN\nPOP\nOutput:\n5\n5\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "q = int(input())\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "7\nPUSH 3\nPUSH 1\nMIN\nPUSH 2\nTOP\nPOP\nMIN\n",
+          "expected_stdout": "1\n2\n1"
+        },
+        {
+          "stdin": "4\nPUSH 5\nTOP\nMIN\nPOP\n",
+          "expected_stdout": "5\n5"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "6\nPUSH 2\nPUSH 2\nMIN\nPOP\nMIN\nTOP\n",
+          "expected_stdout": "2\n2\n2"
+        },
+        {
+          "stdin": "5\nPUSH -1\nPUSH 0\nMIN\nTOP\nPOP\n",
+          "expected_stdout": "-1\n0"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-min-stack-ops-002f62e0"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Missing Number XOR",
+    "prompt_text": "Missing Number\nArray contains N distinct numbers from 0..N with one missing. Find missing.\n\nInput:\n  Line 1: N (length of array)\n  Line 2: N integers in [0,N]\nOutput: missing number\n\nExample 1:\nInput:\n3\n3 0 1\nOutput:\n2\n\nExample 2:\nInput:\n2\n0 1\nOutput:\n2\n",
+    "skill_tags": [
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Missing Number\nArray contains N distinct numbers from 0..N with one missing. Find missing.\n\nInput:\n  Line 1: N (length of array)\n  Line 2: N integers in [0,N]\nOutput: missing number\n\nExample 1:\nInput:\n3\n3 0 1\nOutput:\n2\n\nExample 2:\nInput:\n2\n0 1\nOutput:\n2\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input()); a=list(map(int,input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "3\n3 0 1\n",
+          "expected_stdout": "2"
+        },
+        {
+          "stdin": "2\n0 1\n",
+          "expected_stdout": "2"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1\n1\n",
+          "expected_stdout": "0"
+        },
+        {
+          "stdin": "4\n4 2 1 0\n",
+          "expected_stdout": "3"
+        },
+        {
+          "stdin": "5\n0 1 2 3 4\n",
+          "expected_stdout": "5"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-missing-number-xor-71355b14"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Move Zeroes Stable",
+    "prompt_text": "Move Zeroes\nMove all zeroes to end keeping relative order of non-zeroes.\n\nInput:\n  Line 1: N\n  Line 2: N integers\nOutput: transformed array\n\nExample 1:\nInput:\n5\n0 1 0 3 12\nOutput:\n1 3 12 0 0\n\nExample 2:\nInput:\n3\n0 0 1\nOutput:\n1 0 0\n",
+    "skill_tags": [
+      "arrays",
+      "two-pointers"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Move Zeroes\nMove all zeroes to end keeping relative order of non-zeroes.\n\nInput:\n  Line 1: N\n  Line 2: N integers\nOutput: transformed array\n\nExample 1:\nInput:\n5\n0 1 0 3 12\nOutput:\n1 3 12 0 0\n\nExample 2:\nInput:\n3\n0 0 1\nOutput:\n1 0 0\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input()); a=list(map(int,input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "5\n0 1 0 3 12\n",
+          "expected_stdout": "1 3 12 0 0"
+        },
+        {
+          "stdin": "3\n0 0 1\n",
+          "expected_stdout": "1 0 0"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1\n0\n",
+          "expected_stdout": "0"
+        },
+        {
+          "stdin": "4\n1 2 3 4\n",
+          "expected_stdout": "1 2 3 4"
+        },
+        {
+          "stdin": "4\n0 0 0 1\n",
+          "expected_stdout": "1 0 0 0"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-move-zeroes-stable-5864e878"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Single Number",
+    "prompt_text": "Single Number\nEvery element appears twice except one. Find the single.\n\nInput:\n  Line 1: N\n  Line 2: N integers\nOutput: the single number\n\nExample 1:\nInput:\n5\n2 2 1 4 4\nOutput:\n1\n\nExample 2:\nInput:\n1\n9\nOutput:\n9\n",
+    "skill_tags": [
+      "arrays",
+      "hashmap"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Single Number\nEvery element appears twice except one. Find the single.\n\nInput:\n  Line 1: N\n  Line 2: N integers\nOutput: the single number\n\nExample 1:\nInput:\n5\n2 2 1 4 4\nOutput:\n1\n\nExample 2:\nInput:\n1\n9\nOutput:\n9\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input()); a=list(map(int,input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "5\n2 2 1 4 4\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "1\n9\n",
+          "expected_stdout": "9"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "3\n7 3 7\n",
+          "expected_stdout": "3"
+        },
+        {
+          "stdin": "7\n1 1 2 2 3 3 8\n",
+          "expected_stdout": "8"
+        },
+        {
+          "stdin": "5\n0 0 5 6 6\n",
+          "expected_stdout": "5"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-single-number-dcd50376"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Climbing Stairs",
+    "prompt_text": "Climbing Stairs\nWays to climb N stairs taking 1 or 2 steps.\n\nInput: N\nOutput: number of distinct ways\n\nExample 1:\nInput:\n2\nOutput:\n2\n\nExample 2:\nInput:\n3\nOutput:\n3\n",
+    "skill_tags": [
+      "dp"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Climbing Stairs\nWays to climb N stairs taking 1 or 2 steps.\n\nInput: N\nOutput: number of distinct ways\n\nExample 1:\nInput:\n2\nOutput:\n2\n\nExample 2:\nInput:\n3\nOutput:\n3\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input())\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "2\n",
+          "expected_stdout": "2"
+        },
+        {
+          "stdin": "3\n",
+          "expected_stdout": "3"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "4\n",
+          "expected_stdout": "5"
+        },
+        {
+          "stdin": "5\n",
+          "expected_stdout": "8"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-climbing-stairs-3b42f46f"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Best Time One Trade",
+    "prompt_text": "Best Time to Buy and Sell Stock\nMax profit with at most one transaction.\n\nInput:\n  Line 1: N\n  Line 2: N prices\nOutput: max profit (0 if none)\n\nExample 1:\nInput:\n6\n7 1 5 3 6 4\nOutput:\n5\n\nExample 2:\nInput:\n5\n7 6 4 3 1\nOutput:\n0\n",
+    "skill_tags": [
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Best Time to Buy and Sell Stock\nMax profit with at most one transaction.\n\nInput:\n  Line 1: N\n  Line 2: N prices\nOutput: max profit (0 if none)\n\nExample 1:\nInput:\n6\n7 1 5 3 6 4\nOutput:\n5\n\nExample 2:\nInput:\n5\n7 6 4 3 1\nOutput:\n0\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input()); a=list(map(int,input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "6\n7 1 5 3 6 4\n",
+          "expected_stdout": "5"
+        },
+        {
+          "stdin": "5\n7 6 4 3 1\n",
+          "expected_stdout": "0"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "2\n1 2\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "3\n2 4 1\n",
+          "expected_stdout": "2"
+        },
+        {
+          "stdin": "1\n10\n",
+          "expected_stdout": "0"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-best-time-one-trade-7124798e"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Majority Element",
+    "prompt_text": "Majority Element\nElement appearing more than N/2 times (guaranteed).\n\nInput:\n  Line 1: N\n  Line 2: N integers\nOutput: majority element\n\nExample 1:\nInput:\n3\n3 2 3\nOutput:\n3\n\nExample 2:\nInput:\n7\n2 2 1 1 1 2 2\nOutput:\n2\n",
+    "skill_tags": [
+      "arrays",
+      "hashmap"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Majority Element\nElement appearing more than N/2 times (guaranteed).\n\nInput:\n  Line 1: N\n  Line 2: N integers\nOutput: majority element\n\nExample 1:\nInput:\n3\n3 2 3\nOutput:\n3\n\nExample 2:\nInput:\n7\n2 2 1 1 1 2 2\nOutput:\n2\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input()); a=list(map(int,input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "3\n3 2 3\n",
+          "expected_stdout": "3"
+        },
+        {
+          "stdin": "7\n2 2 1 1 1 2 2\n",
+          "expected_stdout": "2"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1\n5\n",
+          "expected_stdout": "5"
+        },
+        {
+          "stdin": "5\n1 1 1 2 3\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "5\n9 9 8 9 7\n",
+          "expected_stdout": "9"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-majority-element-6c272b33"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Container Water",
+    "prompt_text": "Container With Most Water\nMax area between two lines.\n\nInput:\n  Line 1: N\n  Line 2: N heights\nOutput: max area\n\nExample 1:\nInput:\n9\n1 8 6 2 5 4 8 3 7\nOutput:\n49\n\nExample 2:\nInput:\n2\n1 1\nOutput:\n1\n",
+    "skill_tags": [
+      "two-pointers",
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Container With Most Water\nMax area between two lines.\n\nInput:\n  Line 1: N\n  Line 2: N heights\nOutput: max area\n\nExample 1:\nInput:\n9\n1 8 6 2 5 4 8 3 7\nOutput:\n49\n\nExample 2:\nInput:\n2\n1 1\nOutput:\n1\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input()); h=list(map(int,input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "9\n1 8 6 2 5 4 8 3 7\n",
+          "expected_stdout": "49"
+        },
+        {
+          "stdin": "2\n1 1\n",
+          "expected_stdout": "1"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "3\n1 2 1\n",
+          "expected_stdout": "2"
+        },
+        {
+          "stdin": "4\n1 2 4 3\n",
+          "expected_stdout": "4"
+        },
+        {
+          "stdin": "5\n2 3 4 5 18\n",
+          "expected_stdout": "18"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-container-water-379e6b0d"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Hard",
+    "title": "Coin Change Min",
+    "prompt_text": "Coin Change Minimum Coins\nFewest coins to make amount (unlimited supply). Impossible -> -1.\n\nInput:\n  Line 1: N amount\n  Line 2: N coin denominations\nOutput: min coins or -1\n\nExample 1:\nInput:\n3 11\n1 2 5\nOutput:\n3\n\nExample 2:\nInput:\n1 3\n2\nOutput:\n-1\n",
+    "skill_tags": [
+      "dp"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Coin Change Minimum Coins\nFewest coins to make amount (unlimited supply). Impossible -> -1.\n\nInput:\n  Line 1: N amount\n  Line 2: N coin denominations\nOutput: min coins or -1\n\nExample 1:\nInput:\n3 11\n1 2 5\nOutput:\n3\n\nExample 2:\nInput:\n1 3\n2\nOutput:\n-1\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n, amount = map(int, input().split()); coins=list(map(int,input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "3 11\n1 2 5\n",
+          "expected_stdout": "3"
+        },
+        {
+          "stdin": "1 3\n2\n",
+          "expected_stdout": "-1"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1 0\n1\n",
+          "expected_stdout": "0"
+        },
+        {
+          "stdin": "3 7\n1 3 4\n",
+          "expected_stdout": "2"
+        },
+        {
+          "stdin": "2 10\n5 10\n",
+          "expected_stdout": "1"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-coin-change-min-e3309b3d"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Kth Largest",
+    "prompt_text": "Kth Largest Element\nFind k-th largest in unsorted array.\n\nInput:\n  Line 1: N K\n  Line 2: N integers\nOutput: k-th largest\n\nExample 1:\nInput:\n6 2\n3 2 1 5 6 4\nOutput:\n5\n\nExample 2:\nInput:\n9 4\n3 2 3 1 2 4 5 5 6\nOutput:\n4\n",
+    "skill_tags": [
+      "heap",
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Kth Largest Element\nFind k-th largest in unsorted array.\n\nInput:\n  Line 1: N K\n  Line 2: N integers\nOutput: k-th largest\n\nExample 1:\nInput:\n6 2\n3 2 1 5 6 4\nOutput:\n5\n\nExample 2:\nInput:\n9 4\n3 2 3 1 2 4 5 5 6\nOutput:\n4\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n,k=map(int,input().split()); a=list(map(int,input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "6 2\n3 2 1 5 6 4\n",
+          "expected_stdout": "5"
+        },
+        {
+          "stdin": "9 4\n3 2 3 1 2 4 5 5 6\n",
+          "expected_stdout": "4"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1 1\n7\n",
+          "expected_stdout": "7"
+        },
+        {
+          "stdin": "5 1\n1 2 3 4 5\n",
+          "expected_stdout": "5"
+        },
+        {
+          "stdin": "5 5\n1 2 3 4 5\n",
+          "expected_stdout": "1"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-kth-largest-4ac33e81"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Daily Temperatures",
+    "prompt_text": "Daily Temperatures Wait\nFor each day, days until a warmer temperature; 0 if none.\n\nInput:\n  Line 1: N\n  Line 2: N temperatures\nOutput: N integers\n\nExample 1:\nInput:\n8\n73 74 75 71 69 72 76 73\nOutput:\n1 1 4 2 1 1 0 0\n\nExample 2:\nInput:\n4\n30 40 50 60\nOutput:\n1 1 1 0\n",
+    "skill_tags": [
+      "stack",
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Daily Temperatures Wait\nFor each day, days until a warmer temperature; 0 if none.\n\nInput:\n  Line 1: N\n  Line 2: N temperatures\nOutput: N integers\n\nExample 1:\nInput:\n8\n73 74 75 71 69 72 76 73\nOutput:\n1 1 4 2 1 1 0 0\n\nExample 2:\nInput:\n4\n30 40 50 60\nOutput:\n1 1 1 0\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input()); t=list(map(int,input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "8\n73 74 75 71 69 72 76 73\n",
+          "expected_stdout": "1 1 4 2 1 1 0 0"
+        },
+        {
+          "stdin": "4\n30 40 50 60\n",
+          "expected_stdout": "1 1 1 0"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "3\n30 30 30\n",
+          "expected_stdout": "0 0 0"
+        },
+        {
+          "stdin": "2\n50 40\n",
+          "expected_stdout": "0 0"
+        },
+        {
+          "stdin": "1\n80\n",
+          "expected_stdout": "0"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-daily-temperatures-c31b2321"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Sort Colors Dutch",
+    "prompt_text": "Sort Colors\nSort array of 0/1/2 in-place (Dutch national flag).\n\nInput:\n  Line 1: N\n  Line 2: N values in {0,1,2}\nOutput: sorted array\n\nExample 1:\nInput:\n6\n2 0 2 1 1 0\nOutput:\n0 0 1 1 2 2\n\nExample 2:\nInput:\n3\n2 0 1\nOutput:\n0 1 2\n",
+    "skill_tags": [
+      "arrays",
+      "two-pointers"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Sort Colors\nSort array of 0/1/2 in-place (Dutch national flag).\n\nInput:\n  Line 1: N\n  Line 2: N values in {0,1,2}\nOutput: sorted array\n\nExample 1:\nInput:\n6\n2 0 2 1 1 0\nOutput:\n0 0 1 1 2 2\n\nExample 2:\nInput:\n3\n2 0 1\nOutput:\n0 1 2\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input()); a=list(map(int,input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "6\n2 0 2 1 1 0\n",
+          "expected_stdout": "0 0 1 1 2 2"
+        },
+        {
+          "stdin": "3\n2 0 1\n",
+          "expected_stdout": "0 1 2"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1\n1\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "4\n0 0 0 0\n",
+          "expected_stdout": "0 0 0 0"
+        },
+        {
+          "stdin": "5\n2 2 1 1 0\n",
+          "expected_stdout": "0 1 1 2 2"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 25,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-sort-colors-dutch-adc1f2ea"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Hard",
+    "title": "Course Order Check",
+    "prompt_text": "Course Schedule Possible\nN courses 0..N-1 with prerequisites. Return YES if possible to finish.\n\nInput:\n  Line 1: N M\n  Next M lines: a b meaning b must before a\nOutput: YES or NO\n\nExample 1:\nInput:\n2 1\n1 0\nOutput:\nYES\n\nExample 2:\nInput:\n2 2\n1 0\n0 1\nOutput:\nNO\n",
+    "skill_tags": [
+      "graphs"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Course Schedule Possible\nN courses 0..N-1 with prerequisites. Return YES if possible to finish.\n\nInput:\n  Line 1: N M\n  Next M lines: a b meaning b must before a\nOutput: YES or NO\n\nExample 1:\nInput:\n2 1\n1 0\nOutput:\nYES\n\nExample 2:\nInput:\n2 2\n1 0\n0 1\nOutput:\nNO\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n,m=map(int,input().split()); edges=[tuple(map(int,input().split())) for _ in range(m)]\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "2 1\n1 0\n",
+          "expected_stdout": "YES"
+        },
+        {
+          "stdin": "2 2\n1 0\n0 1\n",
+          "expected_stdout": "NO"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1 0\n",
+          "expected_stdout": "YES"
+        },
+        {
+          "stdin": "3 2\n1 0\n2 1\n",
+          "expected_stdout": "YES"
+        },
+        {
+          "stdin": "3 3\n0 1\n1 2\n2 0\n",
+          "expected_stdout": "NO"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-course-order-check-13e87e3b"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Hard",
+    "title": "Gas Station Circuit",
+    "prompt_text": "Gas Station Circuit\nFind starting index to complete circuit; else -1. Unique answer.\n\nInput:\n  Line 1: N\n  Line 2: gas[i]\n  Line 3: cost[i]\nOutput: start index or -1\n\nExample 1:\nInput:\n5\n1 2 3 4 5\n3 4 5 1 2\nOutput:\n3\n\nExample 2:\nInput:\n3\n2 3 4\n3 4 3\nOutput:\n-1\n",
+    "skill_tags": [
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Gas Station Circuit\nFind starting index to complete circuit; else -1. Unique answer.\n\nInput:\n  Line 1: N\n  Line 2: gas[i]\n  Line 3: cost[i]\nOutput: start index or -1\n\nExample 1:\nInput:\n5\n1 2 3 4 5\n3 4 5 1 2\nOutput:\n3\n\nExample 2:\nInput:\n3\n2 3 4\n3 4 3\nOutput:\n-1\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input()); gas=list(map(int,input().split())); cost=list(map(int,input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "5\n1 2 3 4 5\n3 4 5 1 2\n",
+          "expected_stdout": "3"
+        },
+        {
+          "stdin": "3\n2 3 4\n3 4 3\n",
+          "expected_stdout": "-1"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1\n5\n4\n",
+          "expected_stdout": "0"
+        },
+        {
+          "stdin": "2\n1 2\n2 1\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "4\n5 1 2 3\n4 4 1 1\n",
+          "expected_stdout": "2"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-gas-station-circuit-e9a9f6e8"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Hard",
+    "title": "Edit Distance",
+    "prompt_text": "Edit Distance\nMin operations insert/delete/replace to convert A to B.\n\nInput:\n  Line 1: A\n  Line 2: B\nOutput: distance\n\nExample 1:\nInput:\nhorse\nros\nOutput:\n3\n\nExample 2:\nInput:\nintention\nexecution\nOutput:\n5\n",
+    "skill_tags": [
+      "dp",
+      "strings"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Edit Distance\nMin operations insert/delete/replace to convert A to B.\n\nInput:\n  Line 1: A\n  Line 2: B\nOutput: distance\n\nExample 1:\nInput:\nhorse\nros\nOutput:\n3\n\nExample 2:\nInput:\nintention\nexecution\nOutput:\n5\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "a=input().rstrip('\\n'); b=input().rstrip('\\n')\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "horse\nros\n",
+          "expected_stdout": "3"
+        },
+        {
+          "stdin": "intention\nexecution\n",
+          "expected_stdout": "5"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "\na\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "a\na\n",
+          "expected_stdout": "0"
+        },
+        {
+          "stdin": "abc\nyabd\n",
+          "expected_stdout": "2"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-edit-distance-be16e8c3"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Spiral Matrix Print",
+    "prompt_text": "Spiral Matrix Order\nPrint matrix in spiral order.\n\nInput:\n  Line 1: R C\n  Next R lines: C integers\nOutput: spiral values space-separated\n\nExample 1:\nInput:\n3 3\n1 2 3\n4 5 6\n7 8 9\nOutput:\n1 2 3 6 9 8 7 4 5\n\nExample 2:\nInput:\n1 2\n1 2\nOutput:\n1 2\n",
+    "skill_tags": [
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Spiral Matrix Order\nPrint matrix in spiral order.\n\nInput:\n  Line 1: R C\n  Next R lines: C integers\nOutput: spiral values space-separated\n\nExample 1:\nInput:\n3 3\n1 2 3\n4 5 6\n7 8 9\nOutput:\n1 2 3 6 9 8 7 4 5\n\nExample 2:\nInput:\n1 2\n1 2\nOutput:\n1 2\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "r,c=map(int,input().split()); m=[list(map(int,input().split())) for _ in range(r)]\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "3 3\n1 2 3\n4 5 6\n7 8 9\n",
+          "expected_stdout": "1 2 3 6 9 8 7 4 5"
+        },
+        {
+          "stdin": "1 2\n1 2\n",
+          "expected_stdout": "1 2"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "2 2\n1 2\n3 4\n",
+          "expected_stdout": "1 2 4 3"
+        },
+        {
+          "stdin": "3 1\n1\n2\n3\n",
+          "expected_stdout": "1 2 3"
+        },
+        {
+          "stdin": "1 1\n9\n",
+          "expected_stdout": "9"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-spiral-matrix-print-cec52296"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Hard",
+    "title": "Trie Prefix Count",
+    "prompt_text": "Prefix Word Count\nCount how many words start with given prefix.\n\nInput:\n  Line 1: N Q\n  Next N lines: dictionary words\n  Next Q lines: prefixes\nOutput: Q lines of counts\n\nExample 1:\nInput:\n3 2\napple\napp\napricot\napp\nap\nOutput:\n2\n3\n\nExample 2:\nInput:\n2 1\ncat\ncar\nz\nOutput:\n0\n",
+    "skill_tags": [
+      "trees",
+      "strings"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Prefix Word Count\nCount how many words start with given prefix.\n\nInput:\n  Line 1: N Q\n  Next N lines: dictionary words\n  Next Q lines: prefixes\nOutput: Q lines of counts\n\nExample 1:\nInput:\n3 2\napple\napp\napricot\napp\nap\nOutput:\n2\n3\n\nExample 2:\nInput:\n2 1\ncat\ncar\nz\nOutput:\n0\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n,q=map(int,input().split()); words=[input().strip() for _ in range(n)]; prefs=[input().strip() for _ in range(q)]\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "3 2\napple\napp\napricot\napp\nap\n",
+          "expected_stdout": "2\n3"
+        },
+        {
+          "stdin": "2 1\ncat\ncar\nz\n",
+          "expected_stdout": "0"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1 1\na\na\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "4 2\ndog\ndocs\ndo\ndoor\ndo\ndog\n",
+          "expected_stdout": "3\n1"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-trie-prefix-count-40b16179"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Is Subsequence Check",
+    "prompt_text": "Is Subsequence\nCheck if string S is a subsequence of T.\n\nInput:\n  Line 1: S\n  Line 2: T\nOutput: YES or NO\n\nExample 1:\nInput:\nabc\nahbgdc\nOutput:\nYES\n\nExample 2:\nInput:\naxc\nahbgdc\nOutput:\nNO\n",
+    "skill_tags": [
+      "strings",
+      "two-pointers"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Is Subsequence\nCheck if string S is a subsequence of T.\n\nInput:\n  Line 1: S\n  Line 2: T\nOutput: YES or NO\n\nExample 1:\nInput:\nabc\nahbgdc\nOutput:\nYES\n\nExample 2:\nInput:\naxc\nahbgdc\nOutput:\nNO\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "s=input().rstrip('\\n'); t=input().rstrip('\\n')\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "abc\nahbgdc\n",
+          "expected_stdout": "YES"
+        },
+        {
+          "stdin": "axc\nahbgdc\n",
+          "expected_stdout": "NO"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "a\na\n",
+          "expected_stdout": "YES"
+        },
+        {
+          "stdin": "abc\nab\n",
+          "expected_stdout": "NO"
+        },
+        {
+          "stdin": "\nabc\n",
+          "expected_stdout": "YES"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-is-subsequence-check-c52d6bc6"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Reverse Digits Safe",
+    "prompt_text": "Reverse Integer Digits\nReverse digits of a 32-bit signed integer. Overflow -> 0.\n\nInput: one integer X\nOutput: reversed or 0\n\nExample 1:\nInput:\n123\nOutput:\n321\n\nExample 2:\nInput:\n-123\nOutput:\n-321\n",
+    "skill_tags": [
+      "strings"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Reverse Integer Digits\nReverse digits of a 32-bit signed integer. Overflow -> 0.\n\nInput: one integer X\nOutput: reversed or 0\n\nExample 1:\nInput:\n123\nOutput:\n321\n\nExample 2:\nInput:\n-123\nOutput:\n-321\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "x=int(input())\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "123\n",
+          "expected_stdout": "321"
+        },
+        {
+          "stdin": "-123\n",
+          "expected_stdout": "-321"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "120\n",
+          "expected_stdout": "21"
+        },
+        {
+          "stdin": "0\n",
+          "expected_stdout": "0"
+        },
+        {
+          "stdin": "1534236469\n",
+          "expected_stdout": "0"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 25,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-reverse-digits-safe-216bea72"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Hard",
+    "title": "3Sum Triple Count",
+    "prompt_text": "3Sum Unique Triple Count\nCount unique value-triplets that sum to 0.\n\nInput:\n  Line 1: N\n  Line 2: N integers\nOutput: count\n\nExample 1:\nInput:\n6\n-1 0 1 2 -1 -4\nOutput:\n2\n\nExample 2:\nInput:\n3\n0 1 1\nOutput:\n0\n",
+    "skill_tags": [
+      "arrays",
+      "two-pointers"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "3Sum Unique Triple Count\nCount unique value-triplets that sum to 0.\n\nInput:\n  Line 1: N\n  Line 2: N integers\nOutput: count\n\nExample 1:\nInput:\n6\n-1 0 1 2 -1 -4\nOutput:\n2\n\nExample 2:\nInput:\n3\n0 1 1\nOutput:\n0\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input()); a=list(map(int,input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "6\n-1 0 1 2 -1 -4\n",
+          "expected_stdout": "2"
+        },
+        {
+          "stdin": "3\n0 1 1\n",
+          "expected_stdout": "0"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "3\n0 0 0\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "5\n-2 0 1 1 2\n",
+          "expected_stdout": "2"
+        },
+        {
+          "stdin": "4\n1 2 3 4\n",
+          "expected_stdout": "0"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-3sum-triple-count-964458a2"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Hard",
+    "title": "Word Ladder Length",
+    "prompt_text": "Word Ladder Length\nShortest transformation length from begin to end (1 letter change). Impossible -> 0.\n\nInput:\n  Line 1: begin end\n  Line 2: N\n  Next N lines: dictionary words\nOutput: ladder length or 0\n\nExample 1:\nInput:\nhit cog\n6\nhot\ndot\ndog\nlot\nlog\ncog\nOutput:\n5\n\nExample 2:\nInput:\nhit cog\n5\nhot\ndot\ndog\nlot\nlog\nOutput:\n0\n",
+    "skill_tags": [
+      "graphs",
+      "strings"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Word Ladder Length\nShortest transformation length from begin to end (1 letter change). Impossible -> 0.\n\nInput:\n  Line 1: begin end\n  Line 2: N\n  Next N lines: dictionary words\nOutput: ladder length or 0\n\nExample 1:\nInput:\nhit cog\n6\nhot\ndot\ndog\nlot\nlog\ncog\nOutput:\n5\n\nExample 2:\nInput:\nhit cog\n5\nhot\ndot\ndog\nlot\nlog\nOutput:\n0\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "begin,end=input().split(); n=int(input()); words=[input().strip() for _ in range(n)]\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "hit cog\n6\nhot\ndot\ndog\nlot\nlog\ncog\n",
+          "expected_stdout": "5"
+        },
+        {
+          "stdin": "hit cog\n5\nhot\ndot\ndog\nlot\nlog\n",
+          "expected_stdout": "0"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "a c\n3\na\nb\nc\n",
+          "expected_stdout": "2"
+        },
+        {
+          "stdin": "a a\n1\na\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "hit hot\n1\nhot\n",
+          "expected_stdout": "2"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-word-ladder-length-68012922"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Hard",
+    "title": "LRU Cache Trace",
+    "prompt_text": "LRU Cache Trace\nSimulate LRU. Ops: PUT k v | GET k (print value or -1)\n\nInput:\n  Line 1: capacity Q\n  Next Q lines: ops\nOutput: GET results each on a line\n\nExample 1:\nInput:\n2 8\nPUT 1 1\nPUT 2 2\nGET 1\nPUT 3 3\nGET 2\nPUT 4 4\nGET 1\nGET 3\nOutput:\n1\n-1\n-1\n3\n\nExample 2:\nInput:\n1 3\nPUT 1 10\nGET 1\nPUT 2 20\nOutput:\n10\n",
+    "skill_tags": [
+      "hashmap",
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "LRU Cache Trace\nSimulate LRU. Ops: PUT k v | GET k (print value or -1)\n\nInput:\n  Line 1: capacity Q\n  Next Q lines: ops\nOutput: GET results each on a line\n\nExample 1:\nInput:\n2 8\nPUT 1 1\nPUT 2 2\nGET 1\nPUT 3 3\nGET 2\nPUT 4 4\nGET 1\nGET 3\nOutput:\n1\n-1\n-1\n3\n\nExample 2:\nInput:\n1 3\nPUT 1 10\nGET 1\nPUT 2 20\nOutput:\n10\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "cap,q=map(int,input().split())\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "2 8\nPUT 1 1\nPUT 2 2\nGET 1\nPUT 3 3\nGET 2\nPUT 4 4\nGET 1\nGET 3\n",
+          "expected_stdout": "1\n-1\n-1\n3"
+        },
+        {
+          "stdin": "1 3\nPUT 1 10\nGET 1\nPUT 2 20\n",
+          "expected_stdout": "10"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "2 4\nPUT 1 1\nPUT 2 2\nGET 2\nGET 1\n",
+          "expected_stdout": "2\n1"
+        },
+        {
+          "stdin": "2 5\nPUT 2 1\nPUT 1 1\nPUT 2 3\nPUT 4 1\nGET 1\n",
+          "expected_stdout": "-1"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-lru-cache-trace-6b28f7a3"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Hard",
+    "title": "Pacific Atlantic Count",
+    "prompt_text": "Pacific Atlantic Water Flow Count\nCount cells that can flow to both Pacific (top/left) and Atlantic (bottom/right).\n\nInput:\n  Line 1: R C\n  Next R lines: heights\nOutput: count of cells\n\nExample 1:\nInput:\n5 5\n1 2 2 3 5\n3 2 3 4 4\n2 4 5 3 1\n6 7 1 4 5\n5 1 1 2 4\nOutput:\n7\n\nExample 2:\nInput:\n1 1\n1\nOutput:\n1\n",
+    "skill_tags": [
+      "graphs"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Pacific Atlantic Water Flow Count\nCount cells that can flow to both Pacific (top/left) and Atlantic (bottom/right).\n\nInput:\n  Line 1: R C\n  Next R lines: heights\nOutput: count of cells\n\nExample 1:\nInput:\n5 5\n1 2 2 3 5\n3 2 3 4 4\n2 4 5 3 1\n6 7 1 4 5\n5 1 1 2 4\nOutput:\n7\n\nExample 2:\nInput:\n1 1\n1\nOutput:\n1\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "r,c=map(int,input().split()); g=[list(map(int,input().split())) for _ in range(r)]\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "5 5\n1 2 2 3 5\n3 2 3 4 4\n2 4 5 3 1\n6 7 1 4 5\n5 1 1 2 4\n",
+          "expected_stdout": "7"
+        },
+        {
+          "stdin": "1 1\n1\n",
+          "expected_stdout": "1"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "2 2\n1 2\n4 3\n",
+          "expected_stdout": "4"
+        },
+        {
+          "stdin": "2 1\n1\n2\n",
+          "expected_stdout": "2"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-pacific-atlantic-count-0f1a3b76"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Hard",
+    "title": "Median Two Sorted",
+    "prompt_text": "Median of Two Sorted Arrays\nFind median of two sorted arrays. Print with exactly 1 decimal place.\n\nInput:\n  Line 1: N M\n  Line 2: N sorted ints (omit if N=0)\n  Line 3: M sorted ints (omit if M=0)\nOutput: median with 1 decimal place\n\nExample 1:\nInput:\n2 1\n1 3\n2\nOutput:\n2.0\n\nExample 2:\nInput:\n2 2\n1 2\n3 4\nOutput:\n2.5\n",
+    "skill_tags": [
+      "binary-search",
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Median of Two Sorted Arrays\nFind median of two sorted arrays. Print with exactly 1 decimal place.\n\nInput:\n  Line 1: N M\n  Line 2: N sorted ints (omit if N=0)\n  Line 3: M sorted ints (omit if M=0)\nOutput: median with 1 decimal place\n\nExample 1:\nInput:\n2 1\n1 3\n2\nOutput:\n2.0\n\nExample 2:\nInput:\n2 2\n1 2\n3 4\nOutput:\n2.5\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n,m=map(int,input().split())\na=list(map(int,input().split())) if n else []\nb=list(map(int,input().split())) if m else []\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "2 1\n1 3\n2\n",
+          "expected_stdout": "2.0"
+        },
+        {
+          "stdin": "2 2\n1 2\n3 4\n",
+          "expected_stdout": "2.5"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1 1\n1\n1\n",
+          "expected_stdout": "1.0"
+        },
+        {
+          "stdin": "3 3\n1 2 3\n4 5 6\n",
+          "expected_stdout": "3.5"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-median-two-sorted-836e0898"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Level Order Sizes",
+    "prompt_text": "Binary Tree Level Order Sizes\nGiven level-order with null as -1, print counts of non-null nodes per level.\n\nInput:\n  Line 1: N\n  Line 2: N values (-1 = null)\nOutput: space-separated level sizes\n\nExample 1:\nInput:\n7\n3 9 20 -1 -1 15 7\nOutput:\n1 2 2\n\nExample 2:\nInput:\n1\n1\nOutput:\n1\n",
+    "skill_tags": [
+      "trees"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Binary Tree Level Order Sizes\nGiven level-order with null as -1, print counts of non-null nodes per level.\n\nInput:\n  Line 1: N\n  Line 2: N values (-1 = null)\nOutput: space-separated level sizes\n\nExample 1:\nInput:\n7\n3 9 20 -1 -1 15 7\nOutput:\n1 2 2\n\nExample 2:\nInput:\n1\n1\nOutput:\n1\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input()); a=list(map(int,input().split()))\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "7\n3 9 20 -1 -1 15 7\n",
+          "expected_stdout": "1 2 2"
+        },
+        {
+          "stdin": "1\n1\n",
+          "expected_stdout": "1"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "3\n1 2 3\n",
+          "expected_stdout": "1 2"
+        },
+        {
+          "stdin": "5\n1 -1 2 -1 3\n",
+          "expected_stdout": "1 1 1"
+        }
+      ],
+      "time_seconds": 1200,
+      "marks": 30,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-level-order-sizes-79600462"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Longest Common Prefix",
+    "prompt_text": "Longest Common Prefix\nFind the longest common prefix string among words. Empty if none.\n\nInput:\n  Line 1: N\n  Next N lines: words\nOutput: prefix string (possibly empty line)\n\nExample 1:\nInput:\n3\nflower\nflow\nflight\nOutput:\nfl\n\nExample 2:\nInput:\n3\ndog\nracecar\ncar\nOutput:\n",
+    "skill_tags": [
+      "strings"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Longest Common Prefix\nFind the longest common prefix string among words. Empty if none.\n\nInput:\n  Line 1: N\n  Next N lines: words\nOutput: prefix string (possibly empty line)\n\nExample 1:\nInput:\n3\nflower\nflow\nflight\nOutput:\nfl\n\nExample 2:\nInput:\n3\ndog\nracecar\ncar\nOutput:\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input()); words=[input().rstrip('\\n') for _ in range(n)]\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "3\nflower\nflow\nflight\n",
+          "expected_stdout": "fl"
+        },
+        {
+          "stdin": "3\ndog\nracecar\ncar\n",
+          "expected_stdout": ""
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1\nalone\n",
+          "expected_stdout": "alone"
+        },
+        {
+          "stdin": "2\ninterspecies\ninterstellar\n",
+          "expected_stdout": "inters"
+        },
+        {
+          "stdin": "2\na\nb\n",
+          "expected_stdout": ""
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-longest-common-prefix-144165a2"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Valid Anagram Pair",
+    "prompt_text": "Valid Anagram\nCheck whether two strings are anagrams.\n\nInput:\n  Line 1: A\n  Line 2: B\nOutput: YES or NO\n\nExample 1:\nInput:\nanagram\nnagaram\nOutput:\nYES\n\nExample 2:\nInput:\nrat\ncar\nOutput:\nNO\n",
+    "skill_tags": [
+      "strings",
+      "hashmap"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Valid Anagram\nCheck whether two strings are anagrams.\n\nInput:\n  Line 1: A\n  Line 2: B\nOutput: YES or NO\n\nExample 1:\nInput:\nanagram\nnagaram\nOutput:\nYES\n\nExample 2:\nInput:\nrat\ncar\nOutput:\nNO\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "a=input().strip(); b=input().strip()\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "anagram\nnagaram\n",
+          "expected_stdout": "YES"
+        },
+        {
+          "stdin": "rat\ncar\n",
+          "expected_stdout": "NO"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "a\na\n",
+          "expected_stdout": "YES"
+        },
+        {
+          "stdin": "ab\nba\n",
+          "expected_stdout": "YES"
+        },
+        {
+          "stdin": "a\nab\n",
+          "expected_stdout": "NO"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-valid-anagram-pair-bbdac03f"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Fibonacci N",
+    "prompt_text": "Nth Fibonacci\nF(0)=0, F(1)=1. Compute F(N).\n\nInput: N (0 <= N <= 40)\nOutput: F(N)\n\nExample 1:\nInput:\n2\nOutput:\n1\n\nExample 2:\nInput:\n10\nOutput:\n55\n",
+    "skill_tags": [
+      "dp"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Nth Fibonacci\nF(0)=0, F(1)=1. Compute F(N).\n\nInput: N (0 <= N <= 40)\nOutput: F(N)\n\nExample 1:\nInput:\n2\nOutput:\n1\n\nExample 2:\nInput:\n10\nOutput:\n55\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input())\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "2\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "10\n",
+          "expected_stdout": "55"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "0\n",
+          "expected_stdout": "0"
+        },
+        {
+          "stdin": "1\n",
+          "expected_stdout": "1"
+        },
+        {
+          "stdin": "20\n",
+          "expected_stdout": "6765"
+        }
+      ],
+      "time_seconds": 600,
+      "marks": 15,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-fibonacci-n-879015e9"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Matrix Diagonal Sum",
+    "prompt_text": "Matrix Diagonal Sum\nSum of primary and secondary diagonals (count center once if odd N).\n\nInput:\n  Line 1: N\n  Next N lines: N integers\nOutput: diagonal sum\n\nExample 1:\nInput:\n3\n1 2 3\n4 5 6\n7 8 9\nOutput:\n25\n\nExample 2:\nInput:\n4\n1 1 1 1\n1 1 1 1\n1 1 1 1\n1 1 1 1\nOutput:\n8\n",
+    "skill_tags": [
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Matrix Diagonal Sum\nSum of primary and secondary diagonals (count center once if odd N).\n\nInput:\n  Line 1: N\n  Next N lines: N integers\nOutput: diagonal sum\n\nExample 1:\nInput:\n3\n1 2 3\n4 5 6\n7 8 9\nOutput:\n25\n\nExample 2:\nInput:\n4\n1 1 1 1\n1 1 1 1\n1 1 1 1\n1 1 1 1\nOutput:\n8\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input()); g=[list(map(int,input().split())) for _ in range(n)]\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "3\n1 2 3\n4 5 6\n7 8 9\n",
+          "expected_stdout": "25"
+        },
+        {
+          "stdin": "4\n1 1 1 1\n1 1 1 1\n1 1 1 1\n1 1 1 1\n",
+          "expected_stdout": "8"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1\n5\n",
+          "expected_stdout": "5"
+        },
+        {
+          "stdin": "2\n1 2\n3 4\n",
+          "expected_stdout": "10"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-matrix-diagonal-sum-38cbe2ca"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Easy",
+    "title": "Happy Number",
+    "prompt_text": "Happy Number\nRepeatedly replace n by sum of squares of digits; happy if reaches 1.\n\nInput: N\nOutput: YES or NO\n\nExample 1:\nInput:\n19\nOutput:\nYES\n\nExample 2:\nInput:\n2\nOutput:\nNO\n",
+    "skill_tags": [
+      "hashmap"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Happy Number\nRepeatedly replace n by sum of squares of digits; happy if reaches 1.\n\nInput: N\nOutput: YES or NO\n\nExample 1:\nInput:\n19\nOutput:\nYES\n\nExample 2:\nInput:\n2\nOutput:\nNO\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "n=int(input())\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "19\n",
+          "expected_stdout": "YES"
+        },
+        {
+          "stdin": "2\n",
+          "expected_stdout": "NO"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1\n",
+          "expected_stdout": "YES"
+        },
+        {
+          "stdin": "7\n",
+          "expected_stdout": "YES"
+        },
+        {
+          "stdin": "4\n",
+          "expected_stdout": "NO"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-happy-number-0cdcf9c6"
+  },
+  {
+    "type": "coding",
+    "difficulty": "Medium",
+    "title": "Pascal Row",
+    "prompt_text": "Pascal Triangle Row\nReturn the 0-indexed row of Pascal's triangle as space-separated integers.\n\nInput: rowIndex\nOutput: row values\n\nExample 1:\nInput:\n3\nOutput:\n1 3 3 1\n\nExample 2:\nInput:\n0\nOutput:\n1\n",
+    "skill_tags": [
+      "dp",
+      "arrays"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Pascal Triangle Row\nReturn the 0-indexed row of Pascal's triangle as space-separated integers.\n\nInput: rowIndex\nOutput: row values\n\nExample 1:\nInput:\n3\nOutput:\n1 3 3 1\n\nExample 2:\nInput:\n0\nOutput:\n1\n",
+      "type": "coding",
+      "languages": [
+        "python",
+        "javascript",
+        "java",
+        "cpp",
+        "c"
+      ],
+      "starter_code": {
+        "python": "k=int(input())\n"
+      },
+      "public_tests": [
+        {
+          "stdin": "3\n",
+          "expected_stdout": "1 3 3 1"
+        },
+        {
+          "stdin": "0\n",
+          "expected_stdout": "1"
+        }
+      ],
+      "hidden_tests": [
+        {
+          "stdin": "1\n",
+          "expected_stdout": "1 1"
+        },
+        {
+          "stdin": "4\n",
+          "expected_stdout": "1 4 6 4 1"
+        },
+        {
+          "stdin": "2\n",
+          "expected_stdout": "1 2 1"
+        }
+      ],
+      "time_seconds": 900,
+      "marks": 20,
+      "time_limit_ms": 5000,
+      "memory_limit_mb": 128
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-pascal-row-b88ae130"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Maintainability",
+    "prompt_text": "Which practice best improves long-term code maintainability?",
+    "skill_tags": [
+      "testing",
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which practice best improves long-term code maintainability?",
+      "type": "mcq",
+      "options": [
+        "Clear naming and small focused functions",
+        "Copy-pasting proven snippets everywhere",
+        "Avoiding code reviews to move faster",
+        "Keeping all logic in one module"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-maintainability-47f2c362"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Automated Tests Goal",
+    "prompt_text": "What is the primary goal of writing automated tests?",
+    "skill_tags": [
+      "testing"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "What is the primary goal of writing automated tests?",
+      "type": "mcq",
+      "options": [
+        "Increase deploy confidence and catch regressions early",
+        "Replace all manual QA forever",
+        "Make the codebase larger on purpose",
+        "Slow down every feature release"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-automated-tests-goal-a30f78b5"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Incident First Step",
+    "prompt_text": "In a production incident, what should you do first?",
+    "skill_tags": [
+      "devops",
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "In a production incident, what should you do first?",
+      "type": "mcq",
+      "options": [
+        "Stabilize impact and communicate status",
+        "Rewrite the system from scratch",
+        "Ignore metrics and wait",
+        "Delete logs to reduce noise"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-incident-first-step-919f0285"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "HTTP Created",
+    "prompt_text": "Which HTTP status best indicates a successful resource creation?",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which HTTP status best indicates a successful resource creation?",
+      "type": "mcq",
+      "options": [
+        "201 Created",
+        "204 No Content",
+        "301 Moved Permanently",
+        "409 Conflict"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-http-created-9c141282"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "CAP Theorem",
+    "prompt_text": "What does CAP theorem say a distributed system cannot guarantee simultaneously?",
+    "skill_tags": [
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "What does CAP theorem say a distributed system cannot guarantee simultaneously?",
+      "type": "mcq",
+      "options": [
+        "Consistency, Availability, and Partition tolerance",
+        "Caching, Auth, and Pagination",
+        "CPU, Memory, and Disk",
+        "Latency, Throughput, and Cost"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-cap-theorem-9966c059"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Index Equality",
+    "prompt_text": "Which index type is typically best for equality lookups on a high-cardinality column?",
+    "skill_tags": [
+      "databases"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which index type is typically best for equality lookups on a high-cardinality column?",
+      "type": "mcq",
+      "options": [
+        "B-tree / hash index",
+        "Full table scan only",
+        "Bitmap on unique UUID",
+        "No index needed"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-index-equality-bc9cd107"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Idempotent APIs",
+    "prompt_text": "What is the main benefit of idempotent API design?",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "What is the main benefit of idempotent API design?",
+      "type": "mcq",
+      "options": [
+        "Safe retries without unintended duplicate side effects",
+        "Faster JSON parsing",
+        "Smaller Docker images",
+        "Automatic schema migrations"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-idempotent-apis-751d8cc2"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Secrets CI",
+    "prompt_text": "Which approach best prevents secret leakage in CI/CD?",
+    "skill_tags": [
+      "security",
+      "devops"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which approach best prevents secret leakage in CI/CD?",
+      "type": "mcq",
+      "options": [
+        "Store secrets in a vault / secret manager, inject at runtime",
+        "Commit .env files for convenience",
+        "Put secrets in public README examples",
+        "Hard-code keys in frontend bundles"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-secrets-ci-7e213c38"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "REST Safe Method",
+    "prompt_text": "Which HTTP method is considered safe and idempotent?",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which HTTP method is considered safe and idempotent?",
+      "type": "mcq",
+      "options": [
+        "GET",
+        "POST",
+        "PATCH",
+        "CONNECT"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-rest-safe-method-70c6392a"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "ACID Atomicity",
+    "prompt_text": "In ACID, atomicity means:",
+    "skill_tags": [
+      "databases"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "In ACID, atomicity means:",
+      "type": "mcq",
+      "options": [
+        "All operations in a transaction succeed or none do",
+        "Data is never encrypted",
+        "Indexes are always used",
+        "Replicas are eventually consistent"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-acid-atomicity-3df1d91b"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "N Plus One",
+    "prompt_text": "What is the N+1 query problem?",
+    "skill_tags": [
+      "databases",
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "What is the N+1 query problem?",
+      "type": "mcq",
+      "options": [
+        "Fetching related rows with one query per parent after the initial query",
+        "Using too many CPU cores",
+        "Having N+1 microservices",
+        "A CSS layout bug"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-n-plus-one-bc8f4156"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "JWT Purpose",
+    "prompt_text": "What is a common purpose of JWT in APIs?",
+    "skill_tags": [
+      "security",
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "What is a common purpose of JWT in APIs?",
+      "type": "mcq",
+      "options": [
+        "Stateless authentication / authorization claims",
+        "Compressing images",
+        "Scheduling cron jobs",
+        "Replacing TLS"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-jwt-purpose-a3625f4b"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Horizontal Scale",
+    "prompt_text": "Horizontal scaling primarily means:",
+    "skill_tags": [
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Horizontal scaling primarily means:",
+      "type": "mcq",
+      "options": [
+        "Adding more machines/instances",
+        "Increasing CPU on one machine",
+        "Deleting caches",
+        "Rewriting in assembly"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-horizontal-scale-d747c7f7"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "CDN Benefit",
+    "prompt_text": "A CDN primarily helps by:",
+    "skill_tags": [
+      "system-design",
+      "cloud"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "A CDN primarily helps by:",
+      "type": "mcq",
+      "options": [
+        "Caching static assets closer to users",
+        "Replacing databases",
+        "Encrypting SQL queries",
+        "Running unit tests"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-cdn-benefit-35b5dcaa"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Blue Green",
+    "prompt_text": "Blue/green deployment reduces risk by:",
+    "skill_tags": [
+      "devops"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Blue/green deployment reduces risk by:",
+      "type": "mcq",
+      "options": [
+        "Switching traffic between two complete environments",
+        "Editing production code live",
+        "Skipping staging",
+        "Disabling monitoring"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-blue-green-8002e45d"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Optimistic Lock",
+    "prompt_text": "Optimistic locking typically uses:",
+    "skill_tags": [
+      "databases",
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Optimistic locking typically uses:",
+      "type": "mcq",
+      "options": [
+        "Version numbers / ETags to detect concurrent writes",
+        "Only table locks forever",
+        "Deleting the row on read",
+        "Disabling transactions"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-optimistic-lock-d7cbe7c5"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Rate Limiting",
+    "prompt_text": "Rate limiting protects services by:",
+    "skill_tags": [
+      "backend",
+      "security"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Rate limiting protects services by:",
+      "type": "mcq",
+      "options": [
+        "Restricting request volume per client/key",
+        "Increasing payload size",
+        "Removing authentication",
+        "Disabling retries"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-rate-limiting-f6b85737"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Eventual Consistency",
+    "prompt_text": "Eventual consistency means:",
+    "skill_tags": [
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Eventual consistency means:",
+      "type": "mcq",
+      "options": [
+        "Replicas converge to the same state given enough time without updates",
+        "All reads are always linearizable",
+        "Writes never succeed",
+        "Caches are never used"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-eventual-consistency-f7fbf6bd"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "OAuth Role",
+    "prompt_text": "OAuth 2.0 is primarily designed for:",
+    "skill_tags": [
+      "security"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "OAuth 2.0 is primarily designed for:",
+      "type": "mcq",
+      "options": [
+        "Delegated authorization",
+        "Compressing JSON",
+        "Schema migration",
+        "Packet routing"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-oauth-role-8b53977b"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "SQL Injection Defense",
+    "prompt_text": "Best defense against SQL injection:",
+    "skill_tags": [
+      "security",
+      "databases"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Best defense against SQL injection:",
+      "type": "mcq",
+      "options": [
+        "Parameterized queries / prepared statements",
+        "String concatenation of user input",
+        "Disabling HTTPS",
+        "Using GET for all writes"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-sql-injection-defense-754bf930"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Load Balancer L7",
+    "prompt_text": "Layer-7 load balancers can route based on:",
+    "skill_tags": [
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Layer-7 load balancers can route based on:",
+      "type": "mcq",
+      "options": [
+        "HTTP path/host/headers",
+        "Only MAC addresses",
+        "Only disk RPM",
+        "CSS selectors"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-load-balancer-l7-8b8a1f46"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Cache Stampede",
+    "prompt_text": "A cache stampede happens when:",
+    "skill_tags": [
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "A cache stampede happens when:",
+      "type": "mcq",
+      "options": [
+        "Many clients miss simultaneously and overload the origin",
+        "TTL is infinite",
+        "Only one key exists",
+        "DNS is perfect"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-cache-stampede-d23a7f7d"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Circuit Breaker",
+    "prompt_text": "Circuit breakers help by:",
+    "skill_tags": [
+      "backend",
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Circuit breakers help by:",
+      "type": "mcq",
+      "options": [
+        "Failing fast when a dependency is unhealthy",
+        "Deleting all logs",
+        "Increasing timeouts forever",
+        "Disabling alerts"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-circuit-breaker-f58b91be"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Twelve Factor Config",
+    "prompt_text": "Twelve-Factor apps store config in:",
+    "skill_tags": [
+      "devops",
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Twelve-Factor apps store config in:",
+      "type": "mcq",
+      "options": [
+        "Environment variables",
+        "Hard-coded constants only",
+        "Binary blobs in git",
+        "Client localStorage"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-twelve-factor-config-a70aa5ea"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Postgres Vacuum",
+    "prompt_text": "VACUUM in PostgreSQL primarily:",
+    "skill_tags": [
+      "databases"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "VACUUM in PostgreSQL primarily:",
+      "type": "mcq",
+      "options": [
+        "Reclaims storage and maintains visibility map health",
+        "Creates users",
+        "Shuts down replicas",
+        "Encrypts disks"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-postgres-vacuum-42a0bf83"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "React Key Prop",
+    "prompt_text": "React list keys should be:",
+    "skill_tags": [
+      "frontend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "React list keys should be:",
+      "type": "mcq",
+      "options": [
+        "Stable unique identifiers among siblings",
+        "Array index always even if reordered",
+        "Random on every render",
+        "Empty strings"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-react-key-prop-521d4674"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Python GIL",
+    "prompt_text": "The CPython GIL primarily limits:",
+    "skill_tags": [
+      "python"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "The CPython GIL primarily limits:",
+      "type": "mcq",
+      "options": [
+        "CPU-bound multi-threaded parallelism in one process",
+        "Disk encryption",
+        "JSON encoding speed always",
+        "DNS resolution"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-python-gil-c6342045"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Kafka Consumer Group",
+    "prompt_text": "In Kafka, a consumer group:",
+    "skill_tags": [
+      "queue",
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "In Kafka, a consumer group:",
+      "type": "mcq",
+      "options": [
+        "Shares partitions of a topic for parallel consume",
+        "Deletes topics automatically",
+        "Replaces ZooKeeper always",
+        "Encrypts disks"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-kafka-consumer-group-1b8e3baf"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "TLS Purpose",
+    "prompt_text": "TLS primarily provides:",
+    "skill_tags": [
+      "security"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "TLS primarily provides:",
+      "type": "mcq",
+      "options": [
+        "Encryption and authenticity for data in transit",
+        "Faster SQL joins",
+        "Automatic sharding",
+        "UI theming"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-tls-purpose-dd9e40d4"
+  },
+  {
+    "type": "mcq",
+    "difficulty": "Medium",
+    "title": "Observability Pillars",
+    "prompt_text": "The three common observability pillars are:",
+    "skill_tags": [
+      "devops",
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "The three common observability pillars are:",
+      "type": "mcq",
+      "options": [
+        "Metrics, logs, and traces",
+        "CSS, HTML, and JS",
+        "CPU, GPU, and RAM",
+        "Git, Docker, and npm"
+      ],
+      "correct_indices": [
+        0
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-observability-pillars-6b06683c"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "API Reliability",
+    "prompt_text": "Which of the following improve API reliability? Select all that apply.",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which of the following improve API reliability? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "Timeouts and retries with backoff",
+        "Input validation",
+        "Hard-coding secrets in source",
+        "Health checks and monitoring"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-api-reliability-99ad6337"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "Secure Delivery",
+    "prompt_text": "Which practices support secure software delivery? Select all that apply.",
+    "skill_tags": [
+      "security",
+      "devops"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which practices support secure software delivery? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "Least-privilege access",
+        "Dependency vulnerability scanning",
+        "Sharing production credentials in chat",
+        "Encrypted secrets storage"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-secure-delivery-1906ec50"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "Perf Diagnosis",
+    "prompt_text": "Which techniques help diagnose production performance issues? Select all that apply.",
+    "skill_tags": [
+      "devops",
+      "databases"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which techniques help diagnose production performance issues? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "Profiling hot paths",
+        "Checking slow-query logs",
+        "Ignoring p99 latency",
+        "Load testing representative traffic"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-perf-diagnosis-aea0aa06"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "Message Queue Reasons",
+    "prompt_text": "Which are valid reasons to choose a message queue? Select all that apply.",
+    "skill_tags": [
+      "queue",
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which are valid reasons to choose a message queue? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "Decouple producers and consumers",
+        "Absorb traffic spikes",
+        "Guarantee UI pixel-perfect rendering",
+        "Enable asynchronous processing"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-message-queue-reasons-c9a88fba"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "Good Indexes",
+    "prompt_text": "Which statements about database indexes are true? Select all that apply.",
+    "skill_tags": [
+      "databases"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which statements about database indexes are true? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "They can speed up reads",
+        "They can slow down writes",
+        "They always remove the need for EXPLAIN",
+        "Composite indexes can support multi-column filters"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-good-indexes-16ccc94e"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "Cloud Cost Control",
+    "prompt_text": "Which help control cloud costs? Select all that apply.",
+    "skill_tags": [
+      "cloud",
+      "devops"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which help control cloud costs? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "Right-sizing instances",
+        "Turning off unused environments",
+        "Always using the largest GPU",
+        "Budgets and anomaly alerts"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-cloud-cost-control-c71242a1"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "REST Design",
+    "prompt_text": "Which are REST best practices? Select all that apply.",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which are REST best practices? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "Use nouns for resources",
+        "Use proper HTTP verbs/status codes",
+        "Put secrets in query strings",
+        "Version APIs thoughtfully"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-rest-design-8e7c0598"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "CI Pipeline",
+    "prompt_text": "Which belong in a solid CI pipeline? Select all that apply.",
+    "skill_tags": [
+      "devops",
+      "testing"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which belong in a solid CI pipeline? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "Automated tests",
+        "Lint/static analysis",
+        "Manual production password paste in logs",
+        "Artifact build"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-ci-pipeline-35b79add"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "Data Privacy",
+    "prompt_text": "Which protect user data privacy? Select all that apply.",
+    "skill_tags": [
+      "security"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which protect user data privacy? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "Encryption at rest",
+        "Access audits",
+        "Publishing PII in analytics dashboards publicly",
+        "Data retention limits"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-data-privacy-155c80c4"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "Frontend Perf",
+    "prompt_text": "Which improve web frontend performance? Select all that apply.",
+    "skill_tags": [
+      "frontend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which improve web frontend performance? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "Code splitting",
+        "Image optimization",
+        "Blocking the main thread with huge sync work",
+        "Caching static assets"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-frontend-perf-cf11b4b5"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "SRE Practices",
+    "prompt_text": "Which are common SRE practices? Select all that apply.",
+    "skill_tags": [
+      "devops",
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which are common SRE practices? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "SLIs/SLOs",
+        "Error budgets",
+        "Ignoring on-call handoffs",
+        "Blameless postmortems"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-sre-practices-ff16f812"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "Python Packaging",
+    "prompt_text": "Which are true about Python dependency management? Select all that apply.",
+    "skill_tags": [
+      "python",
+      "devops"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which are true about Python dependency management? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "Pin versions for reproducible builds",
+        "Use virtual environments",
+        "Commit secrets inside wheels",
+        "Prefer audited package sources"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-python-packaging-7182bb3b"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "Graph Algorithms",
+    "prompt_text": "Which algorithms commonly traverse graphs? Select all that apply.",
+    "skill_tags": [
+      "graphs"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which algorithms commonly traverse graphs? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "BFS",
+        "DFS",
+        "Quicksort on edges only always",
+        "Dijkstra for weighted shortest paths"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-graph-algorithms-daebefb7"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "Cache Strategies",
+    "prompt_text": "Which are valid caching strategies? Select all that apply.",
+    "skill_tags": [
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which are valid caching strategies? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "Cache-aside",
+        "Write-through",
+        "Store plaintext passwords only in cache",
+        "TTL expiration"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-cache-strategies-90011bc4"
+  },
+  {
+    "type": "msq",
+    "difficulty": "Medium",
+    "title": "AuthN AuthZ",
+    "prompt_text": "Which statements are correct? Select all that apply.",
+    "skill_tags": [
+      "security"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Which statements are correct? Select all that apply.",
+      "type": "msq",
+      "options": [
+        "Authentication verifies identity",
+        "Authorization checks permissions",
+        "TLS replaces authorization completely",
+        "MFA strengthens authentication"
+      ],
+      "correct_indices": [
+        0,
+        1,
+        3
+      ],
+      "time_seconds": 120,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-authn-authz-c0e3e868"
+  },
+  {
+    "type": "numerical",
+    "difficulty": "Easy",
+    "title": "RPS to Hour",
+    "prompt_text": "A service handles 120 requests/minute. How many requests is that per hour?",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "A service handles 120 requests/minute. How many requests is that per hour?",
+      "type": "numerical",
+      "correct_answer": "7200",
+      "tolerance": 0,
+      "time_seconds": 90,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-rps-to-hour-e066756c"
+  },
+  {
+    "type": "numerical",
+    "difficulty": "Easy",
+    "title": "Latency Ms",
+    "prompt_text": "An API has p95 latency of 0.25 seconds. What is that latency in milliseconds?",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "An API has p95 latency of 0.25 seconds. What is that latency in milliseconds?",
+      "type": "numerical",
+      "correct_answer": "250",
+      "tolerance": 0,
+      "time_seconds": 90,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-latency-ms-f004074e"
+  },
+  {
+    "type": "numerical",
+    "difficulty": "Easy",
+    "title": "Points Per Week",
+    "prompt_text": "A team completes 8 story points in a 2-week sprint. What is average points per week?",
+    "skill_tags": [
+      "testing"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "A team completes 8 story points in a 2-week sprint. What is average points per week?",
+      "type": "numerical",
+      "correct_answer": "4",
+      "tolerance": 0,
+      "time_seconds": 90,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-points-per-week-9289a4f0"
+  },
+  {
+    "type": "numerical",
+    "difficulty": "Easy",
+    "title": "Cache Hits",
+    "prompt_text": "A cache hit rate is 80% of 5000 lookups. How many hits is that?",
+    "skill_tags": [
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "A cache hit rate is 80% of 5000 lookups. How many hits is that?",
+      "type": "numerical",
+      "correct_answer": "4000",
+      "tolerance": 0,
+      "time_seconds": 90,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-cache-hits-77300173"
+  },
+  {
+    "type": "numerical",
+    "difficulty": "Easy",
+    "title": "Log2 Comparisons",
+    "prompt_text": "A binary search on a sorted array of 1,048,576 elements takes at most how many comparisons (log2 N)?",
+    "skill_tags": [
+      "binary-search"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "A binary search on a sorted array of 1,048,576 elements takes at most how many comparisons (log2 N)?",
+      "type": "numerical",
+      "correct_answer": "20",
+      "tolerance": 0,
+      "time_seconds": 90,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-log2-comparisons-e8c7d176"
+  },
+  {
+    "type": "numerical",
+    "difficulty": "Easy",
+    "title": "Cron Runs",
+    "prompt_text": "If a job runs every 15 minutes, how many runs occur in 24 hours?",
+    "skill_tags": [
+      "devops"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "If a job runs every 15 minutes, how many runs occur in 24 hours?",
+      "type": "numerical",
+      "correct_answer": "96",
+      "tolerance": 0,
+      "time_seconds": 90,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-cron-runs-cefe770d"
+  },
+  {
+    "type": "numerical",
+    "difficulty": "Easy",
+    "title": "Percent Failures",
+    "prompt_text": "Out of 2000 requests, 50 failed. What is the failure rate in percent?",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Out of 2000 requests, 50 failed. What is the failure rate in percent?",
+      "type": "numerical",
+      "correct_answer": "2.5",
+      "tolerance": 0.01,
+      "time_seconds": 90,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-percent-failures-366eb664"
+  },
+  {
+    "type": "numerical",
+    "difficulty": "Easy",
+    "title": "Shard Size",
+    "prompt_text": "1,000,000 rows across 8 equal shards. Rows per shard?",
+    "skill_tags": [
+      "databases"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "1,000,000 rows across 8 equal shards. Rows per shard?",
+      "type": "numerical",
+      "correct_answer": "125000",
+      "tolerance": 0,
+      "time_seconds": 90,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-shard-size-fecfcc96"
+  },
+  {
+    "type": "numerical",
+    "difficulty": "Easy",
+    "title": "Bandwidth",
+    "prompt_text": "Transfer 500 MB at 100 MB/s. Seconds needed?",
+    "skill_tags": [
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Transfer 500 MB at 100 MB/s. Seconds needed?",
+      "type": "numerical",
+      "correct_answer": "5",
+      "tolerance": 0,
+      "time_seconds": 90,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-bandwidth-77723760"
+  },
+  {
+    "type": "numerical",
+    "difficulty": "Easy",
+    "title": "Replication Lag",
+    "prompt_text": "Primary write at t=0, replica lags 3s. Earliest safe read-your-write wait seconds?",
+    "skill_tags": [
+      "databases",
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Primary write at t=0, replica lags 3s. Earliest safe read-your-write wait seconds?",
+      "type": "numerical",
+      "correct_answer": "3",
+      "tolerance": 0,
+      "time_seconds": 90,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-replication-lag-f4458a73"
+  },
+  {
+    "type": "numerical",
+    "difficulty": "Easy",
+    "title": "Thread Pool",
+    "prompt_text": "Pool size 20, each task 200ms CPU. Approx max tasks/sec if fully utilized?",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Pool size 20, each task 200ms CPU. Approx max tasks/sec if fully utilized?",
+      "type": "numerical",
+      "correct_answer": "100",
+      "tolerance": 0,
+      "time_seconds": 90,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-thread-pool-0ecab650"
+  },
+  {
+    "type": "numerical",
+    "difficulty": "Medium",
+    "title": "SLA Monthly",
+    "prompt_text": "99.9% monthly uptime allows how many downtime minutes in a 30-day month? (approx floor)",
+    "skill_tags": [
+      "devops"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "99.9% monthly uptime allows how many downtime minutes in a 30-day month? (approx floor)",
+      "type": "numerical",
+      "correct_answer": "43",
+      "tolerance": 1,
+      "time_seconds": 90,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-sla-monthly-1769c47b"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Relevant Experience",
+    "prompt_text": "Describe the most relevant project experience you bring for this role and why it maps to the job description.",
+    "skill_tags": [
+      "backend",
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Describe the most relevant project experience you bring for this role and why it maps to the job description.",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-relevant-experience-d7a5b627"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Production Debug",
+    "prompt_text": "Walk through how you would debug and resolve a production incident under time pressure.",
+    "skill_tags": [
+      "devops",
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Walk through how you would debug and resolve a production incident under time pressure.",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-production-debug-b42c7cba"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Tradeoff Decision",
+    "prompt_text": "Describe a technical decision you made, the tradeoffs you considered, and the outcome.",
+    "skill_tags": [
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Describe a technical decision you made, the tradeoffs you considered, and the outcome.",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-tradeoff-decision-f438b476"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Learning Approach",
+    "prompt_text": "How do you approach learning a new framework required for a role like this?",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "How do you approach learning a new framework required for a role like this?",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-learning-approach-d7fbced9"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Nontechnical Explain",
+    "prompt_text": "Explain a complex concept from this job description as you would to a non-technical stakeholder.",
+    "skill_tags": [
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Explain a complex concept from this job description as you would to a non-technical stakeholder.",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-nontechnical-explain-2c57f785"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Legacy Onboarding",
+    "prompt_text": "Describe your approach to onboarding onto an unfamiliar legacy codebase.",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Describe your approach to onboarding onto an unfamiliar legacy codebase.",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-legacy-onboarding-3343f8f3"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Tech Debt",
+    "prompt_text": "How do you balance technical debt reduction with feature delivery?",
+    "skill_tags": [
+      "backend",
+      "testing"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "How do you balance technical debt reduction with feature delivery?",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-tech-debt-ffe7733c"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Perf Optimization",
+    "prompt_text": "Explain a performance optimization you made and how you measured impact.",
+    "skill_tags": [
+      "backend",
+      "databases"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Explain a performance optimization you made and how you measured impact.",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-perf-optimization-a4ee5431"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Stakeholder Conflict",
+    "prompt_text": "Tell me about a time you disagreed with a technical approach. How did you resolve it?",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Tell me about a time you disagreed with a technical approach. How did you resolve it?",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-stakeholder-conflict-3c6b26e4"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Scalable Design",
+    "prompt_text": "How would you design a scalable component related to this role? What bottlenecks would you watch?",
+    "skill_tags": [
+      "system-design"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "How would you design a scalable component related to this role? What bottlenecks would you watch?",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-scalable-design-7de74f75"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Code Quality Deadline",
+    "prompt_text": "How do you ensure code quality when shipping under a tight deadline?",
+    "skill_tags": [
+      "testing",
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "How do you ensure code quality when shipping under a tight deadline?",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-code-quality-deadline-9d61b0ae"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Distributed Failures",
+    "prompt_text": "Walk through investigating intermittent failures in a distributed system.",
+    "skill_tags": [
+      "system-design",
+      "devops"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Walk through investigating intermittent failures in a distributed system.",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-distributed-failures-30f48161"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Collaboration",
+    "prompt_text": "Tell me about collaborating across teams to deliver a feature end to end.",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Tell me about collaborating across teams to deliver a feature end to end.",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-collaboration-3a53344a"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Prioritization",
+    "prompt_text": "How do you prioritize when multiple stakeholders have competing deadlines?",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "How do you prioritize when multiple stakeholders have competing deadlines?",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-prioritization-1ddf9d52"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Security Mindset",
+    "prompt_text": "How do you incorporate security into day-to-day development?",
+    "skill_tags": [
+      "security"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "How do you incorporate security into day-to-day development?",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-security-mindset-feed8456"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Data Modeling",
+    "prompt_text": "Describe how you would model data for a high-read feature in this domain.",
+    "skill_tags": [
+      "databases"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Describe how you would model data for a high-read feature in this domain.",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-data-modeling-663544ca"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "API Design Story",
+    "prompt_text": "Describe an API you designed and how you evolved it without breaking clients.",
+    "skill_tags": [
+      "backend"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "Describe an API you designed and how you evolved it without breaking clients.",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-api-design-story-b297ee20"
+  },
+  {
+    "type": "subjective",
+    "difficulty": "Medium",
+    "title": "Observability Habit",
+    "prompt_text": "How do you use metrics/logs/traces in your daily debugging workflow?",
+    "skill_tags": [
+      "devops"
+    ],
+    "role_tags": [
+      "sde"
+    ],
+    "payload": {
+      "text": "How do you use metrics/logs/traces in your daily debugging workflow?",
+      "type": "subjective",
+      "time_seconds": 180,
+      "marks": 10
+    },
+    "source": "seed",
+    "quality_score": 1.0,
+    "slug": "seed-observability-habit-49d28ddc"
+  }
+]

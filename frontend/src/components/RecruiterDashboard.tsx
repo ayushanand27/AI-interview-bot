@@ -92,6 +92,8 @@ function normalizeEditableQuestion(q: AssessmentQuestion): AssessmentQuestion {
     type,
     time_seconds: Number(q.time_seconds) || DEFAULT_TIME_SECONDS,
     marks: Number(q.marks) || 10,
+    bank_id: q.bank_id ?? null,
+    origin: q.origin === "library" || q.origin === "ai" ? q.origin : null,
   };
   if (type === "mcq" || type === "msq") {
     const options =
@@ -268,6 +270,7 @@ export default function RecruiterDashboard({
     "msq",
     "numerical",
   ]);
+  const [useQuestionBank, setUseQuestionBank] = useState(true);
   const [assessmentLoading, setAssessmentLoading] = useState(false);
   const [editableQuestions, setEditableQuestions] = useState<AssessmentQuestion[]>(
     [],
@@ -532,6 +535,7 @@ export default function RecruiterDashboard({
         question_count: questionCount,
         difficulty,
         question_types: questionTypes,
+        use_question_bank: useQuestionBank,
       });
       setEditableQuestions(
         (res.data.questions ?? []).map((q) => normalizeEditableQuestion(q)),
@@ -1155,6 +1159,32 @@ export default function RecruiterDashboard({
               </div>
             </div>
 
+            <div className="rp-type-mix">
+              <span className="rp-type-mix-label">Generation mode</span>
+              <div className="rp-type-mix-options">
+                <label className="rp-type-chip">
+                  <input
+                    type="radio"
+                    name="gen-mode"
+                    checked={useQuestionBank}
+                    onChange={() => setUseQuestionBank(true)}
+                    disabled={assessmentLoading}
+                  />
+                  Library-first
+                </label>
+                <label className="rp-type-chip">
+                  <input
+                    type="radio"
+                    name="gen-mode"
+                    checked={!useQuestionBank}
+                    onChange={() => setUseQuestionBank(false)}
+                    disabled={assessmentLoading}
+                  />
+                  AI-only
+                </label>
+              </div>
+            </div>
+
             <button
               type="button"
               className="rp-primary"
@@ -1176,6 +1206,17 @@ export default function RecruiterDashboard({
                     <li key={i} className="rp-question-edit-row">
                       <div className="rp-question-edit-top">
                         <span className="rp-question-num">Q{i + 1}</span>
+                        {q.origin === "library" || q.origin === "ai" ? (
+                          <span
+                            className={
+                              q.origin === "library"
+                                ? "rp-origin-badge rp-origin-library"
+                                : "rp-origin-badge rp-origin-ai"
+                            }
+                          >
+                            {q.origin === "library" ? "Library" : "AI"}
+                          </span>
+                        ) : null}
                         <label className="rp-inline-type">
                           Type
                           <select

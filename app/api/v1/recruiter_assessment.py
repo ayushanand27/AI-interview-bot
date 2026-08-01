@@ -58,8 +58,9 @@ async def generate_questions(
     difficulty: str = Form(...),
     jd_text: str = Form(""),
     question_types: str | None = Form(None),
+    use_question_bank: bool = Form(True),
     jd_pdf: UploadFile | None = File(None),
-    _current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
 ):
     jd_pdf_bytes: bytes | None = None
     if jd_pdf is not None and jd_pdf.filename:
@@ -88,13 +89,16 @@ async def generate_questions(
             question_count=question_count,
             difficulty=difficulty,
             question_types=parsed_types,
+            use_question_bank=use_question_bank,
         )
     except ValidationError as exc:
         raise HTTPException(
             status_code=422, detail=serializable_validation_errors(exc)
         ) from exc
 
-    result = AssessmentService.generate_questions_preview(data)
+    result = AssessmentService.generate_questions_preview(
+        data, recruiter_id=current_user.id
+    )
     return BaseResponse(
         success=True,
         message=f"Generated {len(result.questions)} question(s)",

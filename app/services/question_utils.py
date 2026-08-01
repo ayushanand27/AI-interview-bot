@@ -255,6 +255,15 @@ def normalize_question(item: Any) -> dict[str, Any]:
         payload["memory_limit_mb"] = question_memory_limit_mb(item)
         if isinstance(item, dict) and item.get("rubric_notes"):
             payload["rubric_notes"] = str(item.get("rubric_notes"))
+    if isinstance(item, dict):
+        if item.get("bank_id") is not None:
+            try:
+                payload["bank_id"] = int(item["bank_id"])
+            except (TypeError, ValueError):
+                pass
+        origin = item.get("origin")
+        if origin in ("library", "ai"):
+            payload["origin"] = origin
     return payload
 
 
