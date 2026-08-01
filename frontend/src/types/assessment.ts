@@ -60,6 +60,7 @@ export interface AssessmentSummary {
   max_uses: number;
   created_at: string;
   is_expired: boolean;
+  duration_minutes?: number | null;
 }
 
 export interface ParseJdPdfResponse {

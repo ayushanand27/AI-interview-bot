@@ -191,6 +191,7 @@ def _row_to_interview_session(obj: DBSess) -> InterviewSession:
         adaptive_state=getattr(obj, "adaptive_state", None),
         current_question_index=int(obj.current_question_index or 0),
         created_at=obj.created_at,
+        interview_started_at=getattr(obj, "interview_started_at", None),
     )
 
 
@@ -216,6 +217,7 @@ def _interview_session_to_row(session: InterviewSession, now: datetime) -> DBSes
         total_questions=session.total_questions,
         created_at=session.created_at,
         updated_at=now,
+        interview_started_at=getattr(session, "interview_started_at", None),
     )
 
 
@@ -238,6 +240,9 @@ def _apply_session_fields(obj: DBSess, session: InterviewSession, now: datetime)
     if session_invite:
         obj.invite_token = session_invite
     obj.adaptive_state = getattr(session, "adaptive_state", None)
+    started = getattr(session, "interview_started_at", None)
+    if started is not None:
+        obj.interview_started_at = started
     obj.current_question_index = session.current_question_index
     obj.total_questions = session.total_questions
     obj.updated_at = now

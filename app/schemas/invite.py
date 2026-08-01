@@ -12,6 +12,7 @@ class InviteValidResponse(BaseModel):
     company: str
     question_count: int
     difficulty: str
+    duration_minutes: Optional[int] = None
 
 
 class InviteInvalidResponse(BaseModel):

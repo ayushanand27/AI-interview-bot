@@ -145,6 +145,14 @@ class CurrentQuestionResponse(BaseModel):
         None,
         description="Difficulty band for the current question when adaptive interviewing is active.",
     )
+    assessment_duration_minutes: Optional[int] = Field(
+        None,
+        description="Overall assessment time limit in minutes when configured on the invite.",
+    )
+    assessment_remaining_seconds: Optional[int] = Field(
+        None,
+        description="Seconds remaining on the overall assessment timer (invite sessions).",
+    )
 
 
 class AnswerSubmitRequest(BaseModel):

@@ -56,6 +56,8 @@ export interface CurrentQuestionResponse {
   is_adaptive_follow_up?: boolean;
   adaptive_topic?: string | null;
   adaptive_difficulty?: string | null;
+  assessment_duration_minutes?: number | null;
+  assessment_remaining_seconds?: number | null;
 }
 
 export interface AudioTranscribeResponse {

@@ -4,6 +4,7 @@ export interface InviteValidInfo {
   company: string;
   question_count: number;
   difficulty: string;
+  duration_minutes?: number | null;
 }
 
 export interface InviteInvalidInfo {

@@ -34,6 +34,8 @@ class InterviewSession:
     final_score: dict | None = None
     current_question_index: int = 0
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # Set when candidate first fetches a question (overall assessment timer).
+    interview_started_at: Optional[datetime] = None
 
     @property
     def total_questions(self) -> int:

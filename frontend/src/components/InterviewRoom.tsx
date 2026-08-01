@@ -188,11 +188,18 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
       ? question.time_seconds
       : QUESTION_TIMER_SEC,
   );
+  const [assessmentSecondsLeft, setAssessmentSecondsLeft] = useState<number | null>(
+    question.assessment_remaining_seconds != null &&
+      question.assessment_remaining_seconds >= 0
+      ? question.assessment_remaining_seconds
+      : null,
+  );
 
   const answerRef = useRef("");
   const selectedOptionsRef = useRef<string[]>([]);
   const lastActivityRef = useRef(Date.now());
   const questionTimerExpiredRef = useRef(false);
+  const assessmentExpiredRef = useRef(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const pipContainerRef = useRef<HTMLDivElement>(null);
@@ -322,7 +329,13 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     setSecondsLeft(timerSec);
     questionTimerExpiredRef.current = false;
     lastActivityRef.current = Date.now();
-  }, [sessionId, question.question_index, question.time_seconds, question.question_type, question.languages, question.starter_code]);
+    if (
+      question.assessment_remaining_seconds != null &&
+      question.assessment_remaining_seconds >= 0
+    ) {
+      setAssessmentSecondsLeft(question.assessment_remaining_seconds);
+    }
+  }, [sessionId, question.question_index, question.time_seconds, question.question_type, question.languages, question.starter_code, question.assessment_remaining_seconds]);
 
   useEffect(() => {
     codingSourceRef.current = codingSource;
@@ -1041,6 +1054,37 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     return () => window.clearInterval(idleCheckId);
   }, [onIdleTimeout]);
 
+  // Overall assessment countdown (invite sessions with duration_minutes set)
+  useEffect(() => {
+    if (
+      question.assessment_duration_minutes == null ||
+      question.assessment_duration_minutes <= 0
+    ) {
+      return;
+    }
+    const timerId = window.setInterval(() => {
+      setAssessmentSecondsLeft((prev) => {
+        if (prev == null) return prev;
+        if (prev <= 1) {
+          window.clearInterval(timerId);
+          if (!assessmentExpiredRef.current && !loading) {
+            assessmentExpiredRef.current = true;
+            setFlashMessage("Assessment time is up — ending interview");
+            onEndEarly();
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timerId);
+  }, [
+    question.assessment_duration_minutes,
+    question.question_index,
+    loading,
+    onEndEarly,
+  ]);
+
   useEffect(() => {
     const timerId = window.setInterval(() => {
       setSecondsLeft((prev) => {
@@ -1287,6 +1331,19 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
             Time left: {Math.floor(secondsLeft / 60)}:
             {(secondsLeft % 60).toString().padStart(2, "0")}
           </span>
+          {assessmentSecondsLeft != null && (
+            <span
+              className={`question-timer assessment-timer${
+                assessmentSecondsLeft <= 60 ? " question-timer-urgent" : ""
+              }`}
+              role="timer"
+              aria-live="polite"
+              title="Overall assessment time remaining"
+            >
+              Exam: {Math.floor(assessmentSecondsLeft / 60)}:
+              {(assessmentSecondsLeft % 60).toString().padStart(2, "0")}
+            </span>
+          )}
           <div className="progress-bar">
             <div
               className="progress-fill"

@@ -269,6 +269,8 @@ export default function RecruiterDashboard({
   const [questionCount, setQuestionCount] = useState(5);
   const [difficulty, setDifficulty] = useState("Medium");
   const [expiryHours, setExpiryHours] = useState(48);
+  const [maxUses, setMaxUses] = useState(100);
+  const [durationMinutes, setDurationMinutes] = useState<number | "">("");
   const [questionTypes, setQuestionTypes] = useState<QuestionType[]>([
     "subjective",
     "mcq",
@@ -800,6 +802,9 @@ export default function RecruiterDashboard({
         question_count: cleaned.length,
         difficulty,
         expiry_hours: expiryHours,
+        max_uses: maxUses,
+        duration_minutes:
+          durationMinutes === "" ? null : Number(durationMinutes),
         questions: cleaned,
       });
       setApprovedInviteLink(res.data.invite_link);
@@ -1155,6 +1160,46 @@ export default function RecruiterDashboard({
                   <option value={72}>72 hours</option>
                   <option value={168}>1 week</option>
                 </select>
+              </div>
+              <div>
+                <label htmlFor="max-uses">Max uses</label>
+                <input
+                  id="max-uses"
+                  type="number"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={maxUses}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    if (!Number.isFinite(n)) return;
+                    setMaxUses(Math.min(100, Math.max(1, Math.round(n))));
+                  }}
+                />
+                <p className="rp-hint">1 = single-use · up to 100</p>
+              </div>
+              <div>
+                <label htmlFor="duration-minutes">Exam duration (optional)</label>
+                <input
+                  id="duration-minutes"
+                  type="number"
+                  min={5}
+                  max={480}
+                  step={5}
+                  placeholder="None"
+                  value={durationMinutes}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      setDurationMinutes("");
+                      return;
+                    }
+                    const n = Number(raw);
+                    if (!Number.isFinite(n)) return;
+                    setDurationMinutes(Math.min(480, Math.max(5, Math.round(n))));
+                  }}
+                />
+                <p className="rp-hint">Overall minutes · blank = per-question only</p>
               </div>
             </div>
 
@@ -1686,6 +1731,12 @@ export default function RecruiterDashboard({
                         <td>
                           {a.question_count}
                           <span className="rp-cell-muted"> {a.difficulty}</span>
+                          {a.duration_minutes != null && (
+                            <span className="rp-cell-muted">
+                              {" "}
+                              · {a.duration_minutes}m
+                            </span>
+                          )}
                         </td>
                         <td>
                           {a.used_count}/{a.max_uses}

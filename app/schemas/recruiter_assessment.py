@@ -364,6 +364,8 @@ class CreateAssessmentRequest(BaseModel):
     expiry_hours: int
     questions: list[AssessmentQuestion] | None = None
     question_types: list[QuestionType] | None = None
+    max_uses: int = Field(default=100, ge=1, le=100)
+    duration_minutes: int | None = Field(default=None)
 
     @field_validator("question_count")
     @classmethod
@@ -379,6 +381,22 @@ class CreateAssessmentRequest(BaseModel):
     def validate_expiry_hours(cls, v: int) -> int:
         if v not in (24, 48, 72, 168):
             raise ValueError("expiry_hours must be 24, 48, 72, or 168")
+        return v
+
+    @field_validator("max_uses")
+    @classmethod
+    def validate_max_uses(cls, v: int) -> int:
+        if not (1 <= v <= 100):
+            raise ValueError("max_uses must be between 1 and 100")
+        return v
+
+    @field_validator("duration_minutes")
+    @classmethod
+    def validate_duration_minutes(cls, v: int | None) -> int | None:
+        if v is None:
+            return None
+        if not (5 <= v <= 480):
+            raise ValueError("duration_minutes must be between 5 and 480, or omitted")
         return v
 
     @field_validator("difficulty")
@@ -440,6 +458,7 @@ class AssessmentSummary(BaseModel):
     max_uses: int
     created_at: datetime
     is_expired: bool
+    duration_minutes: int | None = None
 
 
 class UpdateAssessmentRequest(BaseModel):

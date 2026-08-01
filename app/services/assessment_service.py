@@ -1072,6 +1072,7 @@ def _summary_from_invite(invite: InterviewInvite, now: datetime) -> AssessmentSu
         max_uses=invite.max_uses,
         created_at=created,
         is_expired=expiry <= now,
+        duration_minutes=getattr(invite, "duration_minutes", None),
     )
 
 
@@ -1132,9 +1133,10 @@ class AssessmentService:
             questions_json=_questions_payload(questions),
             difficulty=data.difficulty,
             expiry_at=expiry_at,
-            max_uses=100,
+            max_uses=data.max_uses,
             used_count=0,
             created_at=now,
+            duration_minutes=data.duration_minutes,
         )
         self.db.add(invite)
         await self.db.commit()

@@ -57,5 +57,9 @@ class Session(Base):
     )
     # Set when the session was started via a recruiter invite link.
     invite_token: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    # Set when the candidate first opens a question (overall exam countdown start).
+    interview_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     # Phase 5: adaptive interview blueprint / coverage / adaptation log.
     adaptive_state: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)

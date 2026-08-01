@@ -290,6 +290,11 @@ export default function LiveInterviewRoom({
         </div>
       </header>
 
+      <p className="live-room-honesty" role="status">
+        Live collaborative rooms are not proctored — Meet/Zoom handles video.
+        Async assessments (invite links) are proctored.
+      </p>
+
       {error && <p className="live-room-error">{error}</p>}
 
       <div className="live-room-body">

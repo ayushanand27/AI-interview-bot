@@ -583,7 +583,18 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
           </p>
           <p className="invite-meta">
             {inviteInfo.question_count} questions · {inviteInfo.difficulty}
+            {inviteInfo.duration_minutes != null
+              ? ` · ${inviteInfo.duration_minutes} min total`
+              : ""}
           </p>
+          <div className="invite-rules" role="note">
+            <h3 className="invite-rules-title">Rules of engagement</h3>
+            <ul className="invite-rules-list">
+              <li>Quiet private room — no phone or calls</li>
+              <li>Stay in fullscreen; other tabs are logged</li>
+              <li>Webcam + mic must stay on for proctoring</li>
+            </ul>
+          </div>
           <button
             type="button"
             className="primary"

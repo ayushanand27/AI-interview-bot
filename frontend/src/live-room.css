@@ -426,6 +426,17 @@
   flex-shrink: 0;
 }
 
+.live-room-honesty {
+  margin: 0;
+  padding: 0.45rem 1rem;
+  background: rgba(13, 148, 136, 0.12);
+  border-bottom: 1px solid rgba(13, 148, 136, 0.28);
+  color: #99f6e4;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
 @media (max-width: 900px) {
   .live-room-shell {
     height: auto;

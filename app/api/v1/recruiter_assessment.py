@@ -118,6 +118,8 @@ async def create_assessment(
     jd_text: str = Form(""),
     jd_pdf: UploadFile | None = File(None),
     questions: str | None = Form(None),
+    max_uses: int = Form(100),
+    duration_minutes: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
 ):
@@ -137,6 +139,15 @@ async def create_assessment(
 
     custom_questions = _parse_questions_form(questions)
 
+    parsed_duration: int | None = None
+    if duration_minutes is not None and str(duration_minutes).strip() != "":
+        try:
+            parsed_duration = int(str(duration_minutes).strip())
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422, detail="duration_minutes must be an integer"
+            ) from exc
+
     try:
         data = CreateAssessmentRequest(
             jd_text=combined_jd,
@@ -146,6 +157,8 @@ async def create_assessment(
             difficulty=difficulty,
             expiry_hours=expiry_hours,
             questions=custom_questions,
+            max_uses=max_uses,
+            duration_minutes=parsed_duration,
         )
     except ValidationError as exc:
         raise HTTPException(

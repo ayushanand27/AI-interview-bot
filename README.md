@@ -1,6 +1,6 @@
 # AI Interview Bot
 
-AI-powered **proctored technical interviews** — candidates practice or take recruiter invite interviews; recruiters create mixed question-type assessments and review results.
+AI-powered hiring flow: **Jobs → ATS shortlist → Assessment invites → Live coding rooms**. Candidates take proctored async assessments or join collaborative live rooms; recruiters create mixed question-type assessments and review results.
 
 **Repo:** https://github.com/ayushanand27/AI-interview-bot
 
@@ -16,12 +16,74 @@ AI-powered **proctored technical interviews** — candidates practice or take re
 
 > Webcam / microphone need a **secure context** (`https://` or `localhost`). The live site uses free DuckDNS + Let's Encrypt SSL.
 
+### Quick demo path
+
+1. Open https://ai-interview-bot.duckdns.org/recruiter → register / log in as recruiter  
+2. **Jobs** — post a JD, share apply link; review ATS keyword shortlist  
+3. **Assessments** — generate questions (subjective / MCQ / MSQ / numerical / coding), set max uses + optional exam duration, copy invite link  
+4. Open the invite as a candidate (desktop Chrome/Edge) → identity check → proctored interview  
+5. **Live** — create a collaborative coding room + Meet/Zoom URL (not proctored)
+
 ---
 
-## What it does
+## What the product does
 
-1. **Mock interview** — candidate registers, uploads resume + JD, gets AI questions, takes a proctored interview, receives score + PDF report.
-2. **Recruiter invite** — recruiter builds a JD-based assessment (subjective / MCQ / MSQ / numerical), sets per-question time and marks, shares a link; candidate verifies identity, interviews; recruiter reviews transcripts, integrity flags, recordings, and PDFs.
+| Stage | What happens |
+|---|---|
+| **Jobs** | Recruiter posts a job; candidates apply with resume |
+| **ATS** | Free-tier shortlist: resume structure hygiene + JD **keyword** match |
+| **Assessment** | Recruiter builds a timed invite (mixed question types); candidate verifies identity and takes a **proctored** async interview |
+| **Live** | Collaborative coding room + chat; video via **Google Meet / Zoom** link you provide |
+
+Also: candidate **mock interview** (register → resume + JD → AI questions → proctored practice → score + PDF).
+
+---
+
+## Features (current)
+
+- Auth: register / login, email verify, forgot/reset password (Gmail SMTP)
+- Jobs + public apply + keyword ATS shortlist
+- Recruiter assessments with editable question mix, per-question time/marks, **configurable invite max uses (1–100)**, optional **overall exam duration**
+- Invite flow: welcome rules → details → ID + selfie liveness → preflight checklist → proctored room
+- Question types: subjective, MCQ, MSQ, numerical, coding (Judge0 when configured)
+- Browser proctoring signals (face, tab blur, fullscreen, audio, virtual cam heuristics, YOLO objects)
+- Anti-cheat deterrents: copy-block, watermark, blur-on-blur, LLM paste canary
+- Live collaborative coding rooms (WebSocket + Meet/Zoom link)
+- Recruiter tenancy: list / extend / delete unused assessments; review own sessions, analytics, PDFs
+- Privacy policy (`/privacy`), recording (WebM → MP4 when ffmpeg available)
+
+---
+
+## Explicit limitations / non-claims
+
+This is a **demo-grade free-tier** product. Do **not** claim:
+
+| Claim | Reality |
+|---|---|
+| Enterprise SSO / SAML / OIDC | **Not built** — email/password only |
+| LiveKit / self-hosted WebRTC | **Not built** — live video is Meet/Zoom |
+| Redis-backed multi-instance WS | **Not built** — single EC2 worker |
+| Semantic / embedding ATS | **Not built** — keyword + structure only (`ATS_ENABLE_SEMANTIC=false`) |
+| Org RBAC / multi-tenant admin | **Not built** — per-recruiter ownership |
+| SEB / lockdown browser | **Not built** — browser SPA proctoring only |
+| Dual-monitor / plagiarism ML | **Not built** |
+| Live rooms are proctored | **They are not** — Meet handles video; honesty banner in-room |
+| “Phones cannot see questions” / “ChatGPT-proof” | Deterrents only — not cryptographic guarantees |
+
+Browser proctoring logs evidence for recruiters; it is **not** Safe Exam Browser or a locked OS.
+
+---
+
+## Free-tier roadmap (when paid infra is available)
+
+| When you can pay for… | Then add… |
+|---|---|
+| Extra RAM / GPU or managed vectors | Semantic ATS (MiniLM / embeddings) |
+| Dedicated media servers | LiveKit (or similar) in-app video |
+| Multi-instance hosting | Redis-backed WebSocket pub/sub |
+| IdP contract | SSO / org RBAC |
+
+Until then, keep the demo on **t3.micro** + DuckDNS + optional free-tier RDS/S3 (see AWS docs below).
 
 ---
 
@@ -35,23 +97,27 @@ Recruiters choose which kinds to generate and can edit each question before crea
 | **MCQ** (single correct) | Radio options (shuffled) | Exact match server-side |
 | **MSQ** (multi-select) | Checkboxes (shuffled) | Exact set match server-side |
 | **Numerical** | Number input | Exact / tolerance match server-side |
+| **Coding** | Monaco editor + public tests | Judge0 hidden tests when configured |
 
-- Per-question **time (seconds)** and **marks** are editable; weighted scoring uses marks across all types.
+- Per-question **time (seconds)** and **marks** are editable; optional **overall exam minutes** countdown on invite sessions.
 - Correct keys stay on the invite JSON and are **never** sent to the candidate API response.
 - Existing subjective-only invites keep working (default type = `subjective`).
 
 ---
 
-## Proctoring
+## Proctoring (async assessments)
 
 Logged / enforced during the interview room:
 
 - Face missing / multiple faces / looking away (MediaPipe)
 - Tab switch / window blur (focus-loss)
+- Fullscreen exit
 - Loud ambient audio
 - Virtual camera / screen-recording extension heuristics
 - Phone / prohibited object detection (YOLOv8n)
 - Integrity penalty applied to final score; human-review flag for recruiters
+
+**Live collaborative rooms** show an honesty banner and are **not** proctored.
 
 ---
 
@@ -62,28 +128,15 @@ Implemented deterrents (aligned with industry practice, not absolute locks):
 | Control | Behavior |
 |---|---|
 | **Copy / paste / cut block** | Clipboard events + Ctrl/Cmd+C/V/X blocked in the interview room; right-click disabled |
-| **Dynamic watermark** | Candidate email/id + session id + timestamp tiled over the question pane (photo leaks identity) |
-| **Blur-on-blur** | Question text obscured when the window loses focus / tab is hidden (pairs with focus-loss proctor flag) |
-| **LLM paste canary** | Low-visibility instructional canary + visible “Confidential interview assessment — do not share with AI tools” footer |
+| **Dynamic watermark** | Candidate email/id + session id + timestamp tiled over the question pane |
+| **Blur-on-blur** | Question text obscured when the window loses focus / tab is hidden |
+| **LLM paste canary** | Low-visibility instructional canary + confidential footer |
 
 ### Honest limitations
 
 - A **physical phone camera** pointed at the screen cannot be fully blocked in a browser SPA.
 - Motivated candidates can retype questions, strip canaries, or use out-of-band AI tools.
 - Copy-block, watermark, blur, and canaries are **deterrents + evidence aids**, not cryptographic guarantees.
-- Do **not** claim “phones cannot see questions” or “ChatGPT will never answer.”
-
----
-
-## Features
-
-- Auth: register / login, email verify, forgot/reset password (Gmail SMTP)
-- Candidate mock flow + recruiter portal (`/recruiter`)
-- Invite flow with ID + selfie identity check
-- Recruiter tenancy: list / extend / delete unused assessments; review only own sessions
-- Privacy policy page (`/privacy`)
-- Interview recording (WebM → MP4 when ffmpeg available)
-- Candidate + recruiter PDF reports
 
 ---
 
@@ -192,6 +245,7 @@ python scripts/full_test.py
 | `APP_ENV` | `development` / `production` |
 | `UPLOAD_DIR` | Uploads path |
 | `S3_BUCKET` / `AWS_*` | Optional S3 object storage |
+| `ATS_ENABLE_SEMANTIC` | Keep `false` on free tier (keyword ATS only) |
 | `ARTIFACT_RETENTION_DAYS` / `IDENTITY_RETENTION_DAYS` / `RECORDING_RETENTION_DAYS` | Cleanup TTLs |
 
 See `.env.example` and `.env.production.example`.
@@ -270,6 +324,7 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_EMAIL=you@gmail.com
 SMTP_PASSWORD=your-app-password
+ATS_ENABLE_SEMANTIC=false
 ```
 
 Leave `VITE_API_URL` empty for same-origin nginx.
@@ -294,14 +349,15 @@ Leave `VITE_API_URL` empty for same-origin nginx.
 ## Project layout
 
 ```
-app/           FastAPI API, auth, interviews, proctoring, reports
+app/           FastAPI API, auth, interviews, proctoring, reports, jobs/ATS, live rooms
 frontend/      React + Vite UI
 deploy/        EC2 / nginx / HTTPS scripts
 alembic/       DB migrations
 scripts/       bootstrap_db, full_test, dev helpers
+docs/          AWS free-tier setup and ops notes
 ```
 
-Question-type fields live in invite `questions_json` (JSON) — no DB column migration required for MCQ/MSQ/numerical metadata.
+Question-type fields live in invite `questions_json` (JSON) — no DB column migration required for MCQ/MSQ/numerical metadata. Invite `duration_minutes` and session `interview_started_at` use Alembic migration `0022`.
 
 ---
 

@@ -78,6 +78,35 @@
   font-size: 0.92rem;
 }
 
+.invite-rules {
+  text-align: left;
+  margin: 0 auto 1.25rem;
+  max-width: 22rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  background: var(--bg-elevated, rgba(0, 0, 0, 0.03));
+}
+
+.invite-rules-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.invite-rules-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--muted, #555);
+}
+
+.invite-rules-list li + li {
+  margin-top: 0.25rem;
+}
+
 .invite-flow .invite-details-form {
   display: flex;
   flex-direction: column;

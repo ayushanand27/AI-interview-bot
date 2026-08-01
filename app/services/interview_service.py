@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 
 from uuid import UUID
+from datetime import datetime, timezone
 
 from app.models.schemas import (
     AnswerSubmitResponse,
@@ -78,6 +79,59 @@ from app.services.adaptive_interview import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _invite_duration_minutes(invite_token: str | None) -> int | None:
+    if not invite_token:
+        return None
+    try:
+        from sqlalchemy import select as sa_select
+
+        from app.db.interview_invite_model import InterviewInvite
+        from app.services.session_persistence import _get_sync_session_local
+
+        SessionLocal = _get_sync_session_local()
+        with SessionLocal() as db:
+            invite = db.execute(
+                sa_select(InterviewInvite).where(
+                    InterviewInvite.token == str(invite_token)
+                )
+            ).scalar_one_or_none()
+        if invite is None:
+            return None
+        raw = getattr(invite, "duration_minutes", None)
+        if raw is None:
+            return None
+        minutes = int(raw)
+        return minutes if minutes > 0 else None
+    except Exception:
+        logger.debug("Could not load invite duration for token %s", invite_token)
+        return None
+
+
+def _assessment_remaining_seconds(
+    session: InterviewSession,
+    duration_minutes: int | None,
+) -> int | None:
+    if duration_minutes is None or duration_minutes <= 0:
+        return None
+    started = getattr(session, "interview_started_at", None)
+    if started is None:
+        return int(duration_minutes) * 60
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+    return max(0, int(duration_minutes * 60 - elapsed))
+
+
+def _ensure_assessment_not_expired(session: InterviewSession) -> None:
+    """Reject further answers when the overall assessment timer has elapsed."""
+    duration = _invite_duration_minutes(getattr(session, "invite_token", None))
+    remaining = _assessment_remaining_seconds(session, duration)
+    if remaining is not None and remaining <= 0:
+        raise InvalidSessionStateError(
+            "Assessment time limit reached. Please end the interview."
+        )
 
 
 def _candidate_safe_judgments(judgments: list | None) -> list[dict]:
@@ -350,6 +404,8 @@ class InterviewService:
         # First access moves session into active interview
         if session.status == SessionStatus.QUESTIONS_READY:
             session.status = SessionStatus.IN_PROGRESS
+            if getattr(session, "interview_started_at", None) is None:
+                session.interview_started_at = datetime.now(timezone.utc)
             session_store.save(session)
             invite_token = getattr(session, "invite_token", None)
             if invite_token:
@@ -360,6 +416,30 @@ class InterviewService:
                     event_type="started",
                     session_id=session.session_id,
                 )
+        elif (
+            session.status == SessionStatus.IN_PROGRESS
+            and getattr(session, "interview_started_at", None) is None
+        ):
+            session.interview_started_at = datetime.now(timezone.utc)
+            session_store.save(session)
+
+        duration_minutes = _invite_duration_minutes(
+            getattr(session, "invite_token", None)
+        )
+        remaining = _assessment_remaining_seconds(session, duration_minutes)
+        if remaining is not None and remaining <= 0:
+            return CurrentQuestionResponse(
+                session_id=session.session_id,
+                status=session.status,
+                question_index=session.current_question_index,
+                total_questions=session.total_questions,
+                question=None,
+                is_complete=True,
+                message="Assessment time limit reached. Please end the interview.",
+                proctor_warning_count=proctor_warnings,
+                assessment_duration_minutes=duration_minutes,
+                assessment_remaining_seconds=0,
+            )
 
         index = session.current_question_index
         raw_question = session.questions[index]
@@ -391,6 +471,8 @@ class InterviewService:
             is_adaptive_follow_up=bool(adaptive_flags.get("is_adaptive_follow_up")),
             adaptive_topic=adaptive_flags.get("adaptive_topic"),
             adaptive_difficulty=adaptive_flags.get("adaptive_difficulty"),
+            assessment_duration_minutes=duration_minutes,
+            assessment_remaining_seconds=remaining,
         )
 
     def submit_answer(
@@ -405,6 +487,8 @@ class InterviewService:
             raise InvalidSessionStateError(
                 "Interview locked due to integrity violations. Contact the recruiter."
             )
+
+        _ensure_assessment_not_expired(session)
 
         if session.status not in (
             SessionStatus.IN_PROGRESS,
@@ -581,6 +665,8 @@ class InterviewService:
             raise InvalidSessionStateError(
                 "Interview locked due to integrity violations. Contact the recruiter."
             )
+
+        _ensure_assessment_not_expired(session)
 
         if session.status not in (
             SessionStatus.IN_PROGRESS,

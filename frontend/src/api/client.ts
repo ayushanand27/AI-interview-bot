@@ -784,12 +784,22 @@ export const recruiterApi = {
     difficulty: string;
     expiry_hours: number;
     questions?: AssessmentQuestion[];
+    max_uses?: number;
+    duration_minutes?: number | null;
   }) {
     const form = new FormData();
     form.append("jd_text", payload.jd_text ?? "");
     form.append("question_count", String(payload.question_count));
     form.append("difficulty", payload.difficulty);
     form.append("expiry_hours", String(payload.expiry_hours));
+    form.append("max_uses", String(payload.max_uses ?? 100));
+    if (
+      payload.duration_minutes != null &&
+      Number.isFinite(payload.duration_minutes) &&
+      payload.duration_minutes > 0
+    ) {
+      form.append("duration_minutes", String(payload.duration_minutes));
+    }
     if (payload.jd_pdf) {
       form.append("jd_pdf", payload.jd_pdf);
     }

@@ -26,6 +26,8 @@ class InterviewInvite(Base):
     expiry_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     max_uses: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     used_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Optional overall exam length (minutes). None = per-question timers only.
+    duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True

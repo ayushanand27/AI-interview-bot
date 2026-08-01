@@ -125,6 +125,7 @@ class InviteService:
             company=company,
             question_count=len(questions),
             difficulty=invite.difficulty,
+            duration_minutes=getattr(invite, "duration_minutes", None),
         )
 
     async def _resume_existing_registration(

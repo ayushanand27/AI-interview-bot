@@ -296,6 +296,15 @@ export default function PreInterviewChecklist({
       <h2 className="checklist-title">Pre-interview checks</h2>
       <p className="checklist-intro">Complete each step before starting.</p>
 
+      <div className="invite-rules checklist-rules" role="note">
+        <h3 className="invite-rules-title">Rules of engagement</h3>
+        <ul className="invite-rules-list">
+          <li>Quiet private room — no phone or calls</li>
+          <li>Stay in fullscreen; close other tabs</li>
+          <li>Do not leave the interview window until you finish</li>
+        </ul>
+      </div>
+
       <div className="checklist-steps">
         <section>
           <h3 className="checklist-step-title">1. Camera &amp; mic</h3>

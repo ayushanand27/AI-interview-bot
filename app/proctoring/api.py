@@ -332,7 +332,7 @@ def verify_environment(body: VerifyEnvironmentRequest):
         msg = "Fullscreen mode must stay enabled before starting the interview"
         block_reasons.append(msg)
         warning_mgr.record_client_violation(
-            "tab_switch",
+            "fullscreen_exit",
             msg,
             evidence_metadata={"phase": "preflight", "fullscreen_active": False},
         )
