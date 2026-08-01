@@ -15,6 +15,7 @@ import {
 } from "../hooks/useExtensionDetection";
 import { confirmAnswerSubmit, getAnswerWarnings, MAX_ANSWER_LENGTH } from "../utils/validateAnswer";
 import { startAmbientAudioMonitor } from "../utils/audioMonitor";
+import type { AmbientEventType } from "../utils/audioMonitor";
 import {
   CONFIDENTIAL_FOOTER,
   attachInterviewClipboardGuards,
@@ -30,7 +31,10 @@ const MONACO_LANG: Record<string, string> = {
   perl: "plaintext",
 };
 
-const LOUD_AUDIO_MESSAGE = "Please maintain a quiet environment";
+const FULLSCREEN_EXIT_MESSAGE =
+  "Please return to fullscreen — leaving fullscreen has been logged";
+const SESSION_LOCKED_MESSAGE =
+  "Interview locked due to integrity violations. You can end the session.";
 const TAB_SWITCH_MESSAGE =
   "Switched away from interview window - this has been logged";
 const PROCTOR_INTERVAL_MS = 3000;
@@ -39,10 +43,15 @@ const ENVIRONMENT_CHECK_MS = 20000;
 const VIOLATION_FLASH_MS = 3000;
 const PROCTOR_BANNER_DISMISS_MS = 3000;
 const SESSION_IDLE_MS = 15 * 60 * 1000;
+const DRAFT_SAVE_MS = 4000;
 const QUESTION_TIMER_SEC =
   Number(import.meta.env.VITE_QUESTION_TIMER_SECONDS) || 180;
 
 const PROCTOR_OK_STATUSES = new Set(["ok", "calibrating"]);
+
+function draftStorageKey(sessionId: string, questionIndex: number): string {
+  return `interview-draft:${sessionId}:${questionIndex}`;
+}
 
 /** Keep PiP clear of banners (top) and primary action buttons (bottom). */
 const PIP_SAFE_TOP = 72;
@@ -163,6 +172,8 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
   );
   const roomRootRef = useRef<HTMLDivElement | null>(null);
   const [penaltyPercent, setPenaltyPercent] = useState(0);
+  const [sessionLocked, setSessionLocked] = useState(false);
+  const [fullscreenPrompt, setFullscreenPrompt] = useState(false);
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const [proctorBanner, setProctorBanner] = useState<string | null>(null);
   const [streamWarning, setStreamWarning] = useState<string | null>(null);
@@ -214,6 +225,9 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
   const ambientMicRef = useRef<MediaStream | null>(null);
   const stopAmbientMonitorRef = useRef<(() => void) | null>(null);
   const shutdownRecordingRef = useRef(false);
+
+  const isAudioRecordingRef = useRef(false);
+  const sessionLockedRef = useRef(false);
 
   const currentNum = question.question_index + 1;
   const progress =
@@ -269,6 +283,38 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     setCodingSource(starter);
     codingSourceRef.current = starter;
     codingLanguageRef.current = lang;
+
+    // Restore draft for this question if present (refresh recovery).
+    try {
+      const raw = localStorage.getItem(
+        draftStorageKey(sessionId, question.question_index),
+      );
+      if (raw) {
+        const parsed = JSON.parse(raw) as {
+          answer?: string;
+          selectedOptions?: string[];
+          codingLanguage?: string;
+          codingSource?: string;
+        };
+        if (typeof parsed.answer === "string" && parsed.answer.trim()) {
+          setAnswer(parsed.answer);
+        }
+        if (Array.isArray(parsed.selectedOptions) && parsed.selectedOptions.length) {
+          setSelectedOptions(parsed.selectedOptions);
+        }
+        if (typeof parsed.codingLanguage === "string" && parsed.codingLanguage) {
+          setCodingLanguage(parsed.codingLanguage);
+          codingLanguageRef.current = parsed.codingLanguage;
+        }
+        if (typeof parsed.codingSource === "string" && parsed.codingSource.trim()) {
+          setCodingSource(parsed.codingSource);
+          codingSourceRef.current = parsed.codingSource;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
     const timerSec =
       question.time_seconds && question.time_seconds > 0
         ? question.time_seconds
@@ -276,7 +322,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     setSecondsLeft(timerSec);
     questionTimerExpiredRef.current = false;
     lastActivityRef.current = Date.now();
-  }, [question.question_index, question.time_seconds, question.question_type, question.languages, question.starter_code]);
+  }, [sessionId, question.question_index, question.time_seconds, question.question_type, question.languages, question.starter_code]);
 
   useEffect(() => {
     codingSourceRef.current = codingSource;
@@ -371,6 +417,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = undefined;
     }
+    isAudioRecordingRef.current = false;
     setIsAudioRecording(false);
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== "inactive") {
@@ -526,6 +573,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
 
       mediaRecorderRef.current = recorder;
       recorder.start();
+      isAudioRecordingRef.current = true;
       setIsAudioRecording(true);
       setRecordingSeconds(0);
       recordingTimerRef.current = setInterval(() => {
@@ -569,6 +617,11 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
 
   const handleProctorResponse = useCallback((res: ProctorAnalyzeResponse) => {
     setPenaltyPercent(res.score_penalty_percent ?? 0);
+    if (res.terminated) {
+      sessionLockedRef.current = true;
+      setSessionLocked(true);
+      showViolationFlash(SESSION_LOCKED_MESSAGE);
+    }
 
     const alert = res.alert_message?.trim();
     if (alert) {
@@ -601,19 +654,29 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     }
   }, [showViolationFlash]);
 
-  const handleLoudAudio = useCallback(() => {
-    showViolationFlash(LOUD_AUDIO_MESSAGE);
-    void proctorApi
-      .reportLoudAudio(sessionId, LOUD_AUDIO_MESSAGE)
-      .then((res) => {
-        if (res.recorded) {
-          setPenaltyPercent(res.score_penalty_percent ?? 0);
-        }
-      })
-      .catch(() => {});
-  }, [sessionId, showViolationFlash]);
+  const handleAmbientEvent = useCallback(
+    (type: AmbientEventType, message: string) => {
+      if (sessionLockedRef.current) return;
+      showViolationFlash(message);
+      void proctorApi
+        .reportClientViolation(sessionId, type, message)
+        .then((res) => {
+          if (res.recorded) {
+            setPenaltyPercent(res.score_penalty_percent ?? 0);
+          }
+          if (res.terminated) {
+            sessionLockedRef.current = true;
+            setSessionLocked(true);
+            showViolationFlash(SESSION_LOCKED_MESSAGE);
+          }
+        })
+        .catch(() => {});
+    },
+    [sessionId, showViolationFlash],
+  );
 
   const handleTabSwitch = useCallback(() => {
+    if (sessionLockedRef.current) return;
     showViolationFlash(TAB_SWITCH_MESSAGE);
     void proctorApi
       .reportClientViolation(sessionId, "tab_switch", TAB_SWITCH_MESSAGE)
@@ -621,15 +684,24 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
         if (res.recorded) {
           setPenaltyPercent(res.score_penalty_percent ?? 0);
         }
+        if (res.terminated) {
+          sessionLockedRef.current = true;
+          setSessionLocked(true);
+          showViolationFlash(SESSION_LOCKED_MESSAGE);
+        }
       })
       .catch(() => {});
   }, [sessionId, showViolationFlash]);
 
   useTabSwitchDetection({
     onWarning: handleTabSwitch,
-    onTerminate: () => {},
+    onTerminate: () => {
+      sessionLockedRef.current = true;
+      setSessionLocked(true);
+      showViolationFlash(SESSION_LOCKED_MESSAGE);
+    },
     maxWarnings: Number.MAX_SAFE_INTEGER,
-    enabled: true,
+    enabled: !sessionLocked,
   });
 
   const captureAndAnalyze = useCallback(async () => {
@@ -707,7 +779,8 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
       }
       stopAmbientMonitorRef.current = startAmbientAudioMonitor(
         mediaStream,
-        handleLoudAudio,
+        handleAmbientEvent,
+        { isSpeechActive: () => isAudioRecordingRef.current },
       );
       intervalId = setInterval(() => {
         void captureAndAnalyze();
@@ -739,8 +812,61 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     sessionId,
     mediaStream,
     captureAndAnalyze,
-    handleLoudAudio,
+    handleAmbientEvent,
   ]);
+
+  // Mid-session fullscreen enforcement
+  useEffect(() => {
+    const onFsChange = () => {
+      const inFs = Boolean(document.fullscreenElement);
+      setFullscreenPrompt(!inFs);
+      if (!inFs && !sessionLockedRef.current) {
+        showViolationFlash(FULLSCREEN_EXIT_MESSAGE);
+        void proctorApi
+          .reportClientViolation(
+            sessionId,
+            "fullscreen_exit",
+            FULLSCREEN_EXIT_MESSAGE,
+          )
+          .then((res) => {
+            if (res.recorded) {
+              setPenaltyPercent(res.score_penalty_percent ?? 0);
+            }
+            if (res.terminated) {
+              sessionLockedRef.current = true;
+              setSessionLocked(true);
+              showViolationFlash(SESSION_LOCKED_MESSAGE);
+            }
+          })
+          .catch(() => {});
+      }
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    setFullscreenPrompt(!document.fullscreenElement);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, [sessionId, showViolationFlash]);
+
+  // Draft autosave for current question (typed + coding). Recording blobs are not saved.
+  useEffect(() => {
+    const key = draftStorageKey(sessionId, question.question_index);
+    const timer = window.setInterval(() => {
+      try {
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            answer: answerRef.current,
+            selectedOptions: selectedOptionsRef.current,
+            codingLanguage: codingLanguageRef.current,
+            codingSource: codingSourceRef.current,
+          }),
+        );
+      } catch {
+        /* quota */
+      }
+    }, DRAFT_SAVE_MS);
+
+    return () => window.clearInterval(timer);
+  }, [sessionId, question.question_index]);
 
   // Viewport-fixed PiP (must live outside .card — backdrop-filter traps position:fixed).
   useEffect(() => {
@@ -963,15 +1089,30 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     touchActivity();
+    if (sessionLockedRef.current || sessionLocked) return;
     if (isCoding) {
       const src = codingSource.trim();
       if (!src || loading || codingRunning) return;
+      try {
+        localStorage.removeItem(
+          draftStorageKey(sessionId, question.question_index),
+        );
+      } catch {
+        /* ignore */
+      }
       onSubmitCodingAnswer(codingLanguage, src);
       return;
     }
     const payload = resolveSubmitPayload();
     if (!payload || loading) return;
     if (!isObjective && !confirmAnswerSubmit(payload)) return;
+    try {
+      localStorage.removeItem(
+        draftStorageKey(sessionId, question.question_index),
+      );
+    } catch {
+      /* ignore */
+    }
     onSubmitAnswer(payload);
   }
 
@@ -1075,6 +1216,28 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
       {flashMessage && (
         <div className="proctor-violation-banner proctor-client-warning" role="alert">
           {flashMessage}
+        </div>
+      )}
+
+      {sessionLocked && (
+        <div className="proctor-violation-banner proctor-face-warning" role="alert">
+          {SESSION_LOCKED_MESSAGE}
+        </div>
+      )}
+
+      {fullscreenPrompt && !sessionLocked && (
+        <div className="proctor-violation-banner proctor-client-warning" role="status">
+          {FULLSCREEN_EXIT_MESSAGE}{" "}
+          <button
+            type="button"
+            className="primary"
+            style={{ marginLeft: "0.5rem" }}
+            onClick={() => {
+              void document.documentElement.requestFullscreen?.().catch(() => {});
+            }}
+          >
+            Re-enter fullscreen
+          </button>
         </div>
       )}
 
@@ -1381,7 +1544,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
                 type="button"
                 className={isAudioRecording ? "danger" : "secondary"}
                 onClick={handleMicClick}
-                disabled={loading || transcribing}
+                disabled={sessionLocked || loading || transcribing}
                 title={isAudioRecording ? "Stop recording" : "Record audio answer"}
               >
                 {isAudioRecording ? "Stop recording" : "Record answer"}
@@ -1391,6 +1554,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
               type="submit"
               className="primary"
               disabled={
+                sessionLocked ||
                 loading ||
                 codingRunning ||
                 isAudioRecording ||

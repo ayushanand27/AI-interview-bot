@@ -1,5 +1,5 @@
 """
-Integrity violations with score penalties (no interview termination).
+Integrity violations with score penalties and optional soft lockout.
 """
 
 from __future__ import annotations
@@ -21,6 +21,10 @@ VIOLATION_TYPE_LABELS = {
     "looking_sideways": "Looking away (sideways)",
     "looking_down": "Looking down",
     "loud_audio": "Loud environment",
+    "sustained_noise": "Unusual ambient audio",
+    "mic_muted": "Microphone muted or disconnected",
+    "mic_silent": "No microphone signal",
+    "fullscreen_exit": "Left fullscreen mode",
     "tab_switch": "Switched away from interview window",
     "virtual_camera": "Virtual camera",
     "virtual_camera_suspected": "Unusual camera setup",
@@ -36,7 +40,10 @@ def format_violation_type(violation_type: str) -> str:
         violation_type.replace("_", " ").title(),
     )
 
+
 MAX_PENALTY_PERCENT = 50.0
+LOCKOUT_SEVERE_COUNT = 3
+LOCKOUT_PENALTY_PERCENT = 40.0
 
 
 @dataclass
@@ -52,11 +59,9 @@ class Violation:
 class WarningManager:
     """Tracks proctoring violations and cumulative score penalties per session."""
 
-    # Seconds a condition must persist before recording a violation (was 5.0)
     VIOLATION_DURATION_SECONDS = 7.0
     COOLDOWN_SECONDS = 15
     MIN_VIOLATION_CONFIDENCE = 0.6
-    # no_face escalates to moderate after this streak (was 5.0)
     NO_FACE_MODERATE_SECONDS = 10.0
 
     def __init__(self) -> None:
@@ -65,15 +70,18 @@ class WarningManager:
         self._current_violation_type: Optional[str] = None
         self._current_message: Optional[str] = None
         self._last_violation_recorded_at: Optional[float] = None
-        # Per-type cooldown so loud_audio does not suppress phone detection.
         self._last_recorded_by_type: dict[str, float] = {}
         self._multiple_faces_violation_count = 0
         self._looking_down_violation_count = 0
+        self._terminated = False
 
     @property
     def warning_count(self) -> int:
-        """Backward-compatible alias for total recorded violations."""
         return len(self.violations)
+
+    @property
+    def terminated(self) -> bool:
+        return self._terminated
 
     def is_currently_violating(self) -> bool:
         return self._violation_start_time is not None
@@ -116,8 +124,14 @@ class WarningManager:
                 return "critical", SEVERITY_PENALTIES["critical"]
             return "severe", SEVERITY_PENALTIES["severe"]
 
-        if violation_type in ("loud_audio", "tab_switch"):
+        if violation_type in ("loud_audio", "tab_switch", "fullscreen_exit"):
             return "minor", SEVERITY_PENALTIES["minor"]
+
+        if violation_type == "sustained_noise":
+            return "moderate", SEVERITY_PENALTIES["moderate"]
+
+        if violation_type in ("mic_muted", "mic_silent"):
+            return "moderate", SEVERITY_PENALTIES["moderate"]
 
         if violation_type == "virtual_camera":
             return "severe", SEVERITY_PENALTIES["severe"]
@@ -136,6 +150,18 @@ class WarningManager:
 
         return "minor", SEVERITY_PENALTIES["minor"]
 
+    def _check_lockout(self) -> None:
+        if self._terminated:
+            return
+        severe_count = sum(
+            1 for v in self.violations if v.severity in ("severe", "critical")
+        )
+        if (
+            severe_count >= LOCKOUT_SEVERE_COUNT
+            or self.calculate_score_penalty() >= LOCKOUT_PENALTY_PERCENT
+        ):
+            self._terminated = True
+
     def record_client_violation(
         self,
         violation_type: str,
@@ -144,8 +170,10 @@ class WarningManager:
         evidence_metadata: dict[str, Any] | None = None,
     ) -> Optional[Violation]:
         """Record a client-reported integrity violation (audio, tab switch, etc.)."""
+        if self._terminated:
+            return None
+
         now = time.time()
-        # Phone / object hits get a shorter per-type cooldown so they surface quickly.
         cooldown = (
             8.0
             if violation_type == "prohibited_object_detected"
@@ -167,13 +195,13 @@ class WarningManager:
         self.violations.append(violation)
         self._last_violation_recorded_at = now
         self._last_recorded_by_type[violation_type] = now
+        self._check_lockout()
         return violation
 
     def record_loud_audio_violation(
         self,
         message: str = "Please maintain a quiet environment",
     ) -> Optional[Violation]:
-        """Record a minor integrity violation from client-side ambient audio monitoring."""
         return self.record_client_violation("loud_audio", message)
 
     def process_status(
@@ -183,6 +211,9 @@ class WarningManager:
         gaze: str = "unknown",
         confidence: float = 1.0,
     ) -> Optional[Violation]:
+        if self._terminated:
+            return None
+
         if status in ("ok", "calibrating", "unavailable", "error"):
             self._reset_active_violation()
             return None
@@ -229,6 +260,7 @@ class WarningManager:
         self.violations.append(violation)
         self._last_violation_recorded_at = now
         self._reset_active_violation()
+        self._check_lockout()
         return violation
 
     def calculate_score_penalty(self) -> float:
@@ -261,6 +293,7 @@ class WarningManager:
             ],
             "score_penalty_percent": penalty,
             "integrity_level": self._integrity_level(penalty),
+            "terminated": self._terminated,
         }
 
     def get_summary(self) -> dict:
@@ -268,7 +301,7 @@ class WarningManager:
         report = self.get_integrity_report()
         return {
             "warning_count": report["total_violations"],
-            "terminated": False,
+            "terminated": self._terminated,
             "warnings": [
                 {
                     "level": i + 1,
@@ -283,12 +316,49 @@ class WarningManager:
             **report,
         }
 
+    def rehydrate_from_summary(self, summary: dict[str, Any] | None) -> None:
+        """Restore violations from persisted proctoring_summary after process restart."""
+        if not isinstance(summary, dict) or self.violations:
+            return
+        raw = summary.get("violations") or summary.get("warnings") or []
+        if not isinstance(raw, list):
+            return
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            vtype = str(item.get("type") or item.get("gaze") or "unknown")
+            severity = str(item.get("severity") or "minor")
+            try:
+                ts = float(item.get("time") or item.get("timestamp") or time.time())
+            except (TypeError, ValueError):
+                ts = time.time()
+            try:
+                penalty = float(item.get("penalty_percent") or 0.0)
+            except (TypeError, ValueError):
+                penalty = 0.0
+            message = str(item.get("message") or item.get("reason") or "")
+            evidence = item.get("evidence_metadata")
+            self.violations.append(
+                Violation(
+                    type=vtype,
+                    severity=severity,
+                    timestamp=ts,
+                    penalty_percent=penalty,
+                    message=message,
+                    evidence_metadata=evidence if isinstance(evidence, dict) else None,
+                )
+            )
+        self._terminated = bool(summary.get("terminated"))
+        self._check_lockout()
+
     def reset(self) -> None:
         self.violations.clear()
         self._reset_active_violation()
         self._last_violation_recorded_at = None
+        self._last_recorded_by_type.clear()
         self._multiple_faces_violation_count = 0
         self._looking_down_violation_count = 0
+        self._terminated = False
 
     def _reset_active_violation(self) -> None:
         self._violation_start_time = None

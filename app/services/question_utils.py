@@ -11,7 +11,7 @@ from app.core.config import settings
 
 DEFAULT_QUESTION_MARKS = 10
 MIN_ASSESSMENT_QUESTIONS = 1
-MAX_ASSESSMENT_QUESTIONS = 50
+MAX_ASSESSMENT_QUESTIONS = 200
 
 QUESTION_TYPES = ("subjective", "mcq", "msq", "numerical", "coding")
 OBJECTIVE_TYPES = frozenset({"mcq", "msq", "numerical"})

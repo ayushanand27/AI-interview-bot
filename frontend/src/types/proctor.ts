@@ -12,7 +12,7 @@ export interface ProctorAnalyzeResponse {
   score_penalty_percent: number;
   /** @deprecated use total_violations */
   warning_count?: number;
-  /** @deprecated always false */
+  /** Soft lock when integrity threshold exceeded */
   terminated?: boolean;
   is_currently_violating?: boolean;
 }
@@ -34,6 +34,7 @@ export interface AudioViolationResponse {
   total_violations: number;
   score_penalty_percent: number;
   integrity_level?: string;
+  terminated?: boolean;
 }
 
 export interface IntegrityReport {

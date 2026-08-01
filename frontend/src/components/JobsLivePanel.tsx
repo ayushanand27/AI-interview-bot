@@ -567,12 +567,12 @@ export default function JobsLivePanel({
                 Questions
                 <input
                   type="number"
-                  min={3}
-                  max={15}
+                  min={1}
+                  max={200}
                   value={assessQuestionCount}
                   onChange={(e) =>
                     setAssessQuestionCount(
-                      Math.min(15, Math.max(3, Number(e.target.value) || 5)),
+                      Math.min(200, Math.max(1, Number(e.target.value) || 5)),
                     )
                   }
                   disabled={assessBusy}

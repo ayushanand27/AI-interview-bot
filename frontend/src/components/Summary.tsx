@@ -176,6 +176,24 @@ export default function Summary({
               Recommendation band: <strong>{recommendation}</strong>
             </p>
           )}
+          {penalty > 0 && (
+            <p className="summary-penalty">
+              Integrity adjustment: <strong>-{penalty}%</strong>
+              {summary.original_score != null && (
+                <>
+                  {" "}
+                  (raw {Math.round(summary.original_score)} → adjusted{" "}
+                  {displayScore})
+                </>
+              )}
+            </p>
+          )}
+          {summary.integrity_level && summary.integrity_level !== "clean" && (
+            <p className="summary-integrity-level">
+              Integrity:{" "}
+              <strong>{formatIntegrityLevel(summary.integrity_level)}</strong>
+            </p>
+          )}
           {(topStrengths.length > 0 || topImprovements.length > 0) && (
             <div className="summary-overall-list">
               {topStrengths.length > 0 && (
@@ -258,8 +276,7 @@ export default function Summary({
         )}
 
         <p className="summary-score-note" style={{ marginTop: "1.25rem" }}>
-          Recording, integrity details, and the full recruiter report stay with
-          the hiring team.
+          Recording and full integrity timeline stay with the hiring team.
           {candidateEmail
             ? " You may close this page — thank you for completing the assessment."
             : ""}

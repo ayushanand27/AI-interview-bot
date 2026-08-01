@@ -76,6 +76,7 @@ def _analyze_response(
     total_violations: int,
     score_penalty_percent: float,
     alert_message: Optional[str] = None,
+    terminated: bool = False,
 ) -> dict[str, Any]:
     return {
         "session_id": session_id,
@@ -89,9 +90,8 @@ def _analyze_response(
         "score_penalty_percent": score_penalty_percent,
         # Immediate UI flash for non-eye hits (e.g. cell phone) while eye_status stays ok.
         "alert_message": alert_message,
-        # Legacy fields for older clients
         "warning_count": total_violations,
-        "terminated": False,
+        "terminated": terminated,
         "is_currently_violating": current_status == "violation",
         "new_warning": None,
     }
@@ -144,6 +144,7 @@ def _build_analyze_payload(
         total_violations=report["total_violations"],
         score_penalty_percent=report["score_penalty_percent"],
         alert_message=alert_message,
+        terminated=bool(report.get("terminated")),
     )
 
 
@@ -270,6 +271,7 @@ def report_audio_violation(body: AudioViolationRequest):
         "total_violations": report["total_violations"],
         "score_penalty_percent": report["score_penalty_percent"],
         "integrity_level": report["integrity_level"],
+        "terminated": bool(report.get("terminated")),
     }
 
 

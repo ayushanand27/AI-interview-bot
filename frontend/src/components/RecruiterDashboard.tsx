@@ -16,8 +16,8 @@ import "../recruiter-portal.css";
 
 const DEFAULT_TIME_SECONDS =
   Number(import.meta.env.VITE_QUESTION_TIMER_SECONDS) || 180;
-const MIN_QUESTIONS = 2;
-const MAX_QUESTIONS = 20;
+const MIN_QUESTIONS = 1;
+const MAX_QUESTIONS = 200;
 
 const QUESTION_TYPE_OPTIONS: { value: QuestionType; label: string }[] = [
   { value: "subjective", label: "Subjective" },
@@ -149,6 +149,10 @@ const VIOLATION_TYPE_LABELS: Record<string, string> = {
   looking_sideways: "Looking away (sideways)",
   looking_down: "Looking down",
   loud_audio: "Loud environment",
+  sustained_noise: "Unusual ambient audio",
+  mic_muted: "Microphone muted or disconnected",
+  mic_silent: "No microphone signal",
+  fullscreen_exit: "Left fullscreen mode",
   tab_switch: "Switched away from interview window",
   virtual_camera: "Virtual camera",
   virtual_camera_suspected: "Unusual camera setup",
@@ -1116,16 +1120,16 @@ export default function RecruiterDashboard({
                   id="question-count"
                   type="number"
                   min={1}
-                  max={50}
+                  max={200}
                   step={1}
                   value={questionCount}
                   onChange={(e) => {
                     const n = Number(e.target.value);
                     if (!Number.isFinite(n)) return;
-                    setQuestionCount(Math.min(50, Math.max(1, Math.round(n))));
+                    setQuestionCount(Math.min(200, Math.max(1, Math.round(n))));
                   }}
                 />
-                <p className="rp-hint">Any count from 1 to 50</p>
+                <p className="rp-hint">Any count from 1 to 200</p>
               </div>
               <div>
                 <label htmlFor="difficulty">Difficulty</label>

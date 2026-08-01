@@ -17,12 +17,33 @@ def _session_key(session_id: str | UUID | None) -> str:
     return str(session_id).strip()
 
 
+def _try_rehydrate(mgr: WarningManager, key: str) -> None:
+    if key == "default":
+        return
+    try:
+        session_uuid = UUID(key)
+    except (ValueError, TypeError):
+        return
+    try:
+        from app.services.session_persistence import load_session_from_disk
+
+        session = load_session_from_disk(session_uuid)
+        summary = getattr(session, "proctoring_summary", None) if session else None
+        if isinstance(summary, dict):
+            mgr.rehydrate_from_summary(summary)
+    except Exception:
+        # Never block interview start on rehydrate failures.
+        pass
+
+
 def get_warning_manager(session_id: str | UUID | None) -> WarningManager:
     """Return the WarningManager for this session, creating one if needed."""
     key = _session_key(session_id)
     with _lock:
         if key not in _warning_managers:
-            _warning_managers[key] = WarningManager()
+            mgr = WarningManager()
+            _try_rehydrate(mgr, key)
+            _warning_managers[key] = mgr
         return _warning_managers[key]
 
 

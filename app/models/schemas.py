@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.services.question_utils import MAX_ASSESSMENT_QUESTIONS
+
 
 class SessionStatus(str, Enum):
     """Lifecycle states for an interview session."""
@@ -67,7 +69,7 @@ class GenerateQuestionsRequest(BaseModel):
     question_count: Optional[int] = Field(
         default=None,
         ge=1,
-        le=50,
+        le=MAX_ASSESSMENT_QUESTIONS,
         description="Number of questions to generate (defaults to env setting).",
     )
 

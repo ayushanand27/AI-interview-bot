@@ -401,6 +401,11 @@ class InterviewService:
         if not session.questions:
             raise QuestionsNotGeneratedError()
 
+        if get_warning_manager(str(session_id)).terminated:
+            raise InvalidSessionStateError(
+                "Interview locked due to integrity violations. Contact the recruiter."
+            )
+
         if session.status not in (
             SessionStatus.IN_PROGRESS,
             SessionStatus.QUESTIONS_READY,
@@ -571,6 +576,11 @@ class InterviewService:
 
         if not session.questions:
             raise QuestionsNotGeneratedError()
+
+        if get_warning_manager(str(session_id)).terminated:
+            raise InvalidSessionStateError(
+                "Interview locked due to integrity violations. Contact the recruiter."
+            )
 
         if session.status not in (
             SessionStatus.IN_PROGRESS,
@@ -825,7 +835,7 @@ class InterviewService:
         is_invite = bool(getattr(session, "invite_token", None))
         if is_invite:
             # Candidate-safe summary: score + recommendation + short feedback.
-            # Hide answers, integrity timeline, and full recruiter report fields.
+            # Show integrity adjustment transparently; hide timeline/recording.
             return EndInterviewResponse(
                 session_id=session.session_id,
                 status=session.status,
@@ -837,11 +847,11 @@ class InterviewService:
                 answer_judgments=_candidate_safe_judgments(session.answer_judgments),
                 final_score=_candidate_safe_final_score(session.final_score),
                 message=message,
-                original_score=None,
-                integrity_penalty_percent=0.0,
+                original_score=original_score,
+                integrity_penalty_percent=integrity_penalty_percent or 0.0,
                 adjusted_final_score=adjusted_final_score,
                 integrity_report=None,
-                integrity_level=None,
+                integrity_level=integrity_level,
                 candidate_report_email_sent=False,
             )
 
