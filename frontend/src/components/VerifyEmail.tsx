@@ -13,7 +13,7 @@ export default function VerifyEmail() {
 
     if (!token) {
       setStatus("error");
-      setMessage("Invalid verification link - no token found");
+      setMessage("Invalid verification link — no token found");
       return;
     }
 
@@ -29,7 +29,7 @@ export default function VerifyEmail() {
           sessionStorage.setItem("ss_dismiss_register_verify", "1");
           sessionStorage.removeItem("ss_register_verify_notice");
           setStatus("success");
-          setMessage(result.message || "Email verified successfully!");
+          setMessage(result.message || "Email verified successfully.");
           window.setTimeout(() => {
             window.location.href = "/";
           }, 2000);
@@ -56,55 +56,47 @@ export default function VerifyEmail() {
     };
   }, []);
 
-  if (status === "loading") {
-    return (
-      <div className="app">
-        <div className="card status-panel" style={{ textAlign: "center", padding: "40px", maxWidth: "560px", margin: "0 auto" }}>
-          <p>Verifying your email...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === "success") {
-    return (
-      <div className="app">
-        <div className="card status-panel" style={{ textAlign: "center", padding: "40px", maxWidth: "560px", margin: "0 auto" }}>
-          <h2 style={{ color: "#86efac" }}>Email Verified!</h2>
-          <p>{message || "Your email has been verified successfully."}</p>
-          <p className="invite-meta" style={{ marginTop: "0.75rem" }}>
-            Redirecting you to the app…
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              window.location.href = "/";
-            }}
-            className="primary"
-            style={{ marginTop: "16px" }}
-          >
-            Continue to app
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="app">
-      <div className="card status-panel" style={{ textAlign: "center", padding: "40px", maxWidth: "560px", margin: "0 auto" }}>
-        <h2 style={{ color: "#fca5a5" }}>Verification Failed</h2>
-        <p>{message}</p>
-        <button
-          type="button"
-          onClick={() => {
-            window.location.href = "/";
-          }}
-          className="primary"
-          style={{ marginTop: "16px" }}
-        >
-          Back to Login
-        </button>
+      <div className="card status-panel" style={{ textAlign: "center" }}>
+        {status === "loading" && <p>Verifying your email…</p>}
+
+        {status === "success" && (
+          <>
+            <div className="alert success">Email verified</div>
+            <p>{message || "Your email has been verified successfully."}</p>
+            <p className="invite-meta" style={{ marginTop: "0.75rem" }}>
+              Redirecting you to the app…
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/";
+              }}
+              className="primary"
+              style={{ marginTop: "1rem" }}
+            >
+              Continue to app
+            </button>
+          </>
+        )}
+
+        {status === "error" && (
+          <>
+            <div className="alert error">Verification failed</div>
+            <p>{message}</p>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/";
+              }}
+              className="primary"
+              style={{ marginTop: "1rem" }}
+            >
+              Back to login
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

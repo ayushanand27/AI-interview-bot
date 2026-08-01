@@ -284,6 +284,9 @@ export default function RecruiterDashboard({
   const [inviteNote, setInviteNote] = useState("");
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteSendMessage, setInviteSendMessage] = useState<string | null>(null);
+  const [inviteDeliveryNote, setInviteDeliveryNote] = useState<string | null>(
+    null,
+  );
 
   const [assessments, setAssessments] = useState<AssessmentSummary[]>([]);
   const [assessmentsLoading, setAssessmentsLoading] = useState(false);
@@ -836,6 +839,7 @@ export default function RecruiterDashboard({
     }
     setInviteSending(true);
     setInviteSendMessage(null);
+    setInviteDeliveryNote(null);
     onError(null);
     try {
       const res = await recruiterApi.sendAssessmentInvites(
@@ -846,15 +850,12 @@ export default function RecruiterDashboard({
         },
       );
       const failed = res.data.failed?.length ?? 0;
-      const note = res.data.delivery_note;
-      let msg =
+      setInviteSendMessage(
         failed > 0
           ? `Sent ${res.data.sent}. Failed (${failed}): ${res.data.failed.join(", ")}`
-          : `Sent ${res.data.sent} invite email(s).`;
-      if (note) {
-        msg += ` — ${note}`;
-      }
-      setInviteSendMessage(msg);
+          : `Sent ${res.data.sent} invite email(s).`,
+      );
+      setInviteDeliveryNote(res.data.delivery_note || null);
     } catch (err) {
       onError(
         err instanceof Error ? err.message : "Failed to send invite emails",
@@ -1641,6 +1642,9 @@ export default function RecruiterDashboard({
                   </div>
                   {inviteSendMessage && (
                     <p className="rp-copy-success">{inviteSendMessage}</p>
+                  )}
+                  {inviteDeliveryNote && (
+                    <p className="rp-copy-warning">{inviteDeliveryNote}</p>
                   )}
                 </div>
               </div>

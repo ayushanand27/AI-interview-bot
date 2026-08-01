@@ -452,6 +452,45 @@
   font-size: 0.85rem;
 }
 
+.recruiter-portal .rp-copy-warning {
+  margin: 0.4rem 0 0;
+  color: #fbbf24;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.recruiter-portal .rp-alert.info {
+  background: rgba(var(--rp-accent-rgb), 0.1);
+  border: 1px solid rgba(var(--rp-accent-rgb), 0.35);
+  color: var(--rp-text);
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+
+.recruiter-portal .rp-dsar-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-top: 0.45rem;
+  line-height: 1.4;
+}
+
+.recruiter-portal .rp-dsar-check input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .recruiter-portal .rp-dsar-check {
+    flex-direction: row;
+  }
+
+  .recruiter-portal .rp-danger {
+    width: 100%;
+  }
+}
+
 .recruiter-portal .rp-empty {
   color: var(--rp-muted);
   line-height: 1.5;

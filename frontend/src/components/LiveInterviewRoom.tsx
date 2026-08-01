@@ -164,9 +164,18 @@ export default function LiveInterviewRoom({
     return parts.length ? parts.join(" · ") : "Waiting for peers…";
   }, [presence]);
 
+  // Clear the remote-apply guard after React/Monaco settle so the next local
+  // keystroke is broadcast (do not consume it inside broadcastCode).
+  useEffect(() => {
+    if (!applyingRemote.current) return;
+    const timer = window.setTimeout(() => {
+      applyingRemote.current = false;
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [code, language]);
+
   function broadcastCode(next: string, lang: string) {
     if (applyingRemote.current) {
-      applyingRemote.current = false;
       return;
     }
     if (wsRef.current?.readyState === WebSocket.OPEN) {

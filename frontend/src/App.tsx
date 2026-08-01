@@ -102,22 +102,28 @@ function RecruiterDashboardRoute() {
 
   if (!ready) {
     return (
-      <div className="app">
-        <div className="card loading">Loading recruiter dashboard…</div>
+      <div className="recruiter-portal">
+        <div className="rp-card loading">Loading recruiter dashboard…</div>
       </div>
     );
   }
 
   return (
-    <div className="app">
-      {error && <div className="alert error">{error}</div>}
+    <>
+      {error && (
+        <div className="recruiter-portal" style={{ paddingBottom: 0 }}>
+          <div className="rp-alert error" style={{ maxWidth: 960, margin: "0 auto 0.75rem" }}>
+            {error}
+          </div>
+        </div>
+      )}
       <RecruiterDashboard
         loading={loading}
         onLoadingChange={setLoading}
         onError={setError}
         onLogout={handleLogout}
       />
-    </div>
+    </>
   );
 }
 
@@ -504,6 +510,13 @@ export default function App() {
     setServerError(false);
   }
 
+  useEffect(() => {
+    if (!accessToken || !user) return;
+    if (user.role === "recruiter") {
+      window.location.replace("/recruiter/dashboard");
+    }
+  }, [accessToken, user]);
+
   const isLoggedIn = accessToken !== null;
   const isRecruiter = user?.role === "recruiter";
   const needsEmailVerification =
@@ -621,11 +634,21 @@ export default function App() {
           onAuthenticated={handleAuthenticated}
         />
       ) : isRecruiter ? (
-        <RecruiterDashboard
-          loading={loading}
-          onLoadingChange={setLoading}
-          onError={setError}
-        />
+        <div className="card status-panel">
+          <h2 className="section-title">Recruiter portal</h2>
+          <p className="invite-meta">
+            Assessments, ATS jobs, and live interviews live in the recruiter dashboard.
+          </p>
+          <div className="actions" style={{ marginTop: "1rem" }}>
+            <a
+              href="/recruiter/dashboard"
+              className="primary"
+              style={{ textDecoration: "none" }}
+            >
+              Open dashboard
+            </a>
+          </div>
+        </div>
       ) : mobileBlocked ? (
         <MobileBlock />
       ) : needsEmailVerification ? (

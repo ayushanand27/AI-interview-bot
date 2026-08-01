@@ -30,11 +30,11 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-        const result = await authApi.resetPassword(token, password);
+      const result = await authApi.resetPassword(token, password);
       const message =
         result?.message ??
         (result as { data?: { message?: string } })?.data?.message ??
-        "Password reset successfully. You can now login with your new password.";
+        "Password reset successfully. You can now log in with your new password.";
       sessionStorage.setItem("ss_password_reset_done", "1");
       setSuccess(message);
     } catch (err) {
@@ -47,15 +47,15 @@ export default function ResetPassword() {
   return (
     <div className="app">
       <header>
-        <h1>Reset Password</h1>
+        <h1>Reset password</h1>
         <p>Set a new password to regain access to your interview account.</p>
       </header>
 
-      <div className="card auth-panel stack" style={{ maxWidth: "480px", margin: "0 auto" }}>
+      <div className="card auth-panel stack">
         {success ? (
           <>
-            <div className="alert success">Password reset! You can now login.</div>
-            <p>{success}</p>
+            <div className="alert success">Password reset — you can log in now.</div>
+            <p className="invite-meta">{success}</p>
             <button
               type="button"
               className="primary"
@@ -63,7 +63,7 @@ export default function ResetPassword() {
                 window.location.href = "/";
               }}
             >
-              Login
+              Log in
             </button>
           </>
         ) : (
@@ -75,7 +75,7 @@ export default function ResetPassword() {
             )}
 
             <div className="field">
-              <label htmlFor="new_password">New Password</label>
+              <label htmlFor="new_password">New password</label>
               <PasswordInput
                 id="new_password"
                 name="new_password"
@@ -88,7 +88,7 @@ export default function ResetPassword() {
             </div>
 
             <div className="field">
-              <label htmlFor="confirm_password">Confirm Password</label>
+              <label htmlFor="confirm_password">Confirm password</label>
               <PasswordInput
                 id="confirm_password"
                 name="confirm_password"

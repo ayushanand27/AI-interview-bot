@@ -76,15 +76,27 @@ button:disabled {
   cursor: not-allowed;
 }
 
-button.primary {
+button.primary,
+a.primary {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
   color: white;
   box-shadow: 0 10px 24px rgba(var(--accent-rgb), 0.28);
 }
 
-button.primary:hover:not(:disabled) {
+button.primary:hover:not(:disabled),
+a.primary:hover {
   background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent) 100%);
   transform: translateY(-1px);
+}
+
+a.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 0.72rem 1.3rem;
+  font-weight: 600;
 }
 
 button.secondary {
@@ -443,7 +455,13 @@ header p {
 
 .option-choice.is-selected {
   border-color: var(--accent);
-  background: rgba(59, 130, 246, 0.1);
+  background: rgba(var(--accent-rgb), 0.12);
+}
+
+.app-wide {
+  max-width: none;
+  padding: 0;
+  margin: 0;
 }
 
 .option-choice input {

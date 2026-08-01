@@ -8,8 +8,10 @@ export default function JobApplyPage({ token }: { token: string }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [bootLoading, setBootLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [jobMissing, setJobMissing] = useState(false);
   const [result, setResult] = useState<{
     ats_score: number;
     fit_label?: string;
@@ -18,15 +20,28 @@ export default function JobApplyPage({ token }: { token: string }) {
   } | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    setBootLoading(true);
+    setJobMissing(false);
     jobsLiveApi
       .getPublicJob(token)
       .then((res) => {
+        if (cancelled) return;
         setTitle(res.data.title);
         setJdPreview(res.data.jd_preview);
+        setError(null);
       })
-      .catch((err) =>
-        setError(err instanceof Error ? err.message : "Job not found"),
-      );
+      .catch((err) => {
+        if (cancelled) return;
+        setJobMissing(true);
+        setError(err instanceof Error ? err.message : "Job not found");
+      })
+      .finally(() => {
+        if (!cancelled) setBootLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   async function onSubmit(e: React.FormEvent) {
@@ -57,30 +72,71 @@ export default function JobApplyPage({ token }: { token: string }) {
     }
   }
 
+  if (bootLoading) {
+    return (
+      <div className="invite-flow">
+        <div className="card loading">Loading job posting…</div>
+      </div>
+    );
+  }
+
+  if (jobMissing) {
+    return (
+      <div className="invite-flow">
+        <div className="card status-panel">
+          <h2 className="section-title">Job unavailable</h2>
+          <p className="invite-meta">
+            {error || "This apply link is invalid or the job was removed."}
+          </p>
+          <div className="actions" style={{ marginTop: "1.25rem" }}>
+            <a href="/" className="primary" style={{ textDecoration: "none" }}>
+              Back to home
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="invite-flow">
-      <div className="invite-card">
-        <h1>{title || "Apply"}</h1>
+      <div className="card hero-card">
+        <h1 className="section-title" style={{ marginBottom: "0.35rem" }}>
+          {title || "Apply"}
+        </h1>
+        <p className="invite-meta" style={{ marginBottom: "1rem" }}>
+          Submit your resume for an ATS skills match. The recruiter reviews
+          ranked applicants from their dashboard.
+        </p>
         {jdPreview && (
-          <pre className="invite-jd-preview" style={{ whiteSpace: "pre-wrap" }}>
-            {jdPreview}
-          </pre>
+          <pre className="apply-jd-preview">{jdPreview}</pre>
         )}
-        {error && <p className="invite-error">{error}</p>}
+        {error && <div className="alert error">{error}</div>}
         {result ? (
-          <div className="invite-success">
-            <h2>Application received</h2>
-            <p>
+          <div className="apply-result">
+            <div className="alert success">Application received</div>
+            <p className="apply-score">
               ATS score: <strong>{result.ats_score}</strong>
-              {result.fit_label ? ` · ${result.fit_label}` : ""}
+              {result.fit_label ? (
+                <span className="apply-fit"> · {result.fit_label}</span>
+              ) : null}
             </p>
             {result.matched_skills.length > 0 && (
-              <p>Matched: {result.matched_skills.join(", ")}</p>
+              <div className="apply-skills">
+                <h3>Matched skills</h3>
+                <p>{result.matched_skills.join(", ")}</p>
+              </div>
             )}
             {result.missing_skills.length > 0 && (
-              <p>Gaps: {result.missing_skills.join(", ")}</p>
+              <div className="apply-skills apply-skills-gap">
+                <h3>Gaps</h3>
+                <p>{result.missing_skills.join(", ")}</p>
+              </div>
             )}
-            <p>The recruiter can shortlist you from the dashboard.</p>
+            <p className="invite-meta" style={{ marginTop: "1rem" }}>
+              You can close this page. The recruiter can shortlist you and send
+              a live interview or assessment invite.
+            </p>
           </div>
         ) : (
           <form className="invite-details-form" onSubmit={onSubmit}>
@@ -91,6 +147,8 @@ export default function JobApplyPage({ token }: { token: string }) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
+                disabled={loading}
+                autoComplete="name"
               />
             </div>
             <div className="field">
@@ -101,19 +159,27 @@ export default function JobApplyPage({ token }: { token: string }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={loading}
+                autoComplete="email"
               />
             </div>
             <div className="field">
-              <label htmlFor="apply-resume">Resume</label>
+              <label htmlFor="apply-resume">Resume (PDF, Word, or TXT)</label>
               <input
                 id="apply-resume"
                 type="file"
                 accept=".pdf,.doc,.docx,.txt"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 required
+                disabled={loading}
               />
+              {file && (
+                <p className="invite-meta" style={{ marginTop: "0.35rem" }}>
+                  Selected: {file.name}
+                </p>
+              )}
             </div>
-            <button type="submit" className="invite-primary" disabled={loading}>
+            <button type="submit" className="primary" disabled={loading}>
               {loading ? "Scoring…" : "Submit application"}
             </button>
           </form>

@@ -374,8 +374,8 @@ export default function Summary({
         )}
         {recordingStatus === "unavailable" && (
           <p className="summary-recording-note">
-            Recording is not available. If you just finished, check the browser
-            console for [RECORDING] logs and try refreshing this page.
+            Recording is not available yet. Refresh this page in a moment, or
+            contact support if it still does not appear.
           </p>
         )}
       </section>

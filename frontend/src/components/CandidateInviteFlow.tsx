@@ -79,6 +79,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
   const [invalidReason, setInvalidReason] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [forgotResetUrl, setForgotResetUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [detailsMode, setDetailsMode] = useState<DetailsMode>("register");
   const [prefilledEmail, setPrefilledEmail] = useState("");
@@ -297,11 +298,19 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
     setLoading(true);
     setError(null);
     setInfo(null);
+    setForgotResetUrl(null);
     try {
-      await authApi.forgotPassword(email);
-      setInfo(
-        "If an account exists for that email, a password reset link has been sent. Check your inbox and spam folder.",
-      );
+      const result = await authApi.forgotPassword(email);
+      if (result.reset_url) {
+        setInfo(
+          "SMTP email may not deliver right now. Use this local reset link:",
+        );
+        setForgotResetUrl(result.reset_url);
+      } else {
+        setInfo(
+          "If an account exists for that email, a password reset link has been sent. Check your inbox and spam folder.",
+        );
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Could not send password reset email.",
@@ -538,11 +547,16 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
 
   if (step === "invalid") {
     return (
-      <div className="invite-flow card">
-        <h2>Invite unavailable</h2>
+      <div className="invite-flow card status-panel">
+        <h2 className="section-title">Invite unavailable</h2>
         <p className="invite-meta">
           {invalidReason || "This link has expired or is invalid"}
         </p>
+        <div className="actions" style={{ marginTop: "1.25rem" }}>
+          <a href="/" className="primary" style={{ textDecoration: "none" }}>
+            Back to home
+          </a>
+        </div>
       </div>
     );
   }
@@ -550,7 +564,16 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
   return (
     <div className="invite-flow">
       {error && <div className="alert error">{error}</div>}
-      {info && <div className="alert info">{info}</div>}
+      {info && (
+        <div className="alert info">
+          <p>{info}</p>
+          {forgotResetUrl && (
+            <p style={{ marginTop: "0.5rem", wordBreak: "break-all" }}>
+              <a href={forgotResetUrl}>{forgotResetUrl}</a>
+            </p>
+          )}
+        </div>
+      )}
 
       {step === "welcome" && inviteInfo && (
         <div className="card invite-welcome hero-card">

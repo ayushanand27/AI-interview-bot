@@ -300,6 +300,8 @@ export default function Auth({
         </form>
       )}
       <p className="auth-footer">
+        <a href="/recruiter">Recruiter portal</a>
+        {" · "}
         <a href="/privacy">Privacy Policy</a>
       </p>
     </div>

@@ -59,6 +59,9 @@ export default function JobsLivePanel({
   const [liveRooms, setLiveRooms] = useState<LiveRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
+  const [inviteDeliveryNote, setInviteDeliveryNote] = useState<string | null>(
+    null,
+  );
 
   const [inviteRoomToken, setInviteRoomToken] = useState<string | null>(null);
   const [inviteEmails, setInviteEmails] = useState("");
@@ -229,11 +232,9 @@ export default function JobsLivePanel({
       if (failed.length) {
         parts.push(`Failed (${failed.length}): ${failed.join(", ")}`);
       }
-      if (res.data.delivery_note) {
-        parts.push(res.data.delivery_note);
-      }
       parts.push(`Live link: ${absoluteLink(res.data.live_link)}`);
       setInviteStatus(parts.join(" "));
+      setInviteDeliveryNote(res.data.delivery_note || null);
       setCopyMsg(absoluteLink(res.data.live_link));
     } catch (err) {
       onError(err instanceof Error ? err.message : "Could not send invites");
@@ -265,7 +266,7 @@ export default function JobsLivePanel({
           <div className="rp-tabs rp-tabs-spaced" style={{ marginBottom: "0.5rem" }}>
             <button
               type="button"
-              className={jdMode === "paste" ? "rp-tab rp-tab-active" : "rp-tab"}
+              className={jdMode === "paste" ? "active" : undefined}
               onClick={() => setJdMode("paste")}
               disabled={busy || parsingJd}
             >
@@ -273,7 +274,7 @@ export default function JobsLivePanel({
             </button>
             <button
               type="button"
-              className={jdMode === "upload" ? "rp-tab rp-tab-active" : "rp-tab"}
+              className={jdMode === "upload" ? "active" : undefined}
               onClick={() => setJdMode("upload")}
               disabled={busy || parsingJd}
             >
@@ -351,18 +352,24 @@ export default function JobsLivePanel({
       </div>
 
       {copyMsg && (
-        <p className="rp-copy-ok">
-          Link:{" "}
-          <a href={copyMsg} target="_blank" rel="noreferrer">
-            {copyMsg}
-          </a>{" "}
-          <button
-            type="button"
-            className="rp-secondary rp-btn-compact"
-            onClick={() => void navigator.clipboard.writeText(copyMsg)}
-          >
-            Copy
-          </button>
+        <p className="rp-copy-success">
+          {copyMsg.startsWith("http") ? (
+            <>
+              Link:{" "}
+              <a href={copyMsg} target="_blank" rel="noreferrer">
+                {copyMsg}
+              </a>{" "}
+              <button
+                type="button"
+                className="rp-secondary rp-btn-compact"
+                onClick={() => void navigator.clipboard.writeText(copyMsg)}
+              >
+                Copy
+              </button>
+            </>
+          ) : (
+            copyMsg
+          )}
         </p>
       )}
 
@@ -423,166 +430,190 @@ export default function JobsLivePanel({
               onClick={() => {
                 setInviteRoomToken(null);
                 setInviteStatus(null);
+                setInviteDeliveryNote(null);
               }}
             >
               Dismiss
             </button>
           </div>
-          {inviteStatus && <p className="rp-copy-ok">{inviteStatus}</p>}
+          {inviteStatus && <p className="rp-copy-success">{inviteStatus}</p>}
+          {inviteDeliveryNote && (
+            <p className="rp-copy-warning">{inviteDeliveryNote}</p>
+          )}
         </div>
       )}
 
       <h3 className="rp-preview-title">Your jobs</h3>
-      <table className="rp-table">
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Applicants</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {jobs.map((j) => (
-            <tr key={j.token}>
-              <td>{j.title}</td>
-              <td>{j.application_count}</td>
-              <td>
-                <button
-                  type="button"
-                  className="rp-secondary rp-btn-compact"
-                  onClick={() => setSelectedJob(j.token)}
-                >
-                  View
-                </button>{" "}
-                <button
-                  type="button"
-                  className="rp-secondary rp-btn-compact"
-                  onClick={() => {
-                    const url = absoluteLink(j.apply_link);
-                    setCopyMsg(url);
-                    void navigator.clipboard.writeText(url);
-                  }}
-                >
-                  Copy apply link
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {selectedJob && (
-        <>
-          <h3 className="rp-preview-title">Applicants (ATS ranked)</h3>
-          <table className="rp-table">
+      {jobs.length === 0 ? (
+        <p className="rp-empty">No jobs yet — create one above to get an apply link.</p>
+      ) : (
+        <div className="recruiter-table-wrap">
+          <table className="recruiter-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Score</th>
-                <th>Matched</th>
-                <th>Gaps</th>
-                <th>Status</th>
+                <th>Title</th>
+                <th>Applicants</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {apps.map((a) => (
-                <tr key={a.id}>
-                  <td>
-                    {a.full_name}
-                    <br />
-                    <span className="rp-muted-small">{a.email}</span>
-                  </td>
-                  <td>
-                    {a.ats_score}
-                    {a.fit_label ? ` · ${a.fit_label}` : ""}
-                  </td>
-                  <td className="rp-muted-small">
-                    {(a.matched_skills || []).slice(0, 6).join(", ")}
-                  </td>
-                  <td className="rp-muted-small">
-                    {(a.missing_skills || []).slice(0, 6).join(", ")}
-                  </td>
-                  <td>{a.status}</td>
+              {jobs.map((j) => (
+                <tr key={j.token} className="rp-row-static">
+                  <td>{j.title}</td>
+                  <td>{j.application_count}</td>
                   <td>
                     <button
                       type="button"
                       className="rp-secondary rp-btn-compact"
-                      onClick={() => void setStatus(a.id, "shortlisted")}
+                      onClick={() => setSelectedJob(j.token)}
                     >
-                      Shortlist
+                      View
                     </button>{" "}
                     <button
                       type="button"
                       className="rp-secondary rp-btn-compact"
-                      onClick={() => void setStatus(a.id, "rejected")}
-                    >
-                      Reject
-                    </button>{" "}
-                    <button
-                      type="button"
-                      className="rp-primary rp-btn-compact"
-                      onClick={() =>
-                        void startLive({
-                          applicationId: a.id,
-                          candidateName: a.full_name,
-                          candidateEmail: a.email,
-                        })
-                      }
-                    >
-                      Live interview
-                    </button>{" "}
-                    <button
-                      type="button"
-                      className="rp-secondary rp-btn-compact"
-                      title="Copy email to paste into assessment invite"
                       onClick={() => {
-                        void navigator.clipboard.writeText(a.email);
-                        setCopyMsg(
-                          `Email copied (${a.email}). Use Assessments → send invite.`,
-                        );
+                        const url = absoluteLink(j.apply_link);
+                        setCopyMsg(url);
+                        void navigator.clipboard.writeText(url);
                       }}
                     >
-                      Copy email for assessment
+                      Copy apply link
                     </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {selectedJob && (
+        <>
+          <h3 className="rp-preview-title">Applicants (ATS ranked)</h3>
+          {apps.length === 0 ? (
+            <p className="rp-empty">
+              No applicants yet. Share the apply link, then shortlist strong resumes here.
+            </p>
+          ) : (
+            <div className="recruiter-table-wrap">
+              <table className="recruiter-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Score</th>
+                    <th>Matched</th>
+                    <th>Gaps</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {apps.map((a) => (
+                    <tr key={a.id} className="rp-row-static">
+                      <td>
+                        {a.full_name}
+                        <br />
+                        <span className="rp-muted-small">{a.email}</span>
+                      </td>
+                      <td>
+                        {a.ats_score}
+                        {a.fit_label ? ` · ${a.fit_label}` : ""}
+                      </td>
+                      <td className="rp-muted-small">
+                        {(a.matched_skills || []).slice(0, 6).join(", ") || "—"}
+                      </td>
+                      <td className="rp-muted-small">
+                        {(a.missing_skills || []).slice(0, 6).join(", ") || "—"}
+                      </td>
+                      <td>{a.status}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="rp-secondary rp-btn-compact"
+                          onClick={() => void setStatus(a.id, "shortlisted")}
+                        >
+                          Shortlist
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="rp-secondary rp-btn-compact"
+                          onClick={() => void setStatus(a.id, "rejected")}
+                        >
+                          Reject
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="rp-primary rp-btn-compact"
+                          onClick={() =>
+                            void startLive({
+                              applicationId: a.id,
+                              candidateName: a.full_name,
+                              candidateEmail: a.email,
+                            })
+                          }
+                        >
+                          Live interview
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="rp-secondary rp-btn-compact"
+                          title="Copy email to paste into assessment invite"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(a.email);
+                            setCopyMsg(
+                              `Email copied (${a.email}). Paste into Assessments → Send invite.`,
+                            );
+                          }}
+                        >
+                          Copy email for assessment
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>
       )}
 
       <h3 className="rp-preview-title">Recent live rooms</h3>
-      <ul className="rp-questions-editor">
-        {liveRooms.slice(0, 8).map((r) => (
-          <li key={r.token} className="rp-question-edit-row">
-            {r.title} · {r.status}{" "}
-            <a href={`${r.join_link}?role=recruiter`} target="_blank" rel="noreferrer">
-              Open as recruiter
-            </a>{" "}
-            ·{" "}
-            <a href={`${r.join_link}?role=candidate`} target="_blank" rel="noreferrer">
-              Candidate link
-            </a>{" "}
-            ·{" "}
-            <button
-              type="button"
-              className="rp-secondary rp-btn-compact"
-              disabled={r.status === "ended"}
-              onClick={() =>
-                openInviteForm({
-                  token: r.token,
-                  email: inviteRoomToken === r.token ? inviteEmails : "",
-                  name: inviteRoomToken === r.token ? inviteCandidateName : "",
-                })
-              }
-            >
-              Email invite
-            </button>
-          </li>
-        ))}
-      </ul>
+      {liveRooms.length === 0 ? (
+        <p className="rp-empty">
+          No live rooms yet — create one or start from a shortlisted applicant.
+        </p>
+      ) : (
+        <ul className="rp-questions-editor">
+          {liveRooms.slice(0, 8).map((r) => (
+            <li key={r.token} className="rp-question-edit-row">
+              {r.title} · {r.status}{" "}
+              <a href={`${r.join_link}?role=recruiter`} target="_blank" rel="noreferrer">
+                Open as recruiter
+              </a>{" "}
+              ·{" "}
+              <a href={`${r.join_link}?role=candidate`} target="_blank" rel="noreferrer">
+                Candidate link
+              </a>{" "}
+              ·{" "}
+              <button
+                type="button"
+                className="rp-secondary rp-btn-compact"
+                disabled={r.status === "ended"}
+                onClick={() =>
+                  openInviteForm({
+                    token: r.token,
+                    email: inviteRoomToken === r.token ? inviteEmails : "",
+                    name: inviteRoomToken === r.token ? inviteCandidateName : "",
+                  })
+                }
+              >
+                Email invite
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

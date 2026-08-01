@@ -9,6 +9,10 @@ export default function RecruiterLogin() {
   const [mode, setMode] = useState<Mode>("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotMessage, setForgotMessage] = useState<string | null>(null);
+  const [forgotResetUrl, setForgotResetUrl] = useState<string | null>(null);
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -61,6 +65,34 @@ export default function RecruiterLogin() {
     }
   }
 
+  async function handleForgotPassword(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const email = forgotEmail.trim();
+    if (!email) return;
+
+    setLoading(true);
+    setError(null);
+    setForgotMessage(null);
+    setForgotResetUrl(null);
+    try {
+      const result = await authApi.forgotPassword(email);
+      if (result.reset_url) {
+        setForgotMessage(
+          "SMTP email may not deliver right now. Use this local reset link:",
+        );
+        setForgotResetUrl(result.reset_url);
+      } else {
+        setForgotMessage(
+          "If this email exists, check your inbox (and spam folder).",
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Request failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="recruiter-portal">
       <header>
@@ -69,32 +101,84 @@ export default function RecruiterLogin() {
       </header>
 
       <div className="rp-card status-panel">
-        <div className="rp-tabs">
-          <button
-            type="button"
-            className={mode === "login" ? "active" : undefined}
-            onClick={() => {
-              setMode("login");
-              setError(null);
-            }}
-          >
-            Login
-          </button>
-          <button
-            type="button"
-            className={mode === "register" ? "active" : undefined}
-            onClick={() => {
-              setMode("register");
-              setError(null);
-            }}
-          >
-            Register
-          </button>
-        </div>
+        {!showForgotPassword && (
+          <div className="rp-tabs">
+            <button
+              type="button"
+              className={mode === "login" ? "active" : undefined}
+              onClick={() => {
+                setMode("login");
+                setError(null);
+                setShowForgotPassword(false);
+                setForgotMessage(null);
+                setForgotResetUrl(null);
+              }}
+            >
+              Login
+            </button>
+            <button
+              type="button"
+              className={mode === "register" ? "active" : undefined}
+              onClick={() => {
+                setMode("register");
+                setError(null);
+                setShowForgotPassword(false);
+                setForgotMessage(null);
+                setForgotResetUrl(null);
+              }}
+            >
+              Register
+            </button>
+          </div>
+        )}
 
         {error && <div className="rp-alert error">{error}</div>}
 
-        {mode === "login" ? (
+        {showForgotPassword ? (
+          <form onSubmit={handleForgotPassword}>
+            <h2 className="rp-section-title" style={{ marginTop: 0 }}>
+              Reset password
+            </h2>
+            <label htmlFor="recruiter-forgot-email">Email</label>
+            <input
+              id="recruiter-forgot-email"
+              type="email"
+              required
+              autoComplete="email"
+              value={forgotEmail}
+              onChange={(e) => setForgotEmail(e.target.value)}
+              disabled={loading}
+            />
+            {forgotMessage && (
+              <div className="rp-alert info" style={{ marginTop: "0.75rem" }}>
+                <p>{forgotMessage}</p>
+                {forgotResetUrl && (
+                  <p style={{ marginTop: "0.5rem", wordBreak: "break-all" }}>
+                    <a href={forgotResetUrl}>{forgotResetUrl}</a>
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="rp-actions" style={{ marginTop: "0.75rem" }}>
+              <button type="submit" className="rp-primary" disabled={loading}>
+                {loading ? "Sending…" : "Send reset link"}
+              </button>
+              <button
+                type="button"
+                className="rp-secondary"
+                disabled={loading}
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setForgotMessage(null);
+                  setForgotResetUrl(null);
+                  setError(null);
+                }}
+              >
+                Back to login
+              </button>
+            </div>
+          </form>
+        ) : mode === "login" ? (
           <form onSubmit={handleLogin}>
             <label htmlFor="recruiter-login-email">Email</label>
             <input
@@ -111,6 +195,18 @@ export default function RecruiterLogin() {
               required
               autoComplete="current-password"
             />
+            <button
+              type="button"
+              className="link-button"
+              style={{ margin: "0.35rem 0 0.75rem", fontSize: "0.85rem" }}
+              onClick={() => {
+                setShowForgotPassword(true);
+                setError(null);
+              }}
+              disabled={loading}
+            >
+              Forgot password?
+            </button>
             <button type="submit" className="rp-primary" disabled={loading}>
               {loading ? "Signing in…" : "Sign in"}
             </button>
@@ -144,6 +240,8 @@ export default function RecruiterLogin() {
         )}
       </div>
       <p className="rp-footer">
+        <a href="/">Candidate login</a>
+        {" · "}
         <a href="/privacy">Privacy Policy</a>
       </p>
     </div>

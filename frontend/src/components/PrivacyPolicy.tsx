@@ -329,26 +329,23 @@ export default function PrivacyPolicy() {
                 </button>
               </div>
               <div style={{ marginTop: "1rem" }}>
-                <label className="rp-muted-small" style={{ display: "flex", gap: "0.5rem" }}>
+                <label className="rp-muted-small rp-dsar-check">
                   <input
                     type="checkbox"
                     checked={deleteConfirm}
                     onChange={(e) => setDeleteConfirm(e.target.checked)}
                     disabled={busy}
                   />
-                  I understand anonymization is irreversible
+                  <span>I understand anonymization is irreversible</span>
                 </label>
-                <label
-                  className="rp-muted-small"
-                  style={{ display: "flex", gap: "0.5rem", marginTop: "0.35rem" }}
-                >
+                <label className="rp-muted-small rp-dsar-check">
                   <input
                     type="checkbox"
                     checked={deleteFiles}
                     onChange={(e) => setDeleteFiles(e.target.checked)}
                     disabled={busy}
                   />
-                  Also delete identity images and recordings from storage
+                  <span>Also delete identity images and recordings from storage</span>
                 </label>
                 <button
                   type="button"
@@ -403,29 +400,23 @@ export default function PrivacyPolicy() {
                 Export ZIP
               </button>
             </div>
-            <label
-              className="rp-muted-small"
-              style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}
-            >
+            <label className="rp-muted-small rp-dsar-check">
               <input
                 type="checkbox"
                 checked={adminConfirm}
                 onChange={(e) => setAdminConfirm(e.target.checked)}
                 disabled={busy}
               />
-              Confirm irreversible anonymization
+              <span>Confirm irreversible anonymization</span>
             </label>
-            <label
-              className="rp-muted-small"
-              style={{ display: "flex", gap: "0.5rem", marginTop: "0.35rem" }}
-            >
+            <label className="rp-muted-small rp-dsar-check">
               <input
                 type="checkbox"
                 checked={adminDeleteFiles}
                 onChange={(e) => setAdminDeleteFiles(e.target.checked)}
                 disabled={busy}
               />
-              Also delete stored files
+              <span>Also delete stored files</span>
             </label>
             <button
               type="button"
