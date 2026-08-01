@@ -30,6 +30,8 @@ from app.proctoring.api import mountable_app as proctoring_app
 from app.routes.interview_routes import router as interview_router
 from app.api.v1.recruiter_assessment import router as recruiter_assessment_router
 from app.api.v1.invite import router as invite_router
+from app.api.v1.jobs import router as jobs_router
+from app.api.v1.live import router as live_router
 
 # Load .env before settings/services read environment variables
 load_dotenv()
@@ -48,6 +50,8 @@ async def lifespan(_app: FastAPI):
     import app.db.candidate_verification_model  # noqa: F401
     import app.db.evidence_model  # noqa: F401
     import app.db.invite_funnel_model  # noqa: F401
+    import app.db.question_bank_model  # noqa: F401
+    import app.db.job_live_models  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -95,6 +99,8 @@ app.add_middleware(
 app.include_router(api_router)
 app.include_router(recruiter_assessment_router, prefix="/api/v1")
 app.include_router(invite_router, prefix="/api/v1")
+app.include_router(jobs_router, prefix="/api/v1")
+app.include_router(live_router, prefix="/api/v1")
 app.include_router(interview_router, prefix="/api/v1")
 app.mount("/proctor", proctoring_app)
 

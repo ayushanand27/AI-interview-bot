@@ -11,6 +11,7 @@ import type {
   AssessmentSummary,
   QuestionType,
 } from "../types/assessment";
+import JobsLivePanel from "./JobsLivePanel";
 import "../recruiter-portal.css";
 
 const DEFAULT_TIME_SECONDS =
@@ -1006,6 +1007,13 @@ export default function RecruiterDashboard({
           </button>
         )}
       </header>
+
+      <JobsLivePanel
+        onError={onError}
+        absoluteLink={(path) =>
+          path.startsWith("http") ? path : `${window.location.origin}${path}`
+        }
+      />
 
       <section className="rp-card rp-card-wide rp-section">
         <div className="rp-toolbar">

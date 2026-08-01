@@ -15,6 +15,8 @@ import RecruiterDashboard from "./components/RecruiterDashboard";
 import RecruiterLogin from "./components/RecruiterLogin";
 import PrivacyPolicy from "./components/PrivacyPolicy";
 import CandidateInviteFlow from "./components/CandidateInviteFlow";
+import JobApplyPage from "./components/JobApplyPage";
+import LiveInterviewRoom from "./components/LiveInterviewRoom";
 import PreInterviewChecklist from "./components/PreInterviewChecklist";
 import SetupForm from "./components/SetupForm";
 import Summary from "./components/Summary";
@@ -158,6 +160,37 @@ export default function App() {
       return (
         <div className="app">
           <CandidateInviteFlow token={inviteToken} />
+        </div>
+      );
+    }
+  }
+
+  if (pathname.startsWith("/apply/")) {
+    const jobToken = decodeURIComponent(pathname.slice("/apply/".length));
+    if (jobToken) {
+      return (
+        <div className="app">
+          <JobApplyPage token={jobToken} />
+        </div>
+      );
+    }
+  }
+
+  if (pathname.startsWith("/live/")) {
+    const rest = pathname.slice("/live/".length);
+    const roomToken = decodeURIComponent(rest.split("?")[0] || rest);
+    const params = new URLSearchParams(window.location.search);
+    const role =
+      params.get("role") === "recruiter" ? "recruiter" : "candidate";
+    const displayName = params.get("name") || undefined;
+    if (roomToken) {
+      return (
+        <div className="app">
+          <LiveInterviewRoom
+            token={roomToken}
+            role={role}
+            displayName={displayName}
+          />
         </div>
       );
     }

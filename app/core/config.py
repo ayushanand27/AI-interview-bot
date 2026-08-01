@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     JUDGE0_RAPIDAPI_HOST: str = "sandboxapi.p.rapidapi.com"
     MAX_CODING_SOURCE_LENGTH: int = 100_000
 
+    # ATS free-tier: keep semantic/MiniLM off on t3.micro
+    ATS_ENABLE_SEMANTIC: bool = False
+
     # ── File Upload ───────────────────────────────────────
     UPLOAD_DIR: str = "uploads"         # Local folder / S3 download cache
     MAX_FILE_SIZE_MB: int = 10

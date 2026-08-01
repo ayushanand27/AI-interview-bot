@@ -1402,3 +1402,201 @@ export const inviteApi = {
 };
 
 
+function wsBase(): string {
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${window.location.host}`;
+}
+
+export const jobsLiveApi = {
+  createJob(payload: { title: string; jd_text: string }) {
+    return request<ApiEnvelope<{
+      token: string;
+      title: string;
+      apply_link: string;
+      created_at: string;
+      application_count: number;
+    }>>("/api/v1/jobs", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  listJobs() {
+    return request<
+      ApiEnvelope<
+        Array<{
+          token: string;
+          title: string;
+          apply_link: string;
+          created_at: string;
+          application_count: number;
+        }>
+      >
+    >("/api/v1/jobs");
+  },
+
+  deleteJob(token: string) {
+    return request<ApiEnvelope<null>>(`/api/v1/jobs/${encodeURIComponent(token)}`, {
+      method: "DELETE",
+    });
+  },
+
+  getPublicJob(token: string) {
+    return request<
+      ApiEnvelope<{ token: string; title: string; jd_preview: string }>
+    >(`/api/v1/jobs/public/${encodeURIComponent(token)}`);
+  },
+
+  async applyToJob(payload: {
+    token: string;
+    full_name: string;
+    email: string;
+    resume: File;
+  }) {
+    const form = new FormData();
+    form.append("full_name", payload.full_name);
+    form.append("email", payload.email);
+    form.append("resume", payload.resume);
+    const response = await fetch(
+      `${API_BASE}/api/v1/jobs/public/${encodeURIComponent(payload.token)}/apply`,
+      { method: "POST", body: form },
+    );
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(parseErrorMessage(body, response.status));
+    }
+    return response.json() as Promise<
+      ApiEnvelope<{
+        application_id: number;
+        ats_score: number;
+        fit_label?: string;
+        matched_skills: string[];
+        missing_skills: string[];
+      }>
+    >;
+  },
+
+  listApplications(token: string) {
+    return request<
+      ApiEnvelope<
+        Array<{
+          id: number;
+          full_name: string;
+          email: string;
+          ats_score: number;
+          fit_label?: string | null;
+          matched_skills: string[];
+          missing_skills: string[];
+          status: string;
+          created_at: string;
+        }>
+      >
+    >(`/api/v1/jobs/${encodeURIComponent(token)}/applications`);
+  },
+
+  updateApplicationStatus(applicationId: number, status: string) {
+    return request<
+      ApiEnvelope<{
+        id: number;
+        full_name: string;
+        email: string;
+        ats_score: number;
+        status: string;
+        created_at: string;
+      }>
+    >(`/api/v1/jobs/applications/${applicationId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  createLiveRoom(payload: {
+    title?: string;
+    meet_url?: string;
+    problem_text?: string;
+    language?: string;
+    application_id?: number;
+    expiry_hours?: number;
+  }) {
+    return request<
+      ApiEnvelope<{
+        token: string;
+        title: string;
+        meet_url: string | null;
+        join_link: string;
+        language: string;
+        status: string;
+        expiry_at: string;
+        created_at: string;
+        application_id?: number | null;
+      }>
+    >("/api/v1/live/rooms", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  listLiveRooms() {
+    return request<
+      ApiEnvelope<
+        Array<{
+          token: string;
+          title: string;
+          meet_url: string | null;
+          join_link: string;
+          language: string;
+          status: string;
+          expiry_at: string;
+          created_at: string;
+        }>
+      >
+    >("/api/v1/live/rooms");
+  },
+
+  getLiveRoom(token: string) {
+    return request<
+      ApiEnvelope<{
+        token: string;
+        title: string;
+        meet_url: string | null;
+        problem_text: string;
+        starter_code: string;
+        language: string;
+        public_tests: Array<{ stdin: string; expected_stdout: string }>;
+        status: string;
+        expiry_at: string;
+      }>
+    >(`/api/v1/live/rooms/${encodeURIComponent(token)}`);
+  },
+
+  runLiveTests(
+    token: string,
+    payload: {
+      language: string;
+      source: string;
+      public_tests?: Array<{ stdin: string; expected_stdout: string }>;
+    },
+  ) {
+    return request<ApiEnvelope<Record<string, unknown>>>(
+      `/api/v1/live/rooms/${encodeURIComponent(token)}/run-tests`,
+      { method: "POST", body: JSON.stringify(payload) },
+    );
+  },
+
+  endLiveRoom(
+    token: string,
+    payload?: { final_code?: string; notes?: unknown[] },
+  ) {
+    return request<ApiEnvelope<{ token: string; status: string }>>(
+      `/api/v1/live/rooms/${encodeURIComponent(token)}/end`,
+      { method: "POST", body: JSON.stringify(payload ?? {}) },
+    );
+  },
+
+  liveWsUrl(token: string, role: string, name: string) {
+    const q = new URLSearchParams({ role, name });
+    return `${wsBase()}/api/v1/live/ws/${encodeURIComponent(token)}?${q}`;
+  },
+};
+
+
