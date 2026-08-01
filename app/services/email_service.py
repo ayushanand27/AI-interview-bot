@@ -212,6 +212,68 @@ def send_assessment_invite_email(
     return sent
 
 
+def send_live_interview_invite_email(
+    to_email: str,
+    *,
+    candidate_name: str,
+    room_title: str,
+    live_url: str,
+    meet_url: str | None = None,
+    recruiter_note: str | None = None,
+) -> bool:
+    """Email candidate the live coding room link (+ optional Meet/Zoom)."""
+    safe_name = (candidate_name or "there").strip() or "there"
+    note_html = ""
+    if recruiter_note and recruiter_note.strip():
+        safe = (
+            recruiter_note.strip()
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
+        note_html = f'<p style="margin-top: 12px; color: #444;">{safe}</p>'
+
+    meet_html = ""
+    if meet_url and meet_url.strip():
+        meet = meet_url.strip()
+        meet_html = f"""
+        <p style="margin-top: 16px;">
+          <strong>Video call:</strong>
+          <a href="{meet}">{meet}</a>
+        </p>
+        """
+
+    subject = f"Live interview invitation — {room_title}"
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">Live interview invitation</h2>
+        <p>Hello {safe_name},</p>
+        <p>
+            You are invited to a live technical interview
+            (<strong>{room_title}</strong>) on {settings.APP_NAME}.
+        </p>
+        {note_html}
+        {meet_html}
+        <a href="{live_url}"
+           style="background: #0d9488; color: white; padding: 12px 24px;
+                  text-decoration: none; border-radius: 6px; display: inline-block;
+                  margin-top: 8px;">
+            Join live coding room
+        </a>
+        <p style="margin-top: 16px; color: #666; font-size: 14px;">
+            Or copy this link: {live_url}
+        </p>
+        <p style="color: #666; font-size: 14px;">
+            Join a few minutes early. Use a desktop browser with a stable connection.
+        </p>
+    </div>
+    """
+    sent = _send_email(to_email, subject, html)
+    if not sent:
+        _log_console_fallback("Live interview invite", to_email, live_url)
+    return sent
+
+
 def send_password_reset_email(to_email: str, name: str, token: str) -> str:
     link = f"{settings.effective_frontend_url}/reset-password?token={token}"
 

@@ -35,6 +35,13 @@ interface JobsLivePanelProps {
   absoluteLink: (path: string) => string;
 }
 
+function parseEmails(raw: string): string[] {
+  return raw
+    .split(/[\s,;]+/)
+    .map((e) => e.trim())
+    .filter(Boolean);
+}
+
 export default function JobsLivePanel({
   onError,
   absoluteLink,
@@ -52,6 +59,13 @@ export default function JobsLivePanel({
   const [liveRooms, setLiveRooms] = useState<LiveRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
+
+  const [inviteRoomToken, setInviteRoomToken] = useState<string | null>(null);
+  const [inviteEmails, setInviteEmails] = useState("");
+  const [inviteMessage, setInviteMessage] = useState("");
+  const [inviteCandidateName, setInviteCandidateName] = useState("");
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteStatus, setInviteStatus] = useState<string | null>(null);
 
   function refreshJobs() {
     jobsLiveApi
@@ -89,6 +103,18 @@ export default function JobsLivePanel({
       );
   }, [selectedJob]);
 
+  function openInviteForm(opts: {
+    token: string;
+    email?: string;
+    name?: string;
+  }) {
+    setInviteRoomToken(opts.token);
+    setInviteEmails(opts.email || "");
+    setInviteCandidateName(opts.name || "");
+    setInviteMessage("");
+    setInviteStatus(null);
+  }
+
   async function resolveJdText(): Promise<string> {
     if (jdMode === "upload") {
       if (!jdFile) {
@@ -109,7 +135,9 @@ export default function JobsLivePanel({
     }
     const text = jobJd.trim();
     if (text.length < 20) {
-      throw new Error("Paste a job description (at least 20 characters) or upload a file.");
+      throw new Error(
+        "Paste a job description (at least 20 characters) or upload a file.",
+      );
     }
     return text;
   }
@@ -148,20 +176,30 @@ export default function JobsLivePanel({
     }
   }
 
-  async function startLive(applicationId?: number, candidateName?: string) {
+  async function startLive(opts?: {
+    applicationId?: number;
+    candidateName?: string;
+    candidateEmail?: string;
+  }) {
     setBusy(true);
     onError(null);
+    setInviteStatus(null);
     try {
       const res = await jobsLiveApi.createLiveRoom({
-        title: candidateName
-          ? `Live with ${candidateName}`
+        title: opts?.candidateName
+          ? `Live with ${opts.candidateName}`
           : liveTitle || "Live technical interview",
         meet_url: meetUrl || undefined,
-        application_id: applicationId,
+        application_id: opts?.applicationId,
       });
       refreshLive();
-      const link = absoluteLink(res.data.join_link);
+      const link = absoluteLink(`${res.data.join_link}?role=candidate`);
       setCopyMsg(link);
+      openInviteForm({
+        token: res.data.token,
+        email: opts?.candidateEmail,
+        name: opts?.candidateName,
+      });
       window.open(`${res.data.join_link}?role=recruiter`, "_blank");
     } catch (err) {
       onError(err instanceof Error ? err.message : "Live room failed");
@@ -170,12 +208,46 @@ export default function JobsLivePanel({
     }
   }
 
+  async function sendLiveInvite() {
+    if (!inviteRoomToken) return;
+    const emails = parseEmails(inviteEmails);
+    if (!emails.length) {
+      onError("Enter at least one candidate email.");
+      return;
+    }
+    setInviteSending(true);
+    onError(null);
+    setInviteStatus(null);
+    try {
+      const res = await jobsLiveApi.sendInvites(inviteRoomToken, {
+        emails,
+        message: inviteMessage.trim() || undefined,
+        candidate_name: inviteCandidateName.trim() || undefined,
+      });
+      const failed = res.data.failed || [];
+      const parts = [`Sent ${res.data.sent} invite email(s).`];
+      if (failed.length) {
+        parts.push(`Failed: ${failed.join(", ")}`);
+      }
+      parts.push(`Live link: ${absoluteLink(res.data.live_link)}`);
+      setInviteStatus(parts.join(" "));
+      setCopyMsg(absoluteLink(res.data.live_link));
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Could not send invites");
+    } finally {
+      setInviteSending(false);
+    }
+  }
+
+  const inviteRoom = liveRooms.find((r) => r.token === inviteRoomToken);
+
   return (
     <section className="rp-card rp-card-wide rp-section">
       <h2 className="rp-section-title">Jobs · ATS shortlist · Live interview</h2>
       <p className="rp-section-desc">
         Create a job apply link, score resumes, shortlist, then open a shared
-        live coding room (video via Meet/Zoom URL).
+        live coding room and email the candidate their join link (video via
+        Meet/Zoom URL).
       </p>
 
       <div className="rp-field-row" style={{ alignItems: "flex-start" }}>
@@ -291,6 +363,72 @@ export default function JobsLivePanel({
         </p>
       )}
 
+      {inviteRoomToken && (
+        <div className="rp-send-invites" style={{ marginTop: "1rem" }}>
+          <h3 className="rp-preview-title" style={{ marginTop: 0 }}>
+            Email live interview invite
+            {inviteRoom ? ` — ${inviteRoom.title}` : ""}
+          </h3>
+          <p className="rp-muted-small">
+            Sends the candidate live room link
+            {inviteRoom?.meet_url ? " and the Meet/Zoom URL stored on the room" : ""}
+            .
+          </p>
+          <label className="rp-muted-small">
+            Candidate name (optional)
+            <input
+              type="text"
+              value={inviteCandidateName}
+              onChange={(e) => setInviteCandidateName(e.target.value)}
+              placeholder="Alex Candidate"
+              disabled={inviteSending}
+            />
+          </label>
+          <label className="rp-muted-small" style={{ display: "block", marginTop: "0.5rem" }}>
+            Emails (comma or new line)
+            <textarea
+              rows={2}
+              value={inviteEmails}
+              onChange={(e) => setInviteEmails(e.target.value)}
+              placeholder="candidate@gmail.com"
+              disabled={inviteSending}
+            />
+          </label>
+          <label className="rp-muted-small" style={{ display: "block", marginTop: "0.5rem" }}>
+            Optional note
+            <input
+              type="text"
+              value={inviteMessage}
+              onChange={(e) => setInviteMessage(e.target.value)}
+              placeholder="Join 5 minutes early; laptop required"
+              disabled={inviteSending}
+            />
+          </label>
+          <div className="rp-actions" style={{ marginTop: "0.75rem" }}>
+            <button
+              type="button"
+              className="rp-primary rp-btn-inline"
+              disabled={inviteSending}
+              onClick={() => void sendLiveInvite()}
+            >
+              {inviteSending ? "Sending…" : "Send invite email"}
+            </button>
+            <button
+              type="button"
+              className="rp-secondary rp-btn-compact"
+              disabled={inviteSending}
+              onClick={() => {
+                setInviteRoomToken(null);
+                setInviteStatus(null);
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+          {inviteStatus && <p className="rp-copy-ok">{inviteStatus}</p>}
+        </div>
+      )}
+
       <h3 className="rp-preview-title">Your jobs</h3>
       <table className="rp-table">
         <thead>
@@ -381,7 +519,13 @@ export default function JobsLivePanel({
                     <button
                       type="button"
                       className="rp-primary rp-btn-compact"
-                      onClick={() => void startLive(a.id, a.full_name)}
+                      onClick={() =>
+                        void startLive({
+                          applicationId: a.id,
+                          candidateName: a.full_name,
+                          candidateEmail: a.email,
+                        })
+                      }
                     >
                       Live interview
                     </button>{" "}
@@ -417,7 +561,22 @@ export default function JobsLivePanel({
             ·{" "}
             <a href={`${r.join_link}?role=candidate`} target="_blank" rel="noreferrer">
               Candidate link
-            </a>
+            </a>{" "}
+            ·{" "}
+            <button
+              type="button"
+              className="rp-secondary rp-btn-compact"
+              disabled={r.status === "ended"}
+              onClick={() =>
+                openInviteForm({
+                  token: r.token,
+                  email: inviteRoomToken === r.token ? inviteEmails : "",
+                  name: inviteRoomToken === r.token ? inviteCandidateName : "",
+                })
+              }
+            >
+              Email invite
+            </button>
           </li>
         ))}
       </ul>

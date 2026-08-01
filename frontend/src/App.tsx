@@ -185,7 +185,7 @@ export default function App() {
     const displayName = params.get("name") || undefined;
     if (roomToken) {
       return (
-        <div className="app">
+        <div className="app app-live-room">
           <LiveInterviewRoom
             token={roomToken}
             role={role}

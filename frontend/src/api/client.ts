@@ -1593,6 +1593,27 @@ export const jobsLiveApi = {
     );
   },
 
+  sendInvites(
+    token: string,
+    payload: {
+      emails: string[];
+      message?: string;
+      candidate_name?: string;
+    },
+  ) {
+    return request<
+      ApiEnvelope<{
+        sent: number;
+        failed: string[];
+        live_link: string;
+        meet_url: string | null;
+      }>
+    >(`/api/v1/live/rooms/${encodeURIComponent(token)}/send-invites`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
   liveWsUrl(token: string, role: string, name: string) {
     const q = new URLSearchParams({ role, name });
     return `${wsBase()}/api/v1/live/ws/${encodeURIComponent(token)}?${q}`;

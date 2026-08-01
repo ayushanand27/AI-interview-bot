@@ -10,7 +10,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.dependencies import require_role
+from app.core.exceptions import NotFoundException
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.common import BaseResponse
@@ -20,8 +22,11 @@ from app.schemas.jobs_live import (
     LiveRoomPublic,
     LiveRoomSummary,
     LiveRunTestsRequest,
+    SendLiveInvitesRequest,
+    SendLiveInvitesResponse,
 )
 from app.services.coding_judge import public_run_payload, run_test_cases
+from app.services.email_service import send_live_interview_invite_email
 from app.services.live_interview_service import LiveInterviewService
 
 logger = logging.getLogger("app.api.live")
@@ -131,6 +136,50 @@ async def run_live_tests(
         success=True,
         message="Tests finished",
         data=public_run_payload(summary),
+    )
+
+
+@router.post(
+    "/rooms/{token}/send-invites",
+    response_model=BaseResponse[SendLiveInvitesResponse],
+)
+async def send_live_invites(
+    token: str,
+    body: SendLiveInvitesRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    service = LiveInterviewService(db)
+    room = await service.get_room(token)
+    if room.recruiter_id != current_user.id:
+        raise NotFoundException("Live room not found")
+
+    live_path = f"/live/{room.token}?role=candidate"
+    live_url = f"{settings.effective_frontend_url}{live_path}"
+    sent = 0
+    failed: list[str] = []
+    for email in body.emails:
+        ok = send_live_interview_invite_email(
+            str(email),
+            candidate_name=body.candidate_name or "Candidate",
+            room_title=room.title,
+            live_url=live_url,
+            meet_url=room.meet_url,
+            recruiter_note=body.message,
+        )
+        if ok:
+            sent += 1
+        else:
+            failed.append(str(email))
+    return BaseResponse(
+        success=True,
+        message=f"Sent {sent} invite(s)",
+        data=SendLiveInvitesResponse(
+            sent=sent,
+            failed=failed,
+            live_link=live_path,
+            meet_url=room.meet_url,
+        ),
     )
 
 

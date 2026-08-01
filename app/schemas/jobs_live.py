@@ -87,3 +87,16 @@ class LiveRunTestsRequest(BaseModel):
 class EndLiveRoomRequest(BaseModel):
     final_code: str | None = None
     notes: list[Any] | None = None
+
+
+class SendLiveInvitesRequest(BaseModel):
+    emails: list[EmailStr] = Field(..., min_length=1)
+    message: str | None = None
+    candidate_name: str | None = None
+
+
+class SendLiveInvitesResponse(BaseModel):
+    sent: int
+    failed: list[str]
+    live_link: str
+    meet_url: str | None = None
