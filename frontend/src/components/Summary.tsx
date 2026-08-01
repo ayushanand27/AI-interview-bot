@@ -12,7 +12,11 @@ interface SummaryProps {
   inviteToken?: string;
   candidateEmail?: string;
   recordingSaved?: boolean;
-  /** Invite/exam flow: show score only — no report, recording, or per-question feedback. */
+  /**
+   * Invite/exam flow: candidate-safe feedback (score, recommendation,
+   * per-question strengths/weaknesses) — no recording, PDF download,
+   * integrity timeline, or recruiter-only notes.
+   */
   scoreOnly?: boolean;
   onRestart: () => void;
 }
@@ -55,7 +59,8 @@ export default function Summary({
   const displayScore =
     summary.adjusted_final_score ?? overallScore(final);
   const penalty = summary.integrity_penalty_percent ?? 0;
-  const isExamResult = scoreOnly || Boolean(inviteToken);
+  const isCandidateSafe = scoreOnly || Boolean(inviteToken);
+  const recommendation = final?.recommendation;
 
   const [recordingStatus, setRecordingStatus] = useState<
     "loading" | "available" | "pending" | "unavailable"
@@ -67,7 +72,7 @@ export default function Summary({
   const recordingUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (isExamResult) {
+    if (isCandidateSafe) {
       setRecordingStatus("unavailable");
       return;
     }
@@ -120,7 +125,7 @@ export default function Summary({
         recordingUrlRef.current = null;
       }
     };
-  }, [effectiveSessionId, inviteToken, isExamResult]);
+  }, [effectiveSessionId, inviteToken, isCandidateSafe]);
 
   async function handleDownloadReport() {
     setDownloadingReport(true);
@@ -147,7 +152,12 @@ export default function Summary({
     }
   }
 
-  if (isExamResult) {
+  if (isCandidateSafe) {
+    const hasQuestions = summary.questions.length > 0;
+    const hasJudgments = (summary.answer_judgments?.length ?? 0) > 0;
+    const topStrengths = final?.top_strengths ?? [];
+    const topImprovements = final?.top_improvements ?? [];
+
     return (
       <div className="card hero-card summary-score-only">
         <div className="alert success">{summary.message}</div>
@@ -161,13 +171,99 @@ export default function Summary({
           ) : (
             <p className="summary-score-note">Your score is being finalized.</p>
           )}
-          <p className="summary-score-note">
-            A detailed report and recording are available to the recruiter only.
-            {candidateEmail
-              ? " You may close this page — thank you for completing the assessment."
-              : ""}
-          </p>
+          {recommendation && (
+            <p className="summary-recommendation">
+              Recommendation band: <strong>{recommendation}</strong>
+            </p>
+          )}
+          {(topStrengths.length > 0 || topImprovements.length > 0) && (
+            <div className="summary-overall-list">
+              {topStrengths.length > 0 && (
+                <>
+                  <h3>Overall strengths</h3>
+                  <ul>
+                    {topStrengths.map((s, idx) => (
+                      <li key={`ts-${idx}`}>{s}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {topImprovements.length > 0 && (
+                <>
+                  <h3>Areas to improve</h3>
+                  <ul>
+                    {topImprovements.map((s, idx) => (
+                      <li key={`ti-${idx}`}>{s}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          )}
         </section>
+
+        {hasQuestions && hasJudgments && (
+          <section className="summary-candidate-feedback">
+            <h2>Question feedback</h2>
+            {summary.questions.map((q, i) => {
+              const judgment = getJudgment(summary.answer_judgments, i);
+              return (
+                <div key={i} className="summary-item">
+                  <h3>Question {i + 1}</h3>
+                  <p>{q}</p>
+                  {typeof judgment?.weighted_total === "number" && (
+                    <p className="summary-question-score">
+                      Score: <strong>{judgment.weighted_total}</strong> / 100
+                    </p>
+                  )}
+                  {judgment?.error === "judging_failed" && (
+                    <div className="alert info" style={{ marginTop: "0.75rem" }}>
+                      Feedback could not be generated for this answer.
+                    </div>
+                  )}
+                  {judgment && !judgment.error && (
+                    <div className="summary-feedback">
+                      {judgment.overall_reasoning && (
+                        <p className="summary-reasoning">
+                          {judgment.overall_reasoning}
+                        </p>
+                      )}
+                      {judgment.strengths && judgment.strengths.length > 0 && (
+                        <div className="summary-feedback-block">
+                          <h4>Strengths</h4>
+                          <ul>
+                            {judgment.strengths.map((s, idx) => (
+                              <li key={idx}>{s}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {judgment.improvements &&
+                        judgment.improvements.length > 0 && (
+                          <div className="summary-feedback-block">
+                            <h4>Areas to improve</h4>
+                            <ul>
+                              {judgment.improvements.map((s, idx) => (
+                                <li key={idx}>{s}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </section>
+        )}
+
+        <p className="summary-score-note" style={{ marginTop: "1.25rem" }}>
+          Recording, integrity details, and the full recruiter report stay with
+          the hiring team.
+          {candidateEmail
+            ? " You may close this page — thank you for completing the assessment."
+            : ""}
+        </p>
         <div className="actions" style={{ marginTop: "1.5rem" }}>
           <button type="button" className="primary" onClick={onRestart}>
             Done

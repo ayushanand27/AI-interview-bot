@@ -680,7 +680,12 @@ export const recruiterApi = {
     payload: { emails: string[]; message?: string },
   ) {
     return request<
-      ApiEnvelope<{ sent: number; failed: string[]; invite_link: string }>
+      ApiEnvelope<{
+        sent: number;
+        failed: string[];
+        invite_link: string;
+        delivery_note?: string | null;
+      }>
     >(`/api/v1/recruiter/assessments/${token}/send-invites`, {
       method: "POST",
       body: JSON.stringify(payload),
@@ -1607,6 +1612,7 @@ export const jobsLiveApi = {
         failed: string[];
         live_link: string;
         meet_url: string | null;
+        delivery_note?: string | null;
       }>
     >(`/api/v1/live/rooms/${encodeURIComponent(token)}/send-invites`, {
       method: "POST",
@@ -1617,6 +1623,76 @@ export const jobsLiveApi = {
   liveWsUrl(token: string, role: string, name: string) {
     const q = new URLSearchParams({ role, name });
     return `${wsBase()}/api/v1/live/ws/${encodeURIComponent(token)}?${q}`;
+  },
+};
+
+export const privacyApi = {
+  async exportMyDataJson() {
+    return request<Record<string, unknown>>("/api/v1/privacy/export?format=json");
+  },
+
+  async exportMyDataZip(): Promise<Blob> {
+    const response = await fetch(`${API_BASE}/api/v1/privacy/export?format=zip`, {
+      headers: authHeaders(),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(parseErrorMessage(body, response.status));
+    }
+    return response.blob();
+  },
+
+  async deleteMyData(payload: { confirm: boolean; delete_files?: boolean }) {
+    return request<{ success: boolean; message?: string } & Record<string, unknown>>(
+      "/api/v1/privacy/delete-request",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+
+  async adminExportJson(email: string) {
+    return request<Record<string, unknown>>("/api/v1/privacy/admin/export?format=json", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  async adminExportZip(email: string): Promise<Blob> {
+    const response = await fetch(
+      `${API_BASE}/api/v1/privacy/admin/export?format=zip`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(),
+        },
+        body: JSON.stringify({ email }),
+      },
+    );
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(parseErrorMessage(body, response.status));
+    }
+    return response.blob();
+  },
+
+  async adminDelete(
+    email: string,
+    opts: { confirm: boolean; delete_files?: boolean },
+  ) {
+    const q = new URLSearchParams({
+      confirm: opts.confirm ? "true" : "false",
+      delete_files: opts.delete_files === false ? "false" : "true",
+    });
+    return request<{ success: boolean; message?: string } & Record<string, unknown>>(
+      `/api/v1/privacy/admin/delete-request?${q}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      },
+    );
   },
 };
 

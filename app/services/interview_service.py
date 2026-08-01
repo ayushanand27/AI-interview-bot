@@ -80,6 +80,57 @@ from app.services.adaptive_interview import (
 logger = logging.getLogger(__name__)
 
 
+def _candidate_safe_judgments(judgments: list | None) -> list[dict]:
+    """Invite candidates: strengths / improvements / short feedback only."""
+    safe: list[dict] = []
+    for raw in judgments or []:
+        if not isinstance(raw, dict):
+            safe.append({"error": "unavailable"})
+            continue
+        if raw.get("error"):
+            safe.append({"error": str(raw.get("error"))})
+            continue
+        item: dict = {}
+        if "weighted_total" in raw and raw["weighted_total"] is not None:
+            try:
+                item["weighted_total"] = float(raw["weighted_total"])
+            except (TypeError, ValueError):
+                pass
+        for key in ("strengths", "improvements"):
+            vals = raw.get(key)
+            if isinstance(vals, list):
+                cleaned = [str(v).strip() for v in vals if str(v).strip()]
+                if cleaned:
+                    item[key] = cleaned[:5]
+        reasoning = raw.get("overall_reasoning") or raw.get("reasoning")
+        if isinstance(reasoning, str) and reasoning.strip():
+            item["overall_reasoning"] = reasoning.strip()[:500]
+        safe.append(item)
+    return safe
+
+
+def _candidate_safe_final_score(final: dict | None) -> dict | None:
+    """Strip recruiter-only / integrity fields from final_score for invite view."""
+    if not isinstance(final, dict):
+        return None
+    out: dict = {}
+    for key in (
+        "final_score",
+        "candidate_score",
+        "recommendation",
+        "adjusted_final_score",
+    ):
+        if key in final and final[key] is not None:
+            out[key] = final[key]
+    for key in ("top_strengths", "top_improvements"):
+        vals = final.get(key)
+        if isinstance(vals, list):
+            cleaned = [str(v).strip() for v in vals if str(v).strip()]
+            if cleaned:
+                out[key] = cleaned[:4]
+    return out or None
+
+
 def resolve_job_description(
     job_description: str | None,
     job_description_pdf_bytes: bytes | None,
@@ -772,24 +823,45 @@ class InterviewService:
         report_email_sent = candidate_report_email_already_sent(session.session_id)
 
         is_invite = bool(getattr(session, "invite_token", None))
+        if is_invite:
+            # Candidate-safe summary: score + recommendation + short feedback.
+            # Hide answers, integrity timeline, and full recruiter report fields.
+            return EndInterviewResponse(
+                session_id=session.session_id,
+                status=session.status,
+                total_questions=session.total_questions,
+                answered_count=answered,
+                unanswered_count=unanswered,
+                questions=[extract_question_text(q) for q in session.questions],
+                answers=[],
+                answer_judgments=_candidate_safe_judgments(session.answer_judgments),
+                final_score=_candidate_safe_final_score(session.final_score),
+                message=message,
+                original_score=None,
+                integrity_penalty_percent=0.0,
+                adjusted_final_score=adjusted_final_score,
+                integrity_report=None,
+                integrity_level=None,
+                candidate_report_email_sent=False,
+            )
+
         return EndInterviewResponse(
             session_id=session.session_id,
             status=session.status,
             total_questions=session.total_questions,
             answered_count=answered,
             unanswered_count=unanswered,
-            # Invite/exam candidates only see score — full transcript stays with recruiter.
-            questions=[] if is_invite else [extract_question_text(q) for q in session.questions],
-            answers=[] if is_invite else session.answers,
-            answer_judgments=[] if is_invite else session.answer_judgments,
+            questions=[extract_question_text(q) for q in session.questions],
+            answers=session.answers,
+            answer_judgments=session.answer_judgments,
             final_score=session.final_score,
             message=message,
-            original_score=None if is_invite else original_score,
-            integrity_penalty_percent=0.0 if is_invite else (integrity_penalty_percent or 0.0),
+            original_score=original_score,
+            integrity_penalty_percent=integrity_penalty_percent or 0.0,
             adjusted_final_score=adjusted_final_score,
-            integrity_report=None if is_invite else integrity_report,
-            integrity_level=None if is_invite else integrity_level,
-            candidate_report_email_sent=report_email_sent and not is_invite,
+            integrity_report=integrity_report,
+            integrity_level=integrity_level,
+            candidate_report_email_sent=report_email_sent,
         )
 
     def _to_session_response(self, session: InterviewSession) -> InterviewSessionResponse:

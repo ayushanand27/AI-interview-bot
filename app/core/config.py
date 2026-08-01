@@ -54,12 +54,17 @@ class Settings(BaseSettings):
     ADAPTIVE_QUALITY_LOW: float = 55.0
     ADAPTIVE_QUALITY_HIGH: float = 80.0
 
-    # ── Coding sandbox (SandboxAPI via RapidAPI free) ─────
+    # ── Coding sandbox (SandboxAPI RapidAPI and/or Piston) ─
+    # Backend: auto (SandboxAPI if keyed, else Piston) | sandboxapi | piston
     CODING_QUESTIONS_ENABLED: bool = True
-    CODING_RAPIDAPI_KEY: str = ""  # preferred
+    CODING_JUDGE_BACKEND: str = "auto"
+    CODING_RAPIDAPI_KEY: str = ""  # preferred for SandboxAPI
     JUDGE0_RAPIDAPI_KEY: str = ""  # legacy alias (same RapidAPI key works)
     CODING_JUDGE_HOST: str = "sandboxapi.p.rapidapi.com"
     JUDGE0_RAPIDAPI_HOST: str = "sandboxapi.p.rapidapi.com"
+    # Piston base URL including /api/v2/piston (public EMKC used when empty + auto/piston)
+    # Self-host example: http://127.0.0.1:2000/api/v2
+    CODING_PISTON_URL: str = ""
     MAX_CODING_SOURCE_LENGTH: int = 100_000
 
     # ATS free-tier: keep semantic/MiniLM off on t3.micro
@@ -157,9 +162,22 @@ class Settings(BaseSettings):
 
     @property
     def coding_judge_configured(self) -> bool:
-        """True when coding questions are enabled and a RapidAPI key is set."""
-        key = self.CODING_RAPIDAPI_KEY.strip() or self.JUDGE0_RAPIDAPI_KEY.strip()
-        return bool(self.CODING_QUESTIONS_ENABLED and key)
+        """True when coding questions are enabled and a judge backend is usable."""
+        if not self.CODING_QUESTIONS_ENABLED:
+            return False
+        backend = (self.CODING_JUDGE_BACKEND or "auto").strip().lower()
+        has_rapid = bool(
+            self.CODING_RAPIDAPI_KEY.strip() or self.JUDGE0_RAPIDAPI_KEY.strip()
+        )
+        has_piston = bool((self.CODING_PISTON_URL or "").strip()) or backend in (
+            "auto",
+            "piston",
+        )
+        if backend == "sandboxapi":
+            return has_rapid
+        if backend == "piston":
+            return has_piston
+        return has_rapid or has_piston
 
     @property
     def effective_frontend_url(self) -> str:

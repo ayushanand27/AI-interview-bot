@@ -568,6 +568,21 @@
   font-size: 0.72rem;
 }
 
+.recruiter-portal .rp-danger {
+  background: #7f1d1d;
+  color: #fecaca;
+  border: 1px solid #991b1b;
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.recruiter-portal .rp-danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .recruiter-portal .privacy-section {
   margin-bottom: 1.5rem;
 }

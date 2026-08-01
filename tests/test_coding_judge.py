@@ -59,9 +59,10 @@ def test_public_run_payload_includes_io():
     assert payload["cases"][0]["expected_stdout"] == "b"
 
 
+@patch("app.services.coding_judge.active_judge_backends", return_value=["sandboxapi"])
 @patch("app.services.coding_judge.coding_judge_configured", return_value=True)
 @patch("app.services.coding_judge.httpx.Client")
-def test_run_test_cases_compares_stdout(mock_client_cls, _configured):
+def test_run_test_cases_compares_stdout(mock_client_cls, _configured, _backends):
     client = MagicMock()
     mock_client_cls.return_value.__enter__.return_value = client
     response = MagicMock()
@@ -86,9 +87,13 @@ def test_run_test_cases_compares_stdout(mock_client_cls, _configured):
     assert summary.cases[0].passed is True
 
 
+
+@patch("app.services.coding_judge.active_judge_backends", return_value=["sandboxapi"])
 @patch("app.services.coding_judge.coding_judge_configured", return_value=True)
 @patch("app.services.coding_judge.httpx.Client")
-def test_run_test_cases_treats_http_408_as_case_result(mock_client_cls, _configured):
+def test_run_test_cases_treats_http_408_as_case_result(
+    mock_client_cls, _configured, _backends
+):
     """SandboxAPI returns HTTP 408 with a body for TLE / some failures — not an outage."""
     client = MagicMock()
     mock_client_cls.return_value.__enter__.return_value = client

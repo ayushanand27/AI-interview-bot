@@ -202,21 +202,29 @@ Ensure `logs/` exists (`mkdir -p /var/www/ai-interview-bot/logs`). Do not put se
 
 ---
 
-## Coding sandbox (SandboxAPI RapidAPI free)
+## Coding sandbox (SandboxAPI + Piston)
 
-Demo / pitch coding rounds use **SandboxAPI Basic (Free)** via RapidAPI
-(~500 executions/month). Candidate code never runs on the interview EC2.
-Perl can appear in the UI but is **not executable** on this free plan.
+See [CODING_JUDGE_FREE_TIER.md](./CODING_JUDGE_FREE_TIER.md).
 
-1. Subscribe free to [SandboxAPI](https://rapidapi.com/sandboxapidev/api/sandboxapi) (Basic $0).
-2. Copy `X-RapidAPI-Key` into EC2 `.env`:
+Demo coding rounds use **SandboxAPI Basic (Free)** via RapidAPI when keyed, with
+**Piston** (public EMKC or self-hosted) as a lightweight fallback so quota/auth
+failures do not break Run tests. Candidate code never runs on the interview EC2.
+Do **not** install heavy Judge0 on t3.micro. Perl can appear in the UI but is
+**not executable** on free backends.
 
 ```bash
 CODING_QUESTIONS_ENABLED=true
-CODING_RAPIDAPI_KEY=your-rapidapi-key
-CODING_JUDGE_HOST=sandboxapi.p.rapidapi.com
+CODING_JUDGE_BACKEND=auto
+CODING_RAPIDAPI_KEY=your_rapidapi_key   # optional if relying on Piston
+CODING_PISTON_URL=                      # empty → public EMKC Piston in auto/piston mode
 ```
 
+Restart after env changes: `pm2 restart ai-interview-bot-backend --update-env`.
+
+Optional RapidAPI setup:
+
+1. Subscribe free to [SandboxAPI](https://rapidapi.com/sandboxapidev/api/sandboxapi) (Basic $0).
+2. Set `CODING_RAPIDAPI_KEY` on EC2 `.env` (keep `CODING_JUDGE_BACKEND=auto`).
 3. Restart PM2. Confirm `/api/v1/status` shows `"coding_judge_configured": true`.
 4. Recruiter → add **Coding** (C/C++/Python/Java/JS). Candidate gets Monaco + Run public + Submit.
 

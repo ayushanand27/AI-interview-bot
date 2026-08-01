@@ -26,7 +26,10 @@ from app.schemas.jobs_live import (
     SendLiveInvitesResponse,
 )
 from app.services.coding_judge import public_run_payload, run_test_cases
-from app.services.email_service import send_live_interview_invite_email
+from app.services.email_service import (
+    send_live_interview_invite_email,
+    smtp_delivery_hint,
+)
 from app.services.live_interview_service import LiveInterviewService
 
 logger = logging.getLogger("app.api.live")
@@ -171,12 +174,17 @@ async def send_live_invites(
             sent += 1
         else:
             failed.append(str(email))
+    note = smtp_delivery_hint(any_failed=bool(failed))
+    msg = f"Sent {sent} invite(s)"
+    if failed:
+        msg += f"; {len(failed)} failed"
     return BaseResponse(
         success=True,
-        message=f"Sent {sent} invite(s)",
+        message=msg,
         data=SendLiveInvitesResponse(
             sent=sent,
             failed=failed,
+            delivery_note=note,
             live_link=live_path,
             meet_url=room.meet_url,
         ),

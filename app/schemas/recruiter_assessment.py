@@ -494,3 +494,4 @@ class SendAssessmentInvitesResponse(BaseModel):
     sent: int
     failed: list[str] = Field(default_factory=list)
     invite_link: str
+    delivery_note: str | None = None

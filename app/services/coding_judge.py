@@ -1,7 +1,10 @@
-"""SandboxAPI (RapidAPI free) client for sandboxed coding test execution.
+"""Coding judge — SandboxAPI (RapidAPI) and/or Piston backends.
 
 Never executes candidate code on the interview host.
-Perl is accepted in question metadata but is not executable on the free SandboxAPI plan.
+Prefer lightweight Piston (public EMKC or self-hosted) when RapidAPI quota/auth
+fails; keep SandboxAPI when a free RapidAPI key is configured.
+
+Perl is accepted in question metadata but is not executable on free backends.
 """
 
 from __future__ import annotations
@@ -9,7 +12,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
@@ -17,17 +20,27 @@ from app.core.config import settings
 
 logger = logging.getLogger("app.services.coding_judge")
 
+JudgeBackend = Literal["sandboxapi", "piston"]
+
 # Languages shown in recruiter/candidate UI
 SUPPORTED_CODING_LANGUAGES = ("c", "cpp", "python", "perl", "java", "javascript")
 
-# Languages SandboxAPI free tier can actually run
+# Languages free backends can actually run
 EXECUTABLE_CODING_LANGUAGES = ("c", "cpp", "python", "java", "javascript")
 
-# SandboxAPI language ids
 SANDBOXAPI_LANGUAGE_IDS: dict[str, str] = {
     "c": "c",
     "cpp": "cpp",
     "python": "python3",
+    "java": "java",
+    "javascript": "javascript",
+}
+
+# Piston language names (version resolved as "*")
+PISTON_LANGUAGE_IDS: dict[str, str] = {
+    "c": "c",
+    "cpp": "c++",
+    "python": "python",
     "java": "java",
     "javascript": "javascript",
 }
@@ -90,6 +103,8 @@ LANGUAGE_STARTERS: dict[str, str] = {
     ),
 }
 
+DEFAULT_PUBLIC_PISTON_URL = "https://emkc.org/api/v2/piston"
+
 
 class CodingJudgeError(Exception):
     """Raised when the remote judge is unavailable or rejects a submission."""
@@ -149,11 +164,24 @@ def sandboxapi_language_id(language: str) -> str:
         raise CodingJudgeError(f"Unsupported language: {language}", retryable=False)
     if normalized not in EXECUTABLE_CODING_LANGUAGES:
         raise CodingJudgeError(
-            f"{normalized} is not executable on the free SandboxAPI judge. "
+            f"{normalized} is not executable on the free coding judge. "
             "Use C, C++, Python, Java, or JavaScript.",
             retryable=False,
         )
     return SANDBOXAPI_LANGUAGE_IDS[normalized]
+
+
+def piston_language_id(language: str) -> str:
+    normalized = normalize_coding_language(language)
+    if not normalized:
+        raise CodingJudgeError(f"Unsupported language: {language}", retryable=False)
+    if normalized not in EXECUTABLE_CODING_LANGUAGES:
+        raise CodingJudgeError(
+            f"{normalized} is not executable on the free coding judge. "
+            "Use C, C++, Python, Java, or JavaScript.",
+            retryable=False,
+        )
+    return PISTON_LANGUAGE_IDS[normalized]
 
 
 def _normalize_stdout(value: str | None) -> str:
@@ -171,11 +199,57 @@ def _rapidapi_key() -> str:
     )
 
 
+def _piston_base_url() -> str:
+    configured = (settings.CODING_PISTON_URL or "").strip().rstrip("/")
+    if configured:
+        return configured
+    return DEFAULT_PUBLIC_PISTON_URL
+
+
+def sandboxapi_available() -> bool:
+    return bool(_rapidapi_key())
+
+
+def piston_available() -> bool:
+    # Public EMKC Piston is always reachable as a free fallback when enabled.
+    backend = (settings.CODING_JUDGE_BACKEND or "auto").strip().lower()
+    if backend == "sandboxapi":
+        return False
+    if backend == "piston":
+        return True
+    # auto
+    return True
+
+
 def coding_judge_configured() -> bool:
-    return bool(settings.CODING_QUESTIONS_ENABLED and _rapidapi_key())
+    if not settings.CODING_QUESTIONS_ENABLED:
+        return False
+    backend = (settings.CODING_JUDGE_BACKEND or "auto").strip().lower()
+    if backend == "sandboxapi":
+        return sandboxapi_available()
+    if backend == "piston":
+        return piston_available()
+    # auto: either RapidAPI key or Piston (public/self-hosted)
+    return sandboxapi_available() or piston_available()
 
 
-def _headers() -> dict[str, str]:
+def active_judge_backends() -> list[JudgeBackend]:
+    """Ordered backends to try for this process."""
+    backend = (settings.CODING_JUDGE_BACKEND or "auto").strip().lower()
+    if backend == "sandboxapi":
+        return ["sandboxapi"] if sandboxapi_available() else []
+    if backend == "piston":
+        return ["piston"] if piston_available() else []
+    # Prefer SandboxAPI when keyed (stable for demos), then Piston fallback.
+    ordered: list[JudgeBackend] = []
+    if sandboxapi_available():
+        ordered.append("sandboxapi")
+    if piston_available():
+        ordered.append("piston")
+    return ordered
+
+
+def _sandbox_headers() -> dict[str, str]:
     host = (
         settings.CODING_JUDGE_HOST.strip()
         or settings.JUDGE0_RAPIDAPI_HOST.strip()
@@ -188,7 +262,7 @@ def _headers() -> dict[str, str]:
     }
 
 
-def _base_url() -> str:
+def _sandbox_base_url() -> str:
     host = (
         settings.CODING_JUDGE_HOST.strip()
         or settings.JUDGE0_RAPIDAPI_HOST.strip()
@@ -197,7 +271,7 @@ def _base_url() -> str:
     return f"https://{host}"
 
 
-def _execute_once(
+def _execute_sandboxapi(
     client: httpx.Client,
     *,
     source: str,
@@ -211,11 +285,11 @@ def _execute_once(
         "stdin": stdin if stdin is not None else "",
         "timeout": timeout_sec,
     }
-    url = f"{_base_url()}/v1/execute"
+    url = f"{_sandbox_base_url()}/v1/execute"
     try:
         response = client.post(
             url,
-            headers=_headers(),
+            headers=_sandbox_headers(),
             json=payload,
             timeout=max(45.0, float(timeout_sec) + 25.0),
         )
@@ -224,18 +298,19 @@ def _execute_once(
             "Judge temporarily unavailable — try again (timeout)."
         ) from exc
     except httpx.HTTPError as exc:
-        raise CodingJudgeError(
-            "Judge temporarily unavailable — try again."
-        ) from exc
+        raise CodingJudgeError("Judge temporarily unavailable — try again.") from exc
 
     if response.status_code == 429:
         raise CodingJudgeError(
             "Judge temporarily unavailable — free monthly quota reached. Try again later."
         )
-    if response.status_code == 401 or response.status_code == 403:
-        logger.warning("SandboxAPI auth error %s: %s", response.status_code, response.text[:200])
+    if response.status_code in (401, 403):
+        logger.warning(
+            "SandboxAPI auth error %s: %s", response.status_code, response.text[:200]
+        )
         raise CodingJudgeError(
-            "Judge auth failed — subscribe to SandboxAPI Basic (Free) on RapidAPI and check the key.",
+            "Judge auth failed — check CODING_RAPIDAPI_KEY or switch to Piston "
+            "(CODING_JUDGE_BACKEND=piston).",
             retryable=False,
         )
 
@@ -247,9 +322,6 @@ def _execute_once(
     except Exception:
         data = None
 
-    # SandboxAPI often returns HTTP 408 for execution timeouts (and sometimes
-    # compile/runtime failures) WITH a normal result body. Treat those as
-    # case results, not judge outages.
     if data is not None and (
         response.status_code < 400
         or response.status_code == 408
@@ -257,20 +329,220 @@ def _execute_once(
         or "stdout" in data
         or "stderr" in data
     ):
-        if response.status_code >= 400 and response.status_code != 408:
-            logger.info(
-                "SandboxAPI HTTP %s with execution payload status=%s",
-                response.status_code,
-                data.get("status"),
-            )
         return data
 
     if response.status_code >= 400:
-        detail = response.text[:300]
-        logger.warning("SandboxAPI error %s: %s", response.status_code, detail)
+        logger.warning("SandboxAPI error %s: %s", response.status_code, response.text[:300])
         raise CodingJudgeError("Judge temporarily unavailable — try again.")
 
     raise CodingJudgeError("Judge returned an unexpected response.")
+
+
+def _execute_piston(
+    client: httpx.Client,
+    *,
+    source: str,
+    language: str,
+    stdin: str,
+    timeout_sec: int,
+) -> dict[str, Any]:
+    """Normalize Piston execute response into SandboxAPI-like shape."""
+    lang = piston_language_id(language)
+    url = f"{_piston_base_url()}/execute"
+    payload = {
+        "language": lang,
+        "version": "*",
+        "files": [{"content": source}],
+        "stdin": stdin if stdin is not None else "",
+        "run_timeout": max(1000, min(timeout_sec * 1000, 30000)),
+    }
+    try:
+        response = client.post(
+            url,
+            headers={"Content-Type": "application/json"},
+            json=payload,
+            timeout=max(45.0, float(timeout_sec) + 25.0),
+        )
+    except httpx.TimeoutException as exc:
+        raise CodingJudgeError(
+            "Piston judge timeout — try again."
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise CodingJudgeError("Piston judge unavailable — try again.") from exc
+
+    if response.status_code == 429:
+        raise CodingJudgeError(
+            "Piston rate limit hit — wait a moment or self-host Piston on EC2."
+        )
+    if response.status_code >= 400:
+        logger.warning("Piston error %s: %s", response.status_code, response.text[:300])
+        raise CodingJudgeError("Piston judge temporarily unavailable — try again.")
+
+    try:
+        data = response.json()
+    except Exception as exc:
+        raise CodingJudgeError("Piston returned invalid JSON.") from exc
+    if not isinstance(data, dict):
+        raise CodingJudgeError("Piston returned unexpected response.")
+
+    compile_block = data.get("compile") if isinstance(data.get("compile"), dict) else {}
+    run_block = data.get("run") if isinstance(data.get("run"), dict) else {}
+    compile_code = compile_block.get("code")
+    run_code = run_block.get("code")
+    stdout = str(run_block.get("stdout") or "")
+    stderr_parts = [
+        str(compile_block.get("stderr") or ""),
+        str(run_block.get("stderr") or ""),
+        str(run_block.get("output") or "") if not stdout else "",
+    ]
+    stderr = "\n".join(p for p in stderr_parts if p).strip()
+
+    if compile_code not in (None, 0):
+        status = "compile_error"
+        exit_code = compile_code
+    elif run_code == -1 or str(run_block.get("signal") or "").upper() in (
+        "SIGKILL",
+        "SIGXCPU",
+    ):
+        status = "timeout"
+        exit_code = -1
+    elif run_code not in (None, 0):
+        status = "runtime_error"
+        exit_code = run_code
+    else:
+        status = "completed"
+        exit_code = 0
+
+    return {
+        "status": status,
+        "stdout": stdout,
+        "stderr": stderr,
+        "exit_code": exit_code,
+        "execution_time_ms": run_block.get("cpu_time"),
+        "memory_used_kb": None,
+    }
+
+
+# Back-compat alias used by older unit tests
+def _execute_once(
+    client: httpx.Client,
+    *,
+    source: str,
+    language_id: str,
+    stdin: str,
+    timeout_sec: int,
+) -> dict[str, Any]:
+    return _execute_sandboxapi(
+        client,
+        source=source,
+        language_id=language_id,
+        stdin=stdin,
+        timeout_sec=timeout_sec,
+    )
+
+
+def _grade_case_from_result(
+    result: dict[str, Any],
+    *,
+    expected: str,
+) -> CaseResult:
+    stdin = ""  # filled by caller
+    case = CaseResult(stdin=stdin, expected_stdout=expected)
+    status = str(result.get("status") or "")
+    actual = _normalize_stdout(result.get("stdout"))
+    expected_norm = _normalize_stdout(expected)
+    case.actual_stdout = actual
+    case.status = status or ("Accepted" if actual == expected_norm else "Wrong Answer")
+    case.stderr = str(result.get("stderr") or result.get("compile_output") or "")[:500]
+    if result.get("execution_time_ms") is not None:
+        case.time = str(result.get("execution_time_ms"))
+    try:
+        case.memory = (
+            int(result["memory_used_kb"])
+            if result.get("memory_used_kb") is not None
+            else None
+        )
+    except (TypeError, ValueError):
+        case.memory = None
+
+    exit_code = result.get("exit_code")
+    status_l = status.lower()
+    timed_out = status_l in ("timeout", "time_limit_exceeded") or response_is_timeout(
+        status_l, exit_code
+    )
+    compile_fail = status_l in ("compile_error", "compilation_error") or (
+        bool(case.stderr)
+        and "error:" in case.stderr.lower()
+        and actual == ""
+        and exit_code not in (0, None)
+    )
+    ok_status = status_l in ("", "completed", "accepted", "ok", "success")
+    if timed_out:
+        case.status = "Time Limit Exceeded"
+        case.passed = False
+    elif compile_fail:
+        case.status = "Compilation Error"
+        case.passed = False
+    elif ok_status and (exit_code in (None, 0)) and actual == expected_norm:
+        case.passed = True
+        case.status = "Accepted"
+    elif actual != expected_norm and ok_status and exit_code in (None, 0):
+        case.status = "Wrong Answer"
+        case.passed = False
+    elif exit_code not in (None, 0) and not ok_status:
+        case.status = status or "Runtime Error"
+        case.passed = False
+    return case
+
+
+def _run_with_backend(
+    backend: JudgeBackend,
+    *,
+    source: str,
+    language: str,
+    tests: list[dict[str, Any]],
+    timeout_sec: int,
+) -> RunSummary:
+    summary = RunSummary(total=len(tests))
+    with httpx.Client() as client:
+        for raw in tests:
+            stdin = str(raw.get("stdin", raw.get("input", "")) or "")
+            expected = str(
+                raw.get("expected_stdout", raw.get("expected", raw.get("output", "")))
+                or ""
+            )
+            try:
+                if backend == "sandboxapi":
+                    result = _execute_sandboxapi(
+                        client,
+                        source=source,
+                        language_id=sandboxapi_language_id(language),
+                        stdin=stdin,
+                        timeout_sec=timeout_sec,
+                    )
+                else:
+                    result = _execute_piston(
+                        client,
+                        source=source,
+                        language=language,
+                        stdin=stdin,
+                        timeout_sec=timeout_sec,
+                    )
+            except CodingJudgeError as exc:
+                case = CaseResult(stdin=stdin, expected_stdout=expected)
+                case.status = "judge_error"
+                case.stderr = str(exc)
+                summary.cases.append(case)
+                summary.error = str(exc)
+                break
+
+            case = _grade_case_from_result(result, expected=expected)
+            case.stdin = stdin
+            if case.passed:
+                summary.passed += 1
+            summary.cases.append(case)
+            time.sleep(0.05)
+    return summary
 
 
 def run_test_cases(
@@ -281,12 +553,13 @@ def run_test_cases(
     time_limit_ms: int | None = None,
     memory_limit_mb: int | None = None,
 ) -> RunSummary:
-    """Execute source against stdin/expected_stdout pairs via SandboxAPI."""
-    del memory_limit_mb  # SandboxAPI free plan uses its own memory caps
+    """Execute source against stdin/expected_stdout pairs via configured backends."""
+    del memory_limit_mb  # free backends use their own memory caps
     if not coding_judge_configured():
         raise CodingJudgeError(
-            "Coding judge is not configured. Set CODING_RAPIDAPI_KEY (or JUDGE0_RAPIDAPI_KEY) "
-            "and CODING_QUESTIONS_ENABLED.",
+            "Coding judge is not configured. Set CODING_RAPIDAPI_KEY and/or "
+            "CODING_PISTON_URL (or CODING_JUDGE_BACKEND=piston for public EMKC), "
+            "and CODING_QUESTIONS_ENABLED=true.",
             retryable=False,
         )
     if not source or not str(source).strip():
@@ -294,85 +567,53 @@ def run_test_cases(
     if not tests:
         return RunSummary(passed=0, total=0, error="No test cases provided.")
 
-    language_id = sandboxapi_language_id(language)
-    # Free SandboxAPI needs headroom for compile (esp. C/C++/Java). Floor at 5s.
+    # Validate language early
+    sandboxapi_language_id(language)
     timeout_sec = max(5, min(int((time_limit_ms or 5000) / 1000) or 5, 30))
+    backends = active_judge_backends()
+    if not backends:
+        raise CodingJudgeError(
+            "No coding judge backend available.",
+            retryable=False,
+        )
 
-    summary = RunSummary(total=len(tests))
-    with httpx.Client() as client:
-        for raw in tests:
-            stdin = str(raw.get("stdin", raw.get("input", "")) or "")
-            expected = str(
-                raw.get("expected_stdout", raw.get("expected", raw.get("output", "")))
-                or ""
-            )
-            case = CaseResult(stdin=stdin, expected_stdout=expected)
-            try:
-                result = _execute_once(
-                    client,
-                    source=source,
-                    language_id=language_id,
-                    stdin=stdin,
-                    timeout_sec=timeout_sec,
+    last_error: str | None = None
+    for idx, backend in enumerate(backends):
+        logger.info("Coding judge using backend=%s", backend)
+        summary = _run_with_backend(
+            backend,
+            source=source,
+            language=language,
+            tests=tests,
+            timeout_sec=timeout_sec,
+        )
+        # Fall through to next backend on transport/quota/auth outages only.
+        if summary.error and idx + 1 < len(backends):
+            err_l = summary.error.lower()
+            retryable_outage = any(
+                tip in err_l
+                for tip in (
+                    "quota",
+                    "auth failed",
+                    "temporarily unavailable",
+                    "rate limit",
+                    "timeout",
+                    "unavailable",
                 )
-            except CodingJudgeError as exc:
-                case.status = "judge_error"
-                case.stderr = str(exc)
-                summary.cases.append(case)
-                summary.error = str(exc)
-                break
-
-            status = str(result.get("status") or "")
-            actual = _normalize_stdout(result.get("stdout"))
-            expected_norm = _normalize_stdout(expected)
-            # Some SandboxAPI plans also set expected_output comparison server-side
-            if result.get("expected_output") is not None and status == "wrong_answer":
-                actual = _normalize_stdout(result.get("stdout"))
-
-            case.actual_stdout = actual
-            case.status = status or ("Accepted" if actual == expected_norm else "Wrong Answer")
-            case.stderr = str(result.get("stderr") or result.get("compile_output") or "")[:500]
-            if result.get("execution_time_ms") is not None:
-                case.time = str(result.get("execution_time_ms"))
-            try:
-                case.memory = (
-                    int(result["memory_used_kb"])
-                    if result.get("memory_used_kb") is not None
-                    else None
+            )
+            if retryable_outage:
+                last_error = summary.error
+                logger.warning(
+                    "Backend %s failed (%s); trying fallback", backend, summary.error
                 )
-            except (TypeError, ValueError):
-                case.memory = None
+                continue
+        return summary
 
-            exit_code = result.get("exit_code")
-            status_l = status.lower()
-            timed_out = status_l in ("timeout", "time_limit_exceeded") or response_is_timeout(
-                status_l, exit_code
-            )
-            compile_fail = status_l in ("compile_error", "compilation_error") or (
-                bool(case.stderr)
-                and "error:" in case.stderr.lower()
-                and actual == ""
-                and exit_code not in (0, None)
-            )
-            ok_status = status_l in ("", "completed", "accepted", "ok", "success")
-            if timed_out:
-                case.status = "Time Limit Exceeded"
-                case.passed = False
-            elif compile_fail:
-                case.status = "Compilation Error"
-                case.passed = False
-            elif ok_status and (exit_code in (None, 0)) and actual == expected_norm:
-                case.passed = True
-                case.status = "Accepted"
-                summary.passed += 1
-            elif actual != expected_norm and ok_status and exit_code in (None, 0):
-                case.status = "Wrong Answer"
-            elif exit_code not in (None, 0) and not ok_status:
-                case.status = status or "Runtime Error"
-            summary.cases.append(case)
-            time.sleep(0.1)
-
-    return summary
+    return RunSummary(
+        passed=0,
+        total=len(tests),
+        error=last_error or "All coding judge backends failed.",
+    )
 
 
 def response_is_timeout(status_l: str, exit_code: Any) -> bool:

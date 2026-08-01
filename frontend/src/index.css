@@ -519,6 +519,15 @@ header p {
   font-weight: 400;
 }
 
+.summary-score-only .summary-candidate-feedback {
+  margin-top: 1.25rem;
+}
+
+.summary-score-only .summary-candidate-feedback h2 {
+  font-size: 1.05rem;
+  margin-bottom: 0.35rem;
+}
+
 .summary-recommendation {
   color: var(--muted);
   margin-bottom: 0.75rem;

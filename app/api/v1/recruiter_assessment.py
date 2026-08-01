@@ -251,4 +251,6 @@ async def send_assessment_invites(
     msg = f"Sent {result.sent} invite email(s)"
     if result.failed:
         msg += f"; {len(result.failed)} failed"
+        if result.delivery_note:
+            msg += f". {result.delivery_note}"
     return BaseResponse(success=True, message=msg, data=result)

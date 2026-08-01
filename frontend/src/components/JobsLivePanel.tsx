@@ -227,7 +227,10 @@ export default function JobsLivePanel({
       const failed = res.data.failed || [];
       const parts = [`Sent ${res.data.sent} invite email(s).`];
       if (failed.length) {
-        parts.push(`Failed: ${failed.join(", ")}`);
+        parts.push(`Failed (${failed.length}): ${failed.join(", ")}`);
+      }
+      if (res.data.delivery_note) {
+        parts.push(res.data.delivery_note);
       }
       parts.push(`Live link: ${absoluteLink(res.data.live_link)}`);
       setInviteStatus(parts.join(" "));

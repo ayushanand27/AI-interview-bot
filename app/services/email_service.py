@@ -9,6 +9,27 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Last SMTP failure reason for API callers (never includes secrets).
+_last_delivery_error: str | None = None
+
+
+def get_last_email_delivery_error() -> str | None:
+    return _last_delivery_error
+
+
+def smtp_delivery_hint(*, any_failed: bool) -> str | None:
+    """Short recruiter-facing note when invite emails fail."""
+    if not any_failed:
+        return None
+    if not settings.email_configured:
+        return (
+            "SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_EMAIL, and "
+            "SMTP_PASSWORD (Gmail App Password) in .env, then restart the backend."
+        )
+    if _last_delivery_error:
+        return _last_delivery_error
+    return "Email delivery failed. Check SMTP credentials and server logs."
+
 
 def _log_console_fallback(kind: str, to_email: str, link: str | None = None) -> None:
     """Log a usable recovery path in non-prod; avoid printing tokens in production."""
@@ -47,18 +68,22 @@ def _send_email_with_attachment(
     attachment_bytes: bytes | None,
     attachment_filename: str | None,
 ) -> bool:
+    global _last_delivery_error
+
     if not settings.email_configured:
-        logger.warning(
-            "[EMAIL FALLBACK] SMTP not configured (SMTP_EMAIL / SMTP_PASSWORD empty)."
+        _last_delivery_error = (
+            "SMTP is not configured (SMTP_EMAIL / SMTP_PASSWORD empty)."
         )
-        logger.warning(f"[EMAIL FALLBACK] To: {to_email} | Subject: {subject}")
+        logger.warning("[EMAIL FALLBACK] %s", _last_delivery_error)
+        logger.warning("[EMAIL FALLBACK] To: %s | Subject: %s", to_email, subject)
         return False
 
     try:
+        from_addr = settings.SMTP_EMAIL.strip()
         msg = MIMEMultipart("mixed")
         msg["Subject"] = subject
-        msg["From"] = settings.SMTP_EMAIL
-        msg["To"] = to_email
+        msg["From"] = from_addr
+        msg["To"] = to_email.strip()
 
         msg.attach(MIMEText(html_body, "html"))
 
@@ -72,35 +97,36 @@ def _send_email_with_attachment(
             msg.attach(attachment)
 
         context = ssl.create_default_context()
+        host = settings.SMTP_HOST.strip()
+        port = int(settings.SMTP_PORT)
 
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30) as server:
+        with smtplib.SMTP(host, port, timeout=30) as server:
             server.ehlo()
             server.starttls(context=context)
             server.ehlo()
-            server.login(
-                settings.SMTP_EMAIL.strip(),
-                settings.SMTP_PASSWORD.strip(),
-            )
-            server.sendmail(
-                settings.SMTP_EMAIL.strip(),
-                to_email.strip(),
-                msg.as_string(),
-            )
+            server.login(from_addr, settings.SMTP_PASSWORD.strip())
+            server.sendmail(from_addr, [to_email.strip()], msg.as_string())
 
-        logger.info(f"[EMAIL] Sent successfully to {to_email}")
+        _last_delivery_error = None
+        logger.info("[EMAIL] Sent successfully to %s", to_email)
         return True
 
     except smtplib.SMTPAuthenticationError as e:
-        logger.error(f"[EMAIL] Auth failed: {e}")
+        _last_delivery_error = (
+            "SMTP authentication failed. Use a Gmail App Password (not your normal "
+            "password), ensure 2FA is enabled, and remove spaces from SMTP_PASSWORD."
+        )
+        logger.error("[EMAIL] Auth failed: %s", e)
         logger.error("[EMAIL] Check: 1) Gmail App Password (not normal password)")
         logger.error("[EMAIL] Check: 2) 2FA enabled on Gmail account")
         logger.error("[EMAIL] Check: 3) No spaces in SMTP_PASSWORD in .env")
-        logger.warning(f"[EMAIL FALLBACK] To: {to_email} | Subject: {subject}")
+        logger.warning("[EMAIL FALLBACK] To: %s | Subject: %s", to_email, subject)
         return False
 
     except Exception as e:
-        logger.error(f"[EMAIL] Failed to send: {e}")
-        logger.warning(f"[EMAIL FALLBACK] To: {to_email} | Subject: {subject}")
+        _last_delivery_error = f"SMTP send failed: {type(e).__name__}"
+        logger.error("[EMAIL] Failed to send: %s", e)
+        logger.warning("[EMAIL FALLBACK] To: %s | Subject: %s", to_email, subject)
         return False
 
 

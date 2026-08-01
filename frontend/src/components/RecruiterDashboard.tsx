@@ -846,11 +846,15 @@ export default function RecruiterDashboard({
         },
       );
       const failed = res.data.failed?.length ?? 0;
-      setInviteSendMessage(
+      const note = res.data.delivery_note;
+      let msg =
         failed > 0
-          ? `Sent ${res.data.sent}. Failed: ${res.data.failed.join(", ")}`
-          : `Sent ${res.data.sent} invite email(s).`,
-      );
+          ? `Sent ${res.data.sent}. Failed (${failed}): ${res.data.failed.join(", ")}`
+          : `Sent ${res.data.sent} invite email(s).`;
+      if (note) {
+        msg += ` — ${note}`;
+      }
+      setInviteSendMessage(msg);
     } catch (err) {
       onError(
         err instanceof Error ? err.message : "Failed to send invite emails",

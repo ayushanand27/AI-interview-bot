@@ -25,7 +25,7 @@ from app.schemas.recruiter_assessment import (
     SendAssessmentInvitesResponse,
     UpdateAssessmentRequest,
 )
-from app.services.email_service import send_assessment_invite_email
+from app.services.email_service import send_assessment_invite_email, smtp_delivery_hint
 from app.services.groq_client import get_groq_client
 from app.services.question_utils import (
     QUESTION_TYPES,
@@ -1260,4 +1260,5 @@ class AssessmentService:
             sent=sent,
             failed=failed,
             invite_link=invite_path,
+            delivery_note=smtp_delivery_hint(any_failed=bool(failed)),
         )

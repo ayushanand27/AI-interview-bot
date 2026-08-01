@@ -100,3 +100,4 @@ class SendLiveInvitesResponse(BaseModel):
     failed: list[str]
     live_link: str
     meet_url: str | None = None
+    delivery_note: str | None = None
