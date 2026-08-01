@@ -21,6 +21,17 @@ class JobSummary(BaseModel):
     application_count: int = 0
 
 
+class JobDetail(BaseModel):
+    """Recruiter-only job view including full JD (for assessment-from-job)."""
+
+    token: str
+    title: str
+    jd_text: str
+    apply_link: str
+    created_at: datetime
+    application_count: int = 0
+
+
 class PublicJobInfo(BaseModel):
     token: str
     title: str

@@ -1446,6 +1446,19 @@ export const jobsLiveApi = {
     });
   },
 
+  getJob(token: string) {
+    return request<
+      ApiEnvelope<{
+        token: string;
+        title: string;
+        jd_text: string;
+        apply_link: string;
+        created_at: string;
+        application_count: number;
+      }>
+    >(`/api/v1/jobs/${encodeURIComponent(token)}`);
+  },
+
   getPublicJob(token: string) {
     return request<
       ApiEnvelope<{ token: string; title: string; jd_preview: string }>

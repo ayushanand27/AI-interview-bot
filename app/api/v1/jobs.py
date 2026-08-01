@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import require_role
-from app.core.exceptions import BadRequestException
+from app.core.exceptions import BadRequestException, NotFoundException
 from app.db.job_live_models import JobApplication
 from app.db.session import get_db
 from app.models.user import User, UserRole
@@ -15,6 +15,7 @@ from app.schemas.common import BaseResponse
 from app.schemas.jobs_live import (
     ApplicationSummary,
     CreateJobRequest,
+    JobDetail,
     JobSummary,
     PublicJobInfo,
     UpdateApplicationStatusRequest,
@@ -76,16 +77,6 @@ async def list_jobs(
             )
         )
     return BaseResponse(success=True, message="OK", data=out)
-
-
-@router.delete("/{token}", response_model=BaseResponse[None])
-async def delete_job(
-    token: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
-):
-    await JobService(db).soft_delete_job(current_user.id, token)
-    return BaseResponse(success=True, message="Job deleted", data=None)
 
 
 @router.get("/public/{token}", response_model=BaseResponse[PublicJobInfo])
@@ -192,3 +183,43 @@ async def update_application_status(
             created_at=row.created_at,
         ),
     )
+
+
+@router.get("/{token}", response_model=BaseResponse[JobDetail])
+async def get_job(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    """Recruiter job detail with full JD — used to create assessments from a job."""
+    service = JobService(db)
+    job = await service.get_job_by_token(token)
+    if job.recruiter_id != current_user.id:
+        raise NotFoundException("Job not found")
+    count = await db.scalar(
+        select(func.count())
+        .select_from(JobApplication)
+        .where(JobApplication.job_id == job.id)
+    )
+    return BaseResponse(
+        success=True,
+        message="OK",
+        data=JobDetail(
+            token=job.token,
+            title=job.title,
+            jd_text=job.jd_text,
+            apply_link=_apply_link(job.token),
+            created_at=job.created_at,
+            application_count=int(count or 0),
+        ),
+    )
+
+
+@router.delete("/{token}", response_model=BaseResponse[None])
+async def delete_job(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
+):
+    await JobService(db).soft_delete_job(current_user.id, token)
+    return BaseResponse(success=True, message="Job deleted", data=None)

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { jobsLiveApi, recruiterApi } from "../api/client";
+import type { AssessmentSummary } from "../types/assessment";
 
 type JobRow = {
   token: string;
@@ -70,6 +71,24 @@ export default function JobsLivePanel({
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteStatus, setInviteStatus] = useState<string | null>(null);
 
+  // Assessment invite from shortlist
+  const [assessments, setAssessments] = useState<AssessmentSummary[]>([]);
+  const [assessApp, setAssessApp] = useState<AppRow | null>(null);
+  const [assessMode, setAssessMode] = useState<"existing" | "from_job">(
+    "existing",
+  );
+  const [assessToken, setAssessToken] = useState("");
+  const [assessDifficulty, setAssessDifficulty] = useState("medium");
+  const [assessQuestionCount, setAssessQuestionCount] = useState(5);
+  const [assessExpiryHours, setAssessExpiryHours] = useState(48);
+  const [assessNote, setAssessNote] = useState("");
+  const [assessEmail, setAssessEmail] = useState("");
+  const [assessBusy, setAssessBusy] = useState(false);
+  const [assessStatus, setAssessStatus] = useState<string | null>(null);
+  const [assessDeliveryNote, setAssessDeliveryNote] = useState<string | null>(
+    null,
+  );
+
   function refreshJobs() {
     jobsLiveApi
       .listJobs()
@@ -88,9 +107,25 @@ export default function JobsLivePanel({
       });
   }
 
+  function refreshAssessments() {
+    recruiterApi
+      .listAssessments()
+      .then((res) => {
+        const list = (res.data ?? []).filter((a) => !a.is_expired);
+        setAssessments(list);
+        if (!assessToken && list.length > 0) {
+          setAssessToken(list[0].token);
+        }
+      })
+      .catch(() => {
+        /* ignore — panel still usable */
+      });
+  }
+
   useEffect(() => {
     refreshJobs();
     refreshLive();
+    refreshAssessments();
   }, []);
 
   useEffect(() => {
@@ -116,6 +151,24 @@ export default function JobsLivePanel({
     setInviteCandidateName(opts.name || "");
     setInviteMessage("");
     setInviteStatus(null);
+    setAssessApp(null);
+  }
+
+  function openAssessmentInvite(app: AppRow) {
+    setAssessApp(app);
+    setAssessEmail(app.email);
+    setAssessNote("");
+    setAssessStatus(null);
+    setAssessDeliveryNote(null);
+    setInviteRoomToken(null);
+    refreshAssessments();
+    const active = assessments.filter((a) => !a.is_expired);
+    if (active.length > 0) {
+      setAssessMode("existing");
+      setAssessToken(active[0].token);
+    } else {
+      setAssessMode("from_job");
+    }
   }
 
   async function resolveJdText(): Promise<string> {
@@ -243,16 +296,104 @@ export default function JobsLivePanel({
     }
   }
 
+  async function sendAssessmentInvite() {
+    if (!assessApp) return;
+    const email = assessEmail.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      onError("Enter a valid candidate email.");
+      return;
+    }
+    if (!selectedJob && assessMode === "from_job") {
+      onError("Select a job first to create an assessment from its JD.");
+      return;
+    }
+
+    setAssessBusy(true);
+    onError(null);
+    setAssessStatus(null);
+    setAssessDeliveryNote(null);
+
+    try {
+      let token = assessToken;
+
+      if (assessMode === "from_job") {
+        if (!selectedJob) {
+          throw new Error("No job selected.");
+        }
+        const jobRes = await jobsLiveApi.getJob(selectedJob);
+        const jdText = (jobRes.data.jd_text || "").trim();
+        if (jdText.length < 20) {
+          throw new Error("This job has no usable JD for assessment generation.");
+        }
+        const created = await recruiterApi.createAssessment({
+          jd_text: jdText,
+          question_count: assessQuestionCount,
+          difficulty: assessDifficulty,
+          expiry_hours: assessExpiryHours,
+        });
+        token = created.data.token;
+        refreshAssessments();
+        setAssessToken(token);
+        setCopyMsg(absoluteLink(created.data.invite_link));
+      } else if (!token) {
+        throw new Error("Pick an existing assessment or create one from this job.");
+      }
+
+      if (assessApp.status !== "shortlisted") {
+        await jobsLiveApi.updateApplicationStatus(assessApp.id, "shortlisted");
+      }
+
+      const res = await recruiterApi.sendAssessmentInvites(token, {
+        emails: [email],
+        message: assessNote.trim() || undefined,
+      });
+      const failed = res.data.failed || [];
+      const parts: string[] = [];
+      if (assessMode === "from_job") {
+        parts.push("Assessment created from this job’s JD.");
+      }
+      parts.push(`Sent ${res.data.sent} assessment invite email(s).`);
+      if (failed.length) {
+        parts.push(`Failed (${failed.length}): ${failed.join(", ")}`);
+      }
+      parts.push(`Invite link: ${absoluteLink(res.data.invite_link)}`);
+      setAssessStatus(parts.join(" "));
+      setAssessDeliveryNote(res.data.delivery_note || null);
+      setCopyMsg(absoluteLink(res.data.invite_link));
+
+      if (selectedJob) {
+        const appsRes = await jobsLiveApi.listApplications(selectedJob);
+        setApps(appsRes.data ?? []);
+      }
+    } catch (err) {
+      onError(
+        err instanceof Error ? err.message : "Could not send assessment invite",
+      );
+    } finally {
+      setAssessBusy(false);
+    }
+  }
+
   const inviteRoom = liveRooms.find((r) => r.token === inviteRoomToken);
+  const selectedJobTitle =
+    jobs.find((j) => j.token === selectedJob)?.title || "this job";
 
   return (
     <section className="rp-card rp-card-wide rp-section">
-      <h2 className="rp-section-title">Jobs · ATS shortlist · Live interview</h2>
+      <h2 className="rp-section-title">
+        Hiring funnel · Jobs → ATS → Assessment → Live
+      </h2>
       <p className="rp-section-desc">
-        Create a job apply link, score resumes, shortlist, then open a shared
-        live coding room and email the candidate their join link (video via
-        Meet/Zoom URL).
+        Demo path: create a job with JD → share the apply link → review ATS
+        scores → shortlist → email an assessment invite → optionally start a
+        live coding interview (Meet/Zoom URL).
       </p>
+      <ol className="rp-muted-small" style={{ margin: "0 0 1rem 1.1rem", padding: 0 }}>
+        <li>Create job + copy apply link</li>
+        <li>Candidate applies (resume scored vs JD)</li>
+        <li>Shortlist → Send assessment (email)</li>
+        <li>Optional: Live interview later</li>
+      </ol>
 
       <div className="rp-field-row" style={{ alignItems: "flex-start" }}>
         <div style={{ flex: 1 }}>
@@ -348,6 +489,10 @@ export default function JobsLivePanel({
           >
             Create live room
           </button>
+          <p className="rp-muted-small" style={{ marginTop: "0.5rem" }}>
+            Live rooms are step 4 — use after assessment when you want shared
+            coding + video link.
+          </p>
         </div>
       </div>
 
@@ -371,6 +516,171 @@ export default function JobsLivePanel({
             copyMsg
           )}
         </p>
+      )}
+
+      {assessApp && (
+        <div className="rp-send-invites" style={{ marginTop: "1rem" }}>
+          <h3 className="rp-preview-title" style={{ marginTop: 0 }}>
+            Send assessment invite — {assessApp.full_name}
+          </h3>
+          <p className="rp-muted-small">
+            Emails the candidate their assessment invite link. Prefer shortlisted
+            applicants; sending will also mark them shortlisted.
+          </p>
+
+          <div className="rp-tabs rp-tabs-spaced" style={{ marginBottom: "0.75rem" }}>
+            <button
+              type="button"
+              className={assessMode === "existing" ? "active" : undefined}
+              disabled={assessBusy}
+              onClick={() => setAssessMode("existing")}
+            >
+              Use existing assessment
+            </button>
+            <button
+              type="button"
+              className={assessMode === "from_job" ? "active" : undefined}
+              disabled={assessBusy || !selectedJob}
+              onClick={() => setAssessMode("from_job")}
+            >
+              Create from this job’s JD
+            </button>
+          </div>
+
+          {assessMode === "existing" ? (
+            assessments.length === 0 ? (
+              <p className="rp-empty">
+                No active assessments yet. Switch to “Create from this job’s JD”
+                or build one in the Assessments section below.
+              </p>
+            ) : (
+              <label className="rp-muted-small" style={{ display: "block" }}>
+                Assessment
+                <select
+                  value={assessToken}
+                  onChange={(e) => setAssessToken(e.target.value)}
+                  disabled={assessBusy}
+                  style={{ display: "block", width: "100%", marginTop: "0.25rem" }}
+                >
+                  {assessments.map((a) => (
+                    <option key={a.token} value={a.token}>
+                      {(a.role_preview || "Assessment").slice(0, 60)} ·{" "}
+                      {a.question_count}q · {a.difficulty}
+                      {a.is_expired ? " (expired)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )
+          ) : (
+            <div className="rp-field-row" style={{ gap: "0.75rem" }}>
+              <label className="rp-muted-small" style={{ flex: 1 }}>
+                Difficulty
+                <select
+                  value={assessDifficulty}
+                  onChange={(e) => setAssessDifficulty(e.target.value)}
+                  disabled={assessBusy}
+                  style={{ display: "block", width: "100%", marginTop: "0.25rem" }}
+                >
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+              <label className="rp-muted-small" style={{ flex: 1 }}>
+                Questions
+                <input
+                  type="number"
+                  min={3}
+                  max={15}
+                  value={assessQuestionCount}
+                  onChange={(e) =>
+                    setAssessQuestionCount(
+                      Math.min(15, Math.max(3, Number(e.target.value) || 5)),
+                    )
+                  }
+                  disabled={assessBusy}
+                />
+              </label>
+              <label className="rp-muted-small" style={{ flex: 1 }}>
+                Expiry (hours)
+                <select
+                  value={assessExpiryHours}
+                  onChange={(e) => setAssessExpiryHours(Number(e.target.value))}
+                  disabled={assessBusy}
+                  style={{ display: "block", width: "100%", marginTop: "0.25rem" }}
+                >
+                  <option value={24}>24</option>
+                  <option value={48}>48</option>
+                  <option value={72}>72</option>
+                  <option value={168}>168</option>
+                </select>
+              </label>
+            </div>
+          )}
+
+          {assessMode === "from_job" && selectedJob && (
+            <p className="rp-muted-small" style={{ marginTop: "0.5rem" }}>
+              Will generate questions from <strong>{selectedJobTitle}</strong>{" "}
+              JD, create the assessment, then email the invite.
+            </p>
+          )}
+
+          <label className="rp-muted-small" style={{ display: "block", marginTop: "0.75rem" }}>
+            Candidate email
+            <input
+              type="email"
+              value={assessEmail}
+              onChange={(e) => setAssessEmail(e.target.value)}
+              disabled={assessBusy}
+              placeholder="candidate@gmail.com"
+            />
+          </label>
+          <label className="rp-muted-small" style={{ display: "block", marginTop: "0.5rem" }}>
+            Optional note
+            <input
+              type="text"
+              value={assessNote}
+              onChange={(e) => setAssessNote(e.target.value)}
+              disabled={assessBusy}
+              placeholder="Complete within 48 hours; laptop required"
+            />
+          </label>
+          <div className="rp-actions" style={{ marginTop: "0.75rem" }}>
+            <button
+              type="button"
+              className="rp-primary rp-btn-inline"
+              disabled={
+                assessBusy ||
+                (assessMode === "existing" && !assessToken) ||
+                (assessMode === "from_job" && !selectedJob)
+              }
+              onClick={() => void sendAssessmentInvite()}
+            >
+              {assessBusy
+                ? assessMode === "from_job"
+                  ? "Creating + sending…"
+                  : "Sending…"
+                : "Send assessment invite"}
+            </button>
+            <button
+              type="button"
+              className="rp-secondary rp-btn-compact"
+              disabled={assessBusy}
+              onClick={() => {
+                setAssessApp(null);
+                setAssessStatus(null);
+                setAssessDeliveryNote(null);
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+          {assessStatus && <p className="rp-copy-success">{assessStatus}</p>}
+          {assessDeliveryNote && (
+            <p className="rp-copy-warning">{assessDeliveryNote}</p>
+          )}
+        </div>
       )}
 
       {inviteRoomToken && (
@@ -467,7 +777,7 @@ export default function JobsLivePanel({
                       className="rp-secondary rp-btn-compact"
                       onClick={() => setSelectedJob(j.token)}
                     >
-                      View
+                      View applicants
                     </button>{" "}
                     <button
                       type="button"
@@ -490,10 +800,13 @@ export default function JobsLivePanel({
 
       {selectedJob && (
         <>
-          <h3 className="rp-preview-title">Applicants (ATS ranked)</h3>
+          <h3 className="rp-preview-title">
+            Applicants (ATS ranked) — {selectedJobTitle}
+          </h3>
           {apps.length === 0 ? (
             <p className="rp-empty">
-              No applicants yet. Share the apply link, then shortlist strong resumes here.
+              No applicants yet. Share the apply link, then shortlist and send
+              assessments here.
             </p>
           ) : (
             <div className="recruiter-table-wrap">
@@ -545,6 +858,13 @@ export default function JobsLivePanel({
                         <button
                           type="button"
                           className="rp-primary rp-btn-compact"
+                          onClick={() => openAssessmentInvite(a)}
+                        >
+                          Send assessment
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="rp-secondary rp-btn-compact"
                           onClick={() =>
                             void startLive({
                               applicationId: a.id,
@@ -554,19 +874,6 @@ export default function JobsLivePanel({
                           }
                         >
                           Live interview
-                        </button>{" "}
-                        <button
-                          type="button"
-                          className="rp-secondary rp-btn-compact"
-                          title="Copy email to paste into assessment invite"
-                          onClick={() => {
-                            void navigator.clipboard.writeText(a.email);
-                            setCopyMsg(
-                              `Email copied (${a.email}). Paste into Assessments → Send invite.`,
-                            );
-                          }}
-                        >
-                          Copy email for assessment
                         </button>
                       </td>
                     </tr>

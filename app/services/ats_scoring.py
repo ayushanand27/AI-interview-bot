@@ -13,19 +13,33 @@ from typing import Any
 STRUCTURE_WEIGHT = 0.35
 KEYWORD_WEIGHT = 0.65
 
+# Synonym groups ported from ResumeMatch (ats-checker) skill_aliases — CPU-only.
 ALIAS_GROUPS: list[frozenset[str]] = [
     frozenset({"ml", "machine learning"}),
     frozenset({"ai", "artificial intelligence"}),
     frozenset({"nlp", "natural language processing"}),
     frozenset({"sql", "structured query language"}),
+    frozenset({"power bi", "powerbi", "microsoft power bi"}),
+    frozenset({"excel", "microsoft excel", "ms excel"}),
     frozenset({"aws", "amazon web services"}),
     frozenset({"gcp", "google cloud", "google cloud platform"}),
-    frozenset({"ci/cd", "cicd", "continuous integration"}),
+    frozenset({"ci/cd", "cicd", "continuous integration", "continuous deployment"}),
     frozenset({"js", "javascript"}),
     frozenset({"ts", "typescript"}),
     frozenset({"k8s", "kubernetes"}),
-    frozenset({"rest", "rest api", "restful"}),
+    frozenset({"rest", "rest api", "restful", "restful api"}),
+    frozenset({"seo", "search engine optimization"}),
+    frozenset({"ui", "user interface"}),
+    frozenset({"ux", "user experience"}),
+    frozenset({"etl", "extract transform load"}),
+    frozenset({"bi", "business intelligence"}),
+    frozenset({"salesforce", "salesforce crm", "sfdc"}),
+    frozenset({"power automate", "microsoft power automate", "powerautomate"}),
+    frozenset({"rag", "retrieval augmented generation"}),
     frozenset({"llm", "large language model", "large language models"}),
+    frozenset({"api", "apis", "application programming interface"}),
+    frozenset({"oop", "object oriented programming", "object-oriented programming"}),
+    frozenset({"tcp/ip", "tcp ip", "tcpip"}),
     frozenset({"fastapi", "fast api"}),
     frozenset({"postgres", "postgresql", "psql"}),
     frozenset({"react", "reactjs", "react.js"}),
@@ -41,10 +55,11 @@ _COMMON_SKILLS = [
     "django", "flask", "spring", "sql", "postgres", "mysql", "mongodb",
     "redis", "aws", "gcp", "azure", "docker", "kubernetes", "ci/cd",
     "git", "linux", "rest", "graphql", "kafka", "spark", "pandas",
-    "numpy", "machine learning", "llm", "fastapi", "next.js", "vue",
+    "numpy", "machine learning", "llm", "rag", "next.js", "vue",
     "angular", "go", "golang", "rust", "c++", "html", "css", "tailwind",
     "terraform", "ansible", "jenkins", "github actions", "s3", "lambda",
     "microservices", "system design", "oop", "dsa", "algorithms",
+    "power bi", "excel", "etl", "salesforce", "seo", "ui", "ux",
 ]
 
 SECTION_PATTERNS = {

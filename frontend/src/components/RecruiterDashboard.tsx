@@ -1024,7 +1024,10 @@ export default function RecruiterDashboard({
         <div className="rp-toolbar">
           <div>
             <h2 className="rp-section-title">Assessments</h2>
-            <p className="rp-section-desc">JD → questions → invite link</p>
+            <p className="rp-section-desc">
+              Build reusable assessments here, or create + email one from Jobs →
+              Send assessment (uses this job’s JD).
+            </p>
           </div>
           <button
             type="button"
