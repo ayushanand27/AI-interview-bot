@@ -409,7 +409,7 @@ export default function JobsLivePanel({
             </button>
           </div>
           {jdMode === "paste" ? (
-            <>
+            <div className="rp-jd-mode-block">
               <label htmlFor="job-jd">Job description</label>
               <textarea
                 id="job-jd"
@@ -419,9 +419,9 @@ export default function JobsLivePanel({
                 placeholder="Paste JD (skills, requirements…)"
                 disabled={busy}
               />
-            </>
+            </div>
           ) : (
-            <>
+            <div className="rp-file-block rp-jd-mode-block">
               <label htmlFor="job-jd-file">JD file (PDF, Word, TXT)</label>
               <input
                 id="job-jd-file"
@@ -431,18 +431,18 @@ export default function JobsLivePanel({
                 onChange={(e) => setJdFile(e.target.files?.[0] ?? null)}
               />
               {jdFile && (
-                <p className="rp-file-name rp-muted-small">{jdFile.name}</p>
+                <p className="rp-file-name">{jdFile.name}</p>
               )}
               {jobJd.trim().length >= 20 && (
-                <p className="rp-muted-small">
+                <p className="rp-muted-small rp-file-meta">
                   Extracted {jobJd.trim().length} characters.
                 </p>
               )}
-            </>
+            </div>
           )}
           <button
             type="button"
-            className="rp-primary"
+            className="rp-primary rp-create-job-btn"
             disabled={busy || parsingJd}
             onClick={() => void createJob()}
           >

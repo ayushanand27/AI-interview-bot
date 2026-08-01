@@ -416,13 +416,53 @@
 }
 
 .recruiter-portal .rp-file-block {
+  display: block;
   margin-bottom: 0.85rem;
 }
 
+.recruiter-portal .rp-jd-mode-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+  min-width: 0;
+}
+
+.recruiter-portal .rp-jd-mode-block textarea {
+  margin-bottom: 0;
+}
+
+.recruiter-portal .rp-file-block input[type="file"],
+.recruiter-portal .rp-jd-mode-block input[type="file"] {
+  display: block;
+  position: static;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.35rem 0;
+  border: none;
+  background: transparent;
+  color: var(--rp-muted);
+  font: inherit;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
 .recruiter-portal .rp-file-name {
-  margin: 0.35rem 0 0;
+  margin: 0.15rem 0 0;
   color: var(--rp-muted);
   font-size: 0.85rem;
+}
+
+.recruiter-portal .rp-file-meta {
+  margin: 0.15rem 0 0;
+}
+
+.recruiter-portal .rp-create-job-btn {
+  display: block;
+  position: static;
+  margin-top: 0.35rem;
+  clear: both;
 }
 
 .recruiter-portal .rp-preview-block {
