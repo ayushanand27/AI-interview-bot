@@ -105,9 +105,7 @@ export default function JobApplyPage({ token }: { token: string }) {
           {title || "Apply"}
         </h1>
         <p className="invite-meta" style={{ marginBottom: "1rem" }}>
-          Upload your resume for an ATS match against this job description.
-          Recruiters review scores, shortlist candidates, then send assessment
-          invites by email.
+          Upload your resume to apply.
         </p>
         {jdPreview && (
           <pre className="apply-jd-preview">{jdPreview}</pre>
@@ -135,8 +133,7 @@ export default function JobApplyPage({ token }: { token: string }) {
               </div>
             )}
             <p className="invite-meta" style={{ marginTop: "1rem" }}>
-              Application received. If shortlisted, you will get an assessment
-              invite by email (and optionally a live interview link later).
+              We’ll be in touch if you’re shortlisted.
             </p>
           </div>
         ) : (

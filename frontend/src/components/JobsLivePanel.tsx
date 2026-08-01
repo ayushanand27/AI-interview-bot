@@ -380,23 +380,9 @@ export default function JobsLivePanel({
 
   return (
     <section className="rp-card rp-card-wide rp-section">
-      <h2 className="rp-section-title">
-        Hiring funnel · Jobs → ATS → Assessment → Live
-      </h2>
-      <p className="rp-section-desc">
-        Demo path: create a job with JD → share the apply link → review ATS
-        scores → shortlist → email an assessment invite → optionally start a
-        live coding interview (Meet/Zoom URL).
-      </p>
-      <ol className="rp-muted-small" style={{ margin: "0 0 1rem 1.1rem", padding: 0 }}>
-        <li>Create job + copy apply link</li>
-        <li>Candidate applies (resume scored vs JD)</li>
-        <li>Shortlist → Send assessment (email)</li>
-        <li>Optional: Live interview later</li>
-      </ol>
-
       <div className="rp-field-row" style={{ alignItems: "flex-start" }}>
         <div style={{ flex: 1 }}>
+          <h2 className="rp-section-title">Jobs</h2>
           <label htmlFor="job-title">Job title</label>
           <input
             id="job-title"
@@ -449,7 +435,7 @@ export default function JobsLivePanel({
               )}
               {jobJd.trim().length >= 20 && (
                 <p className="rp-muted-small">
-                  Extracted {jobJd.trim().length} characters — ready to create.
+                  Extracted {jobJd.trim().length} characters.
                 </p>
               )}
             </>
@@ -464,18 +450,19 @@ export default function JobsLivePanel({
               ? "Reading JD file…"
               : busy
                 ? "Creating…"
-                : "Create job + apply link"}
+                : "Create job"}
           </button>
         </div>
         <div style={{ flex: 1 }}>
-          <label htmlFor="meet-url">Default Meet / Zoom URL (optional)</label>
+          <h2 className="rp-section-title">Live interviews</h2>
+          <label htmlFor="meet-url">Meet / Zoom URL (optional)</label>
           <input
             id="meet-url"
             value={meetUrl}
             onChange={(e) => setMeetUrl(e.target.value)}
             placeholder="https://meet.google.com/..."
           />
-          <label htmlFor="live-title">Live room title</label>
+          <label htmlFor="live-title">Room title</label>
           <input
             id="live-title"
             value={liveTitle}
@@ -489,10 +476,6 @@ export default function JobsLivePanel({
           >
             Create live room
           </button>
-          <p className="rp-muted-small" style={{ marginTop: "0.5rem" }}>
-            Live rooms are step 4 — use after assessment when you want shared
-            coding + video link.
-          </p>
         </div>
       </div>
 
@@ -523,10 +506,6 @@ export default function JobsLivePanel({
           <h3 className="rp-preview-title" style={{ marginTop: 0 }}>
             Send assessment invite — {assessApp.full_name}
           </h3>
-          <p className="rp-muted-small">
-            Emails the candidate their assessment invite link. Prefer shortlisted
-            applicants; sending will also mark them shortlisted.
-          </p>
 
           <div className="rp-tabs rp-tabs-spaced" style={{ marginBottom: "0.75rem" }}>
             <button
@@ -549,10 +528,7 @@ export default function JobsLivePanel({
 
           {assessMode === "existing" ? (
             assessments.length === 0 ? (
-              <p className="rp-empty">
-                No active assessments yet. Switch to “Create from this job’s JD”
-                or build one in the Assessments section below.
-              </p>
+              <p className="rp-empty">No active assessments yet.</p>
             ) : (
               <label className="rp-muted-small" style={{ display: "block" }}>
                 Assessment
@@ -619,13 +595,6 @@ export default function JobsLivePanel({
             </div>
           )}
 
-          {assessMode === "from_job" && selectedJob && (
-            <p className="rp-muted-small" style={{ marginTop: "0.5rem" }}>
-              Will generate questions from <strong>{selectedJobTitle}</strong>{" "}
-              JD, create the assessment, then email the invite.
-            </p>
-          )}
-
           <label className="rp-muted-small" style={{ display: "block", marginTop: "0.75rem" }}>
             Candidate email
             <input
@@ -689,11 +658,6 @@ export default function JobsLivePanel({
             Email live interview invite
             {inviteRoom ? ` — ${inviteRoom.title}` : ""}
           </h3>
-          <p className="rp-muted-small">
-            Sends the candidate live room link
-            {inviteRoom?.meet_url ? " and the Meet/Zoom URL stored on the room" : ""}
-            .
-          </p>
           <label className="rp-muted-small">
             Candidate name (optional)
             <input
@@ -755,7 +719,7 @@ export default function JobsLivePanel({
 
       <h3 className="rp-preview-title">Your jobs</h3>
       {jobs.length === 0 ? (
-        <p className="rp-empty">No jobs yet — create one above to get an apply link.</p>
+        <p className="rp-empty">No jobs yet.</p>
       ) : (
         <div className="recruiter-table-wrap">
           <table className="recruiter-table">
@@ -801,13 +765,10 @@ export default function JobsLivePanel({
       {selectedJob && (
         <>
           <h3 className="rp-preview-title">
-            Applicants (ATS ranked) — {selectedJobTitle}
+            Applicants — {selectedJobTitle}
           </h3>
           {apps.length === 0 ? (
-            <p className="rp-empty">
-              No applicants yet. Share the apply link, then shortlist and send
-              assessments here.
-            </p>
+            <p className="rp-empty">No applicants yet.</p>
           ) : (
             <div className="recruiter-table-wrap">
               <table className="recruiter-table">
@@ -887,9 +848,7 @@ export default function JobsLivePanel({
 
       <h3 className="rp-preview-title">Recent live rooms</h3>
       {liveRooms.length === 0 ? (
-        <p className="rp-empty">
-          No live rooms yet — create one or start from a shortlisted applicant.
-        </p>
+        <p className="rp-empty">No live rooms yet.</p>
       ) : (
         <ul className="rp-questions-editor">
           {liveRooms.slice(0, 8).map((r) => (
