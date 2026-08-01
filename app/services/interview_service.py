@@ -761,7 +761,7 @@ class InterviewService:
         else:
             message = "Interview session ended. All questions were answered."
 
-        self._maybe_send_candidate_report_email(
+        self._maybe_send_completion_report_email(
             session,
             candidate_email=candidate_email,
             candidate_name=candidate_name,
@@ -771,23 +771,25 @@ class InterviewService:
 
         report_email_sent = candidate_report_email_already_sent(session.session_id)
 
+        is_invite = bool(getattr(session, "invite_token", None))
         return EndInterviewResponse(
             session_id=session.session_id,
             status=session.status,
             total_questions=session.total_questions,
             answered_count=answered,
             unanswered_count=unanswered,
-            questions=[extract_question_text(q) for q in session.questions],
-            answers=session.answers,
-            answer_judgments=session.answer_judgments,
+            # Invite/exam candidates only see score — full transcript stays with recruiter.
+            questions=[] if is_invite else [extract_question_text(q) for q in session.questions],
+            answers=[] if is_invite else session.answers,
+            answer_judgments=[] if is_invite else session.answer_judgments,
             final_score=session.final_score,
             message=message,
-            original_score=original_score,
-            integrity_penalty_percent=integrity_penalty_percent,
+            original_score=None if is_invite else original_score,
+            integrity_penalty_percent=0.0 if is_invite else (integrity_penalty_percent or 0.0),
             adjusted_final_score=adjusted_final_score,
-            integrity_report=integrity_report,
-            integrity_level=integrity_level,
-            candidate_report_email_sent=report_email_sent,
+            integrity_report=None if is_invite else integrity_report,
+            integrity_level=None if is_invite else integrity_level,
+            candidate_report_email_sent=report_email_sent and not is_invite,
         )
 
     def _to_session_response(self, session: InterviewSession) -> InterviewSessionResponse:
@@ -929,7 +931,7 @@ class InterviewService:
         )
         return pdf_bytes, filename
 
-    def _maybe_send_candidate_report_email(
+    def _maybe_send_completion_report_email(
         self,
         session: InterviewSession,
         *,
@@ -938,13 +940,21 @@ class InterviewService:
         adjusted_final_score: float | None,
         integrity_level: str | None,
     ) -> None:
-        """Send the candidate PDF report once per session; never block interview completion."""
-        from app.services.email_service import send_interview_report_email
+        """Send report PDF after completion.
+
+        Invite/exam sessions: email the recruiter (candidate sees score only in UI).
+        Open practice sessions: email the candidate as before.
+        """
+        from app.services.email_service import (
+            send_interview_report_email,
+            send_recruiter_assessment_report_email,
+        )
+        from app.services.session_persistence import _get_sync_session_local
 
         try:
             if candidate_report_email_already_sent(session.session_id):
                 logger.info(
-                    "[EMAIL] Candidate report already sent for session %s",
+                    "[EMAIL] Completion report already sent for session %s",
                     session.session_id,
                 )
                 return
@@ -953,20 +963,57 @@ class InterviewService:
                 session,
                 candidate_name=candidate_name,
             )
-            sent = send_interview_report_email(
-                candidate_email,
-                candidate_name,
-                role_title=session.role_title,
-                pdf_bytes=pdf_bytes,
-                pdf_filename=pdf_filename,
-                overall_score=adjusted_final_score,
-                integrity_level=integrity_level,
-            )
+
+            invite_token = getattr(session, "invite_token", None)
+            if invite_token:
+                SessionLocal = _get_sync_session_local()
+                with SessionLocal() as db:
+                    from sqlalchemy import select as sa_select
+
+                    from app.db.interview_invite_model import InterviewInvite
+                    from app.models.user import User
+
+                    invite = db.execute(
+                        sa_select(InterviewInvite).where(
+                            InterviewInvite.token == str(invite_token)
+                        )
+                    ).scalar_one_or_none()
+                    recruiter = None
+                    if invite is not None:
+                        recruiter = db.execute(
+                            sa_select(User).where(User.id == invite.recruiter_id)
+                        ).scalar_one_or_none()
+                if recruiter is None or not recruiter.email:
+                    logger.warning(
+                        "[EMAIL] No recruiter email for invite session %s",
+                        session.session_id,
+                    )
+                    return
+                sent = send_recruiter_assessment_report_email(
+                    recruiter.email,
+                    recruiter.full_name or "Recruiter",
+                    candidate_name=candidate_name or "Candidate",
+                    role_title=session.role_title,
+                    pdf_bytes=pdf_bytes,
+                    pdf_filename=pdf_filename,
+                    overall_score=adjusted_final_score,
+                    integrity_level=integrity_level,
+                )
+            else:
+                sent = send_interview_report_email(
+                    candidate_email,
+                    candidate_name,
+                    role_title=session.role_title,
+                    pdf_bytes=pdf_bytes,
+                    pdf_filename=pdf_filename,
+                    overall_score=adjusted_final_score,
+                    integrity_level=integrity_level,
+                )
             if sent:
                 mark_candidate_report_email_sent(session.session_id)
         except Exception as exc:
             logger.exception(
-                "[EMAIL] Failed to send candidate report for session %s: %s",
+                "[EMAIL] Failed to send completion report for session %s: %s",
                 session.session_id,
                 exc,
             )

@@ -12,6 +12,8 @@ interface SummaryProps {
   inviteToken?: string;
   candidateEmail?: string;
   recordingSaved?: boolean;
+  /** Invite/exam flow: show score only — no report, recording, or per-question feedback. */
+  scoreOnly?: boolean;
   onRestart: () => void;
 }
 
@@ -45,6 +47,7 @@ export default function Summary({
   inviteToken,
   candidateEmail,
   recordingSaved,
+  scoreOnly = false,
   onRestart,
 }: SummaryProps) {
   const effectiveSessionId = sessionIdProp ?? summary.session_id;
@@ -52,6 +55,7 @@ export default function Summary({
   const displayScore =
     summary.adjusted_final_score ?? overallScore(final);
   const penalty = summary.integrity_penalty_percent ?? 0;
+  const isExamResult = scoreOnly || Boolean(inviteToken);
 
   const [recordingStatus, setRecordingStatus] = useState<
     "loading" | "available" | "pending" | "unavailable"
@@ -63,6 +67,11 @@ export default function Summary({
   const recordingUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (isExamResult) {
+      setRecordingStatus("unavailable");
+      return;
+    }
+
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let attempts = 0;
@@ -111,7 +120,7 @@ export default function Summary({
         recordingUrlRef.current = null;
       }
     };
-  }, [effectiveSessionId, inviteToken]);
+  }, [effectiveSessionId, inviteToken, isExamResult]);
 
   async function handleDownloadReport() {
     setDownloadingReport(true);
@@ -136,6 +145,36 @@ export default function Summary({
     } finally {
       setDownloadingReport(false);
     }
+  }
+
+  if (isExamResult) {
+    return (
+      <div className="card hero-card summary-score-only">
+        <div className="alert success">{summary.message}</div>
+        <section className="summary-overall" style={{ marginTop: "1rem" }}>
+          <h2>Your result</h2>
+          {displayScore !== null ? (
+            <p className="summary-score">
+              Score: <strong>{displayScore}</strong>
+              <span className="summary-score-max"> / 100</span>
+            </p>
+          ) : (
+            <p className="summary-score-note">Your score is being finalized.</p>
+          )}
+          <p className="summary-score-note">
+            A detailed report and recording are available to the recruiter only.
+            {candidateEmail
+              ? " You may close this page — thank you for completing the assessment."
+              : ""}
+          </p>
+        </section>
+        <div className="actions" style={{ marginTop: "1.5rem" }}>
+          <button type="button" className="primary" onClick={onRestart}>
+            Done
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { authApi } from "../api/client";
+import PasswordInput from "./PasswordInput";
 
 export default function ResetPassword() {
   const token = new URLSearchParams(window.location.search).get("token") ?? "";
@@ -75,10 +76,9 @@ export default function ResetPassword() {
 
             <div className="field">
               <label htmlFor="new_password">New Password</label>
-              <input
+              <PasswordInput
                 id="new_password"
                 name="new_password"
-                type="password"
                 minLength={8}
                 required
                 value={password}
@@ -89,10 +89,9 @@ export default function ResetPassword() {
 
             <div className="field">
               <label htmlFor="confirm_password">Confirm Password</label>
-              <input
+              <PasswordInput
                 id="confirm_password"
                 name="confirm_password"
-                type="password"
                 minLength={8}
                 required
                 value={confirmPassword}

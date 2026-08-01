@@ -89,7 +89,15 @@ def _verification_session_sql_key():
     return func.replace(func.lower(CandidateVerification.session_id), "-", "")
 
 
-def _candidate_display_name(resume_filename: Optional[str]) -> str:
+def _candidate_display_name(
+    resume_filename: Optional[str],
+    *,
+    verification_name: Optional[str] = None,
+    identity_name: Optional[str] = None,
+) -> str:
+    for candidate in (verification_name, identity_name):
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip()
     if not resume_filename or not resume_filename.strip():
         return "Unknown Candidate"
     stem = Path(resume_filename).stem
@@ -285,14 +293,21 @@ def _build_proctor_event_timeline(row: DBSession) -> list[RecruiterProctorEvent]
     return [RecruiterProctorEvent(**event) for event in list_proctor_events(row.session_id)]
 
 
-def _session_to_summary(row: DBSession) -> RecruiterSessionSummary:
+def _session_to_summary(
+    row: DBSession,
+    *,
+    verification_name: Optional[str] = None,
+) -> RecruiterSessionSummary:
     # invite_token is populated for Phase 4 filters/export; older clients ignore it.
     score, recommendation = _extract_final_score(row.final_score)
     review_state = _review_state_payload(row)
     proctoring = _build_proctoring_summary(row) or {}
     return RecruiterSessionSummary(
         session_id=row.session_id,
-        candidate_name=_candidate_display_name(row.resume_filename),
+        candidate_name=_candidate_display_name(
+            row.resume_filename,
+            verification_name=verification_name,
+        ),
         role_title=row.role_title,
         date=row.updated_at,
         final_score=score,
@@ -313,6 +328,8 @@ def _session_to_summary(row: DBSession) -> RecruiterSessionSummary:
 def _session_to_detail(
     row: DBSession,
     identity_attempt: IdentityVerificationAttempt | None = None,
+    *,
+    verification_name: Optional[str] = None,
 ) -> RecruiterSessionDetail:
     questions = list(row.questions or [])
     answers = list(row.answers or [])
@@ -356,7 +373,10 @@ def _session_to_detail(
 
     return RecruiterSessionDetail(
         session_id=row.session_id,
-        candidate_name=_candidate_display_name(row.resume_filename),
+        candidate_name=_candidate_display_name(
+            row.resume_filename,
+            verification_name=verification_name,
+        ),
         role_title=row.role_title,
         experience_level=row.experience_level,
         status=row.status,
@@ -413,21 +433,41 @@ class RecruiterService:
             )
             .order_by(DBSession.updated_at.desc())
         )
-        return [_session_to_summary(row) for row in result.scalars().all()]
+        rows = list(result.scalars().all())
+        name_by_session = await self._candidate_names_for_sessions(
+            [row.session_id for row in rows]
+        )
+        return [
+            _session_to_summary(
+                row,
+                verification_name=name_by_session.get(_uuid_key(row.session_id)),
+            )
+            for row in rows
+        ]
 
     async def get_session_detail(
         self, recruiter_id: int, session_id: UUID
     ) -> RecruiterSessionDetail:
         row = await self._get_owned_completed_row(recruiter_id, session_id)
         identity_attempt = await self._get_latest_identity_attempt(session_id)
-        return _session_to_detail(row, identity_attempt)
+        names = await self._candidate_names_for_sessions([session_id])
+        return _session_to_detail(
+            row,
+            identity_attempt,
+            verification_name=names.get(_uuid_key(session_id)),
+        )
 
     async def get_session_report(
         self, recruiter_id: int, session_id: UUID
     ) -> tuple[bytes, str]:
         row = await self._get_owned_completed_row(recruiter_id, session_id)
         identity_attempt = await self._get_latest_identity_attempt(session_id)
-        detail = _session_to_detail(row, identity_attempt)
+        names = await self._candidate_names_for_sessions([session_id])
+        detail = _session_to_detail(
+            row,
+            identity_attempt,
+            verification_name=names.get(_uuid_key(session_id)),
+        )
         pdf_bytes = generate_session_report_pdf(detail, _build_proctoring_summary(row))
         filename = report_filename(detail)
         upsert_session_artifact(
@@ -454,7 +494,12 @@ class RecruiterService:
         )
         await self.db.refresh(row)
         identity_attempt = await self._get_latest_identity_attempt(session_id)
-        return _session_to_detail(row, identity_attempt)
+        names = await self._candidate_names_for_sessions([session_id])
+        return _session_to_detail(
+            row,
+            identity_attempt,
+            verification_name=names.get(_uuid_key(session_id)),
+        )
 
     async def update_review_state(
         self,
@@ -478,7 +523,12 @@ class RecruiterService:
         )
         await self.db.refresh(row)
         identity_attempt = await self._get_latest_identity_attempt(session_id)
-        return _session_to_detail(row, identity_attempt)
+        names = await self._candidate_names_for_sessions([session_id])
+        return _session_to_detail(
+            row,
+            identity_attempt,
+            verification_name=names.get(_uuid_key(session_id)),
+        )
 
     async def recruiter_owns_session(
         self, recruiter_id: int, session_id: UUID
@@ -488,6 +538,27 @@ class RecruiterService:
         if row is None:
             return False
         return await self._is_owned_by_recruiter(recruiter_id, row)
+
+    async def _candidate_names_for_sessions(
+        self, session_ids: list[UUID]
+    ) -> dict[str, str]:
+        """Map session_id hex-key -> registered candidate_name from invite verification."""
+        if not session_ids:
+            return {}
+        keys = [_uuid_key(sid) for sid in session_ids]
+        result = await self.db.execute(
+            select(CandidateVerification).where(
+                CandidateVerification.session_id.is_not(None),
+                _verification_session_sql_key().in_(keys),
+            )
+        )
+        out: dict[str, str] = {}
+        for row in result.scalars().all():
+            key = _uuid_key(row.session_id)
+            name = (row.candidate_name or "").strip()
+            if key and name and key not in out:
+                out[key] = name
+        return out
 
     async def _get_owned_completed_row(
         self, recruiter_id: int, session_id: UUID

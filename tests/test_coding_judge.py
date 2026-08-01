@@ -86,6 +86,35 @@ def test_run_test_cases_compares_stdout(mock_client_cls, _configured):
     assert summary.cases[0].passed is True
 
 
+@patch("app.services.coding_judge.coding_judge_configured", return_value=True)
+@patch("app.services.coding_judge.httpx.Client")
+def test_run_test_cases_treats_http_408_as_case_result(mock_client_cls, _configured):
+    """SandboxAPI returns HTTP 408 with a body for TLE / some failures — not an outage."""
+    client = MagicMock()
+    mock_client_cls.return_value.__enter__.return_value = client
+    response = MagicMock()
+    response.status_code = 408
+    response.json.return_value = {
+        "status": "timeout",
+        "stdout": "",
+        "stderr": "error: compile failed",
+        "exit_code": -1,
+        "execution_time_ms": 2100,
+    }
+    response.text = '{"status":"timeout"}'
+    client.post.return_value = response
+
+    summary = run_test_cases(
+        source="int main(){while(1){}}",
+        language="cpp",
+        tests=[{"stdin": "", "expected_stdout": "1"}],
+    )
+    assert summary.total == 1
+    assert summary.passed == 0
+    assert summary.error is None
+    assert summary.cases[0].status in ("Time Limit Exceeded", "Compilation Error")
+
+
 @patch("app.services.coding_judge.coding_judge_configured", return_value=False)
 def test_run_requires_config(_configured):
     with pytest.raises(CodingJudgeError):

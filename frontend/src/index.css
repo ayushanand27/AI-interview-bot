@@ -1188,3 +1188,95 @@ header p {
 .auth-footer a {
   color: var(--muted);
 }
+
+.password-input-wrap {
+  position: relative;
+  display: block;
+}
+
+.password-input-wrap input {
+  width: 100%;
+  padding-right: 2.75rem;
+  box-sizing: border-box;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.password-toggle:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.coding-io-examples {
+  margin: 0.85rem 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.coding-io-examples h4 {
+  margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.coding-io-example {
+  margin-bottom: 0.75rem;
+}
+
+.coding-io-example:last-child {
+  margin-bottom: 0;
+}
+
+.coding-io-example strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.coding-io-example pre {
+  margin: 0.2rem 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.summary-score-only {
+  text-align: center;
+  padding: 1.25rem 0 0.5rem;
+}
+
+.summary-score-only .summary-score {
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  margin: 0.5rem 0 0.75rem;
+}
+
+.summary-score-only .summary-score-note {
+  color: var(--muted);
+  font-size: 0.95rem;
+  max-width: 28rem;
+  margin: 0 auto;
+}

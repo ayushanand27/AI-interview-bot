@@ -177,8 +177,42 @@
   margin-bottom: 0.25rem;
 }
 
-.recruiter-portal .rp-field-row select {
+.recruiter-portal .rp-field-row select,
+.recruiter-portal .rp-field-row input[type="number"] {
   margin-bottom: 0.85rem;
+}
+
+.recruiter-portal .password-input-wrap {
+  position: relative;
+  margin-bottom: 0.85rem;
+}
+
+.recruiter-portal .password-input-wrap input {
+  width: 100%;
+  padding-right: 2.75rem;
+  box-sizing: border-box;
+}
+
+.recruiter-portal .password-toggle {
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--rp-muted, #8b96a8);
+}
+
+.recruiter-portal .password-toggle:hover:not(:disabled) {
+  color: var(--rp-text, #f3f6fa);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .recruiter-portal .rp-primary {

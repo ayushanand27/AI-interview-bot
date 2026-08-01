@@ -12,9 +12,11 @@ import numpy as np
 
 # Histogram correlation below this flags low_identity_confidence for recruiter review.
 IDENTITY_SIMILARITY_THRESHOLD = 0.35
-LIVENESS_STRONG_THRESHOLD = 0.75
-LIVENESS_MIN_THRESHOLD = 0.5
-ACTION_SHIFT_THRESHOLD = 0.06
+# Softened: normal head motion / imperfect smile should not annoy candidates.
+# Pass overall liveness with ~40% of steps; soft-flag only when clearly weak.
+LIVENESS_STRONG_THRESHOLD = 0.5
+LIVENESS_MIN_THRESHOLD = 0.4
+ACTION_SHIFT_THRESHOLD = 0.03
 
 
 @dataclass
@@ -151,13 +153,17 @@ def _smile_detected(face_bgr: np.ndarray) -> bool:
         return False
     gray = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2GRAY)
     lower_face = gray[gray.shape[0] // 3 :, :]
-    smiles = detector.detectMultiScale(
-        lower_face,
-        scaleFactor=1.7,
-        minNeighbors=20,
-        minSize=(24, 24),
-    )
-    return len(smiles) > 0
+    # Lenient cascade — haarcascade_smile is noisy; prefer fewer false negatives.
+    for min_neighbors in (10, 8, 6):
+        smiles = detector.detectMultiScale(
+            lower_face,
+            scaleFactor=1.4,
+            minNeighbors=min_neighbors,
+            minSize=(16, 16),
+        )
+        if len(smiles) > 0:
+            return True
+    return False
 
 
 def _normalize_action(action: str) -> str:
@@ -225,13 +231,20 @@ def _evaluate_liveness(
         if action == "center":
             passed = True
         elif action == "move_left":
-            passed = center_x <= (baseline_center_x - ACTION_SHIFT_THRESHOLD)
+            # Positive when face center moved left vs baseline.
+            delta_left = baseline_center_x - center_x
+            passed = delta_left >= ACTION_SHIFT_THRESHOLD
             detail["baseline_center_x"] = round(baseline_center_x, 4)
+            detail["delta_x"] = round(center_x - baseline_center_x, 4)
         elif action == "move_right":
-            passed = center_x >= (baseline_center_x + ACTION_SHIFT_THRESHOLD)
+            delta_right = center_x - baseline_center_x
+            passed = delta_right >= ACTION_SHIFT_THRESHOLD
             detail["baseline_center_x"] = round(baseline_center_x, 4)
+            detail["delta_x"] = round(center_x - baseline_center_x, 4)
         elif action == "smile":
             passed = _smile_detected(face_bgr)
+            if not passed:
+                detail["soft_presence"] = True
         else:
             passed = True
             detail["reason"] = "unsupported_action_treated_as_present"
@@ -241,6 +254,12 @@ def _evaluate_liveness(
         scored_checks += 1
         if passed:
             passed_checks += 1
+        elif action == "smile" and detail.get("soft_presence"):
+            # Half-credit when face is present but smile cascade is unsure.
+            passed_checks += 0.5
+            warnings.append(
+                "Smile was weak or unclear — treated as soft pass for review."
+            )
         else:
             warnings.append(f"Liveness check '{action}' did not pass clearly.")
 

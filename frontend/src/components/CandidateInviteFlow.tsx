@@ -9,6 +9,7 @@ import {
 import InterviewRoom, { type InterviewRoomHandle } from "./InterviewRoom";
 import PreInterviewChecklist from "./PreInterviewChecklist";
 import Summary from "./Summary";
+import PasswordInput from "./PasswordInput";
 import type { InviteValidInfo } from "../types/invite";
 import { InviteFlowError } from "../types/invite";
 import type {
@@ -596,10 +597,9 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
               </div>
               <div className="field">
                 <label htmlFor="invite-password">Password</label>
-                <input
+                <PasswordInput
                   id="invite-password"
                   name="password"
-                  type="password"
                   required
                   minLength={8}
                   autoComplete="new-password"
@@ -607,10 +607,9 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
               </div>
               <div className="field">
                 <label htmlFor="invite-confirm-password">Confirm password</label>
-                <input
+                <PasswordInput
                   id="invite-confirm-password"
                   name="confirmPassword"
-                  type="password"
                   required
                   minLength={8}
                   autoComplete="new-password"
@@ -636,10 +635,9 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
               </div>
               <div className="field">
                 <label htmlFor="invite-login-password">Password</label>
-                <input
+                <PasswordInput
                   id="invite-login-password"
                   name="password"
-                  type="password"
                   required
                   autoComplete="current-password"
                 />
@@ -913,6 +911,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
           inviteToken={token}
           candidateEmail={candidateEmail}
           recordingSaved={recordingSaved}
+          scoreOnly
           onRestart={() => window.location.reload()}
         />
       )}

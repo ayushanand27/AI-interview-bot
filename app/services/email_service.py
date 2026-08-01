@@ -260,7 +260,7 @@ def send_interview_report_email(
     overall_score: float | None = None,
     integrity_level: str | None = None,
 ) -> bool:
-    """Email the candidate their personal interview PDF report."""
+    """Email the candidate their personal interview PDF report (open practice only)."""
     subject = f"Your Interview Report - {role_title}"
 
     score_line = ""
@@ -281,7 +281,7 @@ def send_interview_report_email(
         {score_line}
         {integrity_line}
         <p style="color: #666; font-size: 14px;">
-            You can also view your results and recording when you log back into {settings.APP_NAME}.
+            You can also view your results when you log back into {settings.APP_NAME}.
         </p>
     </div>
     """
@@ -295,4 +295,52 @@ def send_interview_report_email(
     )
     if not sent:
         _log_console_fallback(f"Interview report ({role_title})", to_email, link=None)
+    return sent
+
+
+def send_recruiter_assessment_report_email(
+    to_email: str,
+    recruiter_name: str,
+    *,
+    candidate_name: str,
+    role_title: str,
+    pdf_bytes: bytes,
+    pdf_filename: str,
+    overall_score: float | None = None,
+    integrity_level: str | None = None,
+) -> bool:
+    """Email the recruiter the full assessment report after an invite interview."""
+    subject = f"Assessment complete: {candidate_name} — {role_title}"
+    score_line = ""
+    if overall_score is not None:
+        score_line = f"<p><strong>Overall score:</strong> {overall_score} / 100</p>"
+    integrity_line = (
+        f"<p><strong>Integrity level:</strong> {_format_integrity_level(integrity_level)}</p>"
+    )
+    html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">Candidate assessment completed</h2>
+        <p>Hello {recruiter_name},</p>
+        <p>
+            <strong>{candidate_name}</strong> completed the assessment for
+            <strong>{role_title}</strong>. The full report is attached.
+        </p>
+        {score_line}
+        {integrity_line}
+        <p style="color: #666; font-size: 14px;">
+            Open the recruiter dashboard to review the transcript, proctoring signals,
+            and session recording (available immediately after a successful upload at
+            interview end — usually within a few seconds).
+        </p>
+    </div>
+    """
+    sent = _send_email_with_attachment(
+        to_email,
+        subject,
+        html,
+        attachment_bytes=pdf_bytes,
+        attachment_filename=pdf_filename,
+    )
+    if not sent:
+        _log_console_fallback(f"Recruiter report ({role_title})", to_email, link=None)
     return sent

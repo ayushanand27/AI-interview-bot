@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import random
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -32,6 +34,27 @@ from app.services.question_utils import (
     normalize_questions,
     question_text,
 )
+
+
+def _unique_bank_picker(bank: list):
+    """Yield bank items shuffled without replacement; reshuffle when exhausted."""
+    order = list(range(len(bank)))
+    random.shuffle(order)
+    idx = 0
+
+    def next_item():
+        nonlocal idx, order
+        if not bank:
+            raise ValueError("empty bank")
+        if idx >= len(order):
+            order = list(range(len(bank)))
+            random.shuffle(order)
+            idx = 0
+        item = bank[order[idx]]
+        idx += 1
+        return item
+
+    return next_item
 
 
 def _as_aware_utc(dt: datetime) -> datetime:
@@ -79,6 +102,14 @@ def _fallback_question_dicts(
         "Describe a technical decision you made, the tradeoffs you considered, and the outcome.",
         "How do you prioritize tasks when multiple stakeholders have competing deadlines?",
         "Explain a complex technical concept from the job description as you would to a non-technical stakeholder.",
+        "Describe how you would design a scalable component related to this role. What bottlenecks would you watch for?",
+        "Tell me about a time you disagreed with a technical approach. How did you resolve it?",
+        "How do you ensure code quality when shipping under a tight deadline?",
+        "Walk through how you would investigate intermittent failures in a distributed system.",
+        "Describe your approach to onboarding onto an unfamiliar legacy codebase.",
+        "How do you balance technical debt reduction with feature delivery?",
+        "Explain a performance optimization you made and how you measured its impact.",
+        "Describe how you would handle a sudden production spike for a service in this domain.",
     ]
     mcq_bank = [
         {
@@ -111,6 +142,46 @@ def _fallback_question_dicts(
             ],
             "correct_indices": [0],
         },
+        {
+            "text": "Which HTTP status best indicates a successful resource creation?",
+            "options": ["201 Created", "204 No Content", "301 Moved Permanently", "409 Conflict"],
+            "correct_indices": [0],
+        },
+        {
+            "text": "What does CAP theorem say a distributed system cannot guarantee simultaneously?",
+            "options": [
+                "Consistency, Availability, and Partition tolerance",
+                "Caching, Auth, and Pagination",
+                "CPU, Memory, and Disk",
+                "Latency, Throughput, and Cost",
+            ],
+            "correct_indices": [0],
+        },
+        {
+            "text": "Which index type is typically best for equality lookups on a high-cardinality column?",
+            "options": ["B-tree / hash index", "Full table scan only", "Bitmap on unique UUID", "No index needed"],
+            "correct_indices": [0],
+        },
+        {
+            "text": "What is the main benefit of idempotent API design?",
+            "options": [
+                "Safe retries without unintended duplicate side effects",
+                "Faster JSON parsing",
+                "Smaller Docker images",
+                "Automatic schema migrations",
+            ],
+            "correct_indices": [0],
+        },
+        {
+            "text": "Which approach best prevents secret leakage in CI/CD?",
+            "options": [
+                "Store secrets in a vault / secret manager, inject at runtime",
+                "Commit .env files for convenience",
+                "Put secrets in public README examples",
+                "Hard-code keys in frontend bundles",
+            ],
+            "correct_indices": [0],
+        },
     ]
     msq_bank = [
         {
@@ -133,6 +204,26 @@ def _fallback_question_dicts(
             ],
             "correct_indices": [0, 1, 3],
         },
+        {
+            "text": "Which techniques help diagnose production performance issues? Select all that apply.",
+            "options": [
+                "Profiling hot paths",
+                "Checking slow-query logs",
+                "Ignoring p99 latency",
+                "Load testing representative traffic",
+            ],
+            "correct_indices": [0, 1, 3],
+        },
+        {
+            "text": "Which are valid reasons to choose a message queue? Select all that apply.",
+            "options": [
+                "Decouple producers and consumers",
+                "Absorb traffic spikes",
+                "Guarantee UI pixel-perfect rendering",
+                "Enable asynchronous processing",
+            ],
+            "correct_indices": [0, 1, 3],
+        },
     ]
     numerical_bank = [
         {
@@ -150,152 +241,393 @@ def _fallback_question_dicts(
             "correct_answer": "4",
             "tolerance": 0,
         },
-    ]
-    coding_bank = [
         {
-            "text": (
-                "Two Sum (interview classic).\n"
+            "text": "A cache hit rate is 80% of 5000 lookups. How many hits is that?",
+            "correct_answer": "4000",
+            "tolerance": 0,
+        },
+        {
+            "text": "A binary search on a sorted array of 1,048,576 elements takes at most how many comparisons (log2 N)?",
+            "correct_answer": "20",
+            "tolerance": 0,
+        },
+        {
+            "text": "If a job runs every 15 minutes, how many runs occur in 24 hours?",
+            "correct_answer": "96",
+            "tolerance": 0,
+        },
+    ]
+
+    def _coding(
+        text: str,
+        public: list[dict],
+        hidden: list[dict],
+        *,
+        starter: str | None = None,
+        marks: int = 25,
+        time_seconds: int = 1200,
+        time_limit_ms: int = 5000,
+    ) -> dict:
+        return {
+            "text": text,
+            "languages": ["python", "javascript", "java", "cpp", "c"],
+            "starter_code": {
+                "python": starter
+                or "# Read from stdin, write to stdout\nimport sys\ndata = sys.stdin.read().split()\n"
+            },
+            "public_tests": public,
+            "hidden_tests": hidden,
+            "time_seconds": time_seconds,
+            "marks": marks,
+            "time_limit_ms": time_limit_ms,
+            "memory_limit_mb": 128,
+        }
+
+    coding_bank = [
+        _coding(
+            (
+                "Two Sum\n"
+                "Given an array of integers and a target, return two 0-based indices that sum to target.\n\n"
                 "Input:\n"
                 "  Line 1: integer N (2 <= N <= 1e5)\n"
                 "  Line 2: N integers A[i] (|A[i]| <= 1e9)\n"
                 "  Line 3: integer target\n"
-                "Output: two 0-based indices i j (i < j) such that A[i] + A[j] == target.\n"
-                "If multiple answers exist, print any. Guaranteed that exactly one valid pair exists.\n"
-                "Target complexity: O(N) time preferred."
+                "Output: two indices i j (i < j) with A[i] + A[j] == target. Any valid pair is accepted.\n\n"
+                "Example 1:\n"
+                "Input:\n4\n2 7 11 15\n9\n"
+                "Output:\n0 1\n\n"
+                "Example 2:\n"
+                "Input:\n3\n3 2 4\n6\n"
+                "Output:\n1 2"
             ),
-            "languages": ["python", "javascript", "java", "cpp", "c"],
-            "starter_code": {
-                "python": (
-                    "n = int(input())\n"
-                    "arr = list(map(int, input().split()))\n"
-                    "target = int(input())\n"
-                    "# print two indices i j\n"
-                ),
-            },
-            "public_tests": [
+            [
                 {"stdin": "4\n2 7 11 15\n9\n", "expected_stdout": "0 1"},
                 {"stdin": "3\n3 2 4\n6\n", "expected_stdout": "1 2"},
             ],
-            "hidden_tests": [
+            [
                 {"stdin": "2\n1 1\n2\n", "expected_stdout": "0 1"},
                 {"stdin": "5\n-1 0 5 3 8\n7\n", "expected_stdout": "2 3"},
                 {"stdin": "6\n10 20 30 40 50 60\n90\n", "expected_stdout": "2 5"},
             ],
-            "time_seconds": 1200,
-            "marks": 25,
-            "time_limit_ms": 2000,
-            "memory_limit_mb": 128,
-        },
-        {
-            "text": (
-                "Valid Parentheses.\n"
-                "Input: a single string S consisting only of characters ()[]{} (1 <= |S| <= 1e5).\n"
-                "Output: YES if S is a valid bracket sequence, otherwise NO.\n"
-                "A sequence is valid if brackets close in the correct order (stack matching)."
+            starter="n = int(input())\narr = list(map(int, input().split()))\ntarget = int(input())\n# print two indices i j\n",
+        ),
+        _coding(
+            (
+                "Valid Parentheses\n"
+                "Check whether a bracket string is valid.\n\n"
+                "Input: one string S of ()[]{} only (1 <= |S| <= 1e5)\n"
+                "Output: YES if valid, otherwise NO\n\n"
+                "Example 1:\nInput:\n()\nOutput:\nYES\n\n"
+                "Example 2:\nInput:\n([)]\nOutput:\nNO"
             ),
-            "languages": ["python", "javascript", "java", "cpp", "c"],
-            "starter_code": {
-                "python": (
-                    "s = input().strip()\n"
-                    "# print YES or NO\n"
-                ),
-            },
-            "public_tests": [
+            [
                 {"stdin": "()\n", "expected_stdout": "YES"},
                 {"stdin": "([)]\n", "expected_stdout": "NO"},
                 {"stdin": "{[]}\n", "expected_stdout": "YES"},
             ],
-            "hidden_tests": [
+            [
                 {"stdin": "(((((((((()\n", "expected_stdout": "NO"},
                 {"stdin": "([]{})\n", "expected_stdout": "YES"},
                 {"stdin": "]\n", "expected_stdout": "NO"},
             ],
-            "time_seconds": 900,
-            "marks": 20,
-            "time_limit_ms": 2000,
-            "memory_limit_mb": 128,
-        },
-        {
-            "text": (
-                "Longest Unique Substring length.\n"
-                "Input: a string S of lowercase letters (1 <= |S| <= 1e5).\n"
-                "Output: length of the longest substring without repeating characters.\n"
-                "Example: abcabcbb -> 3 (abc)."
+            starter="s = input().strip()\n# print YES or NO\n",
+            marks=20,
+            time_seconds=900,
+        ),
+        _coding(
+            (
+                "Longest Substring Without Repeating Characters\n"
+                "Find the length of the longest substring with all unique characters.\n\n"
+                "Input: string S of lowercase letters (1 <= |S| <= 1e5)\n"
+                "Output: a single integer\n\n"
+                "Example 1:\nInput:\nabcabcbb\nOutput:\n3\n\n"
+                "Example 2:\nInput:\npwwkew\nOutput:\n3"
             ),
-            "languages": ["python", "javascript", "java", "cpp"],
-            "starter_code": {
-                "python": (
-                    "s = input().strip()\n"
-                    "# print an integer\n"
-                ),
-            },
-            "public_tests": [
+            [
                 {"stdin": "abcabcbb\n", "expected_stdout": "3"},
                 {"stdin": "bbbbb\n", "expected_stdout": "1"},
                 {"stdin": "pwwkew\n", "expected_stdout": "3"},
             ],
-            "hidden_tests": [
+            [
                 {"stdin": "a\n", "expected_stdout": "1"},
                 {"stdin": "abcdef\n", "expected_stdout": "6"},
                 {"stdin": "abba\n", "expected_stdout": "2"},
             ],
-            "time_seconds": 1200,
-            "marks": 25,
-            "time_limit_ms": 2000,
-            "memory_limit_mb": 128,
-        },
+            starter="s = input().strip()\n# print an integer\n",
+        ),
+        _coding(
+            (
+                "Maximum Subarray Sum (Kadane)\n"
+                "Find the contiguous subarray with the largest sum.\n\n"
+                "Input:\n"
+                "  Line 1: N (1 <= N <= 1e5)\n"
+                "  Line 2: N integers A[i] (|A[i]| <= 1e9)\n"
+                "Output: the maximum subarray sum\n\n"
+                "Example 1:\nInput:\n9\n-2 1 -3 4 -1 2 1 -5 4\nOutput:\n6\n\n"
+                "Example 2:\nInput:\n1\n-3\nOutput:\n-3"
+            ),
+            [
+                {"stdin": "9\n-2 1 -3 4 -1 2 1 -5 4\n", "expected_stdout": "6"},
+                {"stdin": "1\n-3\n", "expected_stdout": "-3"},
+            ],
+            [
+                {"stdin": "5\n1 2 3 4 5\n", "expected_stdout": "15"},
+                {"stdin": "4\n-1 -2 -3 -4\n", "expected_stdout": "-1"},
+                {"stdin": "3\n5 -1 5\n", "expected_stdout": "9"},
+            ],
+            starter="n = int(input())\narr = list(map(int, input().split()))\n# print max subarray sum\n",
+        ),
+        _coding(
+            (
+                "Merge Intervals\n"
+                "Merge all overlapping intervals.\n\n"
+                "Input:\n"
+                "  Line 1: N (1 <= N <= 1e4)\n"
+                "  Next N lines: L R (interval inclusive endpoints)\n"
+                "Output: merged intervals, one per line as L R, sorted by L\n\n"
+                "Example 1:\nInput:\n4\n1 3\n2 6\n8 10\n15 18\nOutput:\n1 6\n8 10\n15 18\n\n"
+                "Example 2:\nInput:\n2\n1 4\n4 5\nOutput:\n1 5"
+            ),
+            [
+                {"stdin": "4\n1 3\n2 6\n8 10\n15 18\n", "expected_stdout": "1 6\n8 10\n15 18"},
+                {"stdin": "2\n1 4\n4 5\n", "expected_stdout": "1 5"},
+            ],
+            [
+                {"stdin": "1\n5 5\n", "expected_stdout": "5 5"},
+                {"stdin": "3\n1 10\n2 3\n4 8\n", "expected_stdout": "1 10"},
+                {"stdin": "3\n1 2\n3 4\n5 6\n", "expected_stdout": "1 2\n3 4\n5 6"},
+            ],
+            starter="n = int(input())\nintervals = [tuple(map(int, input().split())) for _ in range(n)]\n# print merged intervals\n",
+            marks=30,
+        ),
+        _coding(
+            (
+                "Top K Frequent Elements\n"
+                "Return the K most frequent integers (any order).\n\n"
+                "Input:\n"
+                "  Line 1: N K\n"
+                "  Line 2: N integers\n"
+                "Output: K integers separated by spaces in ascending order\n\n"
+                "Example 1:\nInput:\n6 2\n1 1 1 2 2 3\nOutput:\n1 2\n\n"
+                "Example 2:\nInput:\n1 1\n1\nOutput:\n1"
+            ),
+            [
+                {"stdin": "6 2\n1 1 1 2 2 3\n", "expected_stdout": "1 2"},
+                {"stdin": "1 1\n1\n", "expected_stdout": "1"},
+            ],
+            [
+                {"stdin": "4 1\n4 4 4 4\n", "expected_stdout": "4"},
+                {"stdin": "5 2\n5 5 3 3 1\n", "expected_stdout": "3 5"},
+                {"stdin": "3 3\n7 8 9\n", "expected_stdout": "7 8 9"},
+            ],
+            starter="n, k = map(int, input().split())\narr = list(map(int, input().split()))\n# print k most frequent values\n",
+            marks=30,
+        ),
+        _coding(
+            (
+                "Product of Array Except Self\n"
+                "For each index i, output the product of all elements except A[i]. Do not use division.\n\n"
+                "Input:\n"
+                "  Line 1: N (2 <= N <= 1e5)\n"
+                "  Line 2: N integers A[i] (|A[i]| <= 100)\n"
+                "Output: N integers (products) separated by spaces\n\n"
+                "Example 1:\nInput:\n4\n1 2 3 4\nOutput:\n24 12 8 6\n\n"
+                "Example 2:\nInput:\n5\n-1 1 0 -3 3\nOutput:\n0 0 9 0 0"
+            ),
+            [
+                {"stdin": "4\n1 2 3 4\n", "expected_stdout": "24 12 8 6"},
+                {"stdin": "5\n-1 1 0 -3 3\n", "expected_stdout": "0 0 9 0 0"},
+            ],
+            [
+                {"stdin": "2\n2 3\n", "expected_stdout": "3 2"},
+                {"stdin": "3\n0 0 2\n", "expected_stdout": "0 0 0"},
+                {"stdin": "3\n1 1 1\n", "expected_stdout": "1 1 1"},
+            ],
+            starter="n = int(input())\narr = list(map(int, input().split()))\n# print n products\n",
+            marks=30,
+        ),
+        _coding(
+            (
+                "Binary Search First Occurrence\n"
+                "Find the first index of target in a sorted array (non-decreasing). Return -1 if missing.\n\n"
+                "Input:\n"
+                "  Line 1: N target\n"
+                "  Line 2: N sorted integers\n"
+                "Output: a single index (0-based) or -1\n\n"
+                "Example 1:\nInput:\n6 2\n1 2 2 2 3 4\nOutput:\n1\n\n"
+                "Example 2:\nInput:\n4 5\n1 2 3 4\nOutput:\n-1"
+            ),
+            [
+                {"stdin": "6 2\n1 2 2 2 3 4\n", "expected_stdout": "1"},
+                {"stdin": "4 5\n1 2 3 4\n", "expected_stdout": "-1"},
+            ],
+            [
+                {"stdin": "1 7\n7\n", "expected_stdout": "0"},
+                {"stdin": "5 1\n1 1 1 1 1\n", "expected_stdout": "0"},
+                {"stdin": "5 9\n1 3 5 7 9\n", "expected_stdout": "4"},
+            ],
+            starter="n, target = map(int, input().split())\narr = list(map(int, input().split()))\n# print first index or -1\n",
+            marks=20,
+            time_seconds=900,
+        ),
+        _coding(
+            (
+                "Next Greater Element\n"
+                "For each element, find the next greater element to its right. Use -1 if none.\n\n"
+                "Input:\n"
+                "  Line 1: N (1 <= N <= 1e5)\n"
+                "  Line 2: N integers\n"
+                "Output: N integers separated by spaces\n\n"
+                "Example 1:\nInput:\n4\n2 1 2 4\nOutput:\n4 2 4 -1\n\n"
+                "Example 2:\nInput:\n3\n3 2 1\nOutput:\n-1 -1 -1"
+            ),
+            [
+                {"stdin": "4\n2 1 2 4\n", "expected_stdout": "4 2 4 -1"},
+                {"stdin": "3\n3 2 1\n", "expected_stdout": "-1 -1 -1"},
+            ],
+            [
+                {"stdin": "1\n10\n", "expected_stdout": "-1"},
+                {"stdin": "5\n1 2 3 4 5\n", "expected_stdout": "2 3 4 5 -1"},
+                {"stdin": "4\n5 4 3 10\n", "expected_stdout": "10 10 10 -1"},
+            ],
+            starter="n = int(input())\narr = list(map(int, input().split()))\n# print next greater for each index\n",
+            marks=30,
+        ),
+        _coding(
+            (
+                "Group Anagram Keys Count\n"
+                "Count how many distinct anagram groups exist in the list of words.\n\n"
+                "Input:\n"
+                "  Line 1: N (1 <= N <= 1e4)\n"
+                "  Next N lines: lowercase words (length <= 100)\n"
+                "Output: number of groups\n\n"
+                "Example 1:\nInput:\n6\neat\ntea\ntan\nate\nnat\nbat\nOutput:\n3\n\n"
+                "Example 2:\nInput:\n1\na\nOutput:\n1"
+            ),
+            [
+                {"stdin": "6\neat\ntea\ntan\nate\nnat\nbat\n", "expected_stdout": "3"},
+                {"stdin": "1\na\n", "expected_stdout": "1"},
+            ],
+            [
+                {"stdin": "3\nabc\nbca\ncab\n", "expected_stdout": "1"},
+                {"stdin": "4\nab\nba\ncd\ndc\n", "expected_stdout": "2"},
+                {"stdin": "2\nxx\nyy\n", "expected_stdout": "2"},
+            ],
+            starter="n = int(input())\nwords = [input().strip() for _ in range(n)]\n# print group count\n",
+            marks=25,
+        ),
+        _coding(
+            (
+                "Rotate Array Right by K\n"
+                "Rotate the array to the right by K steps.\n\n"
+                "Input:\n"
+                "  Line 1: N K\n"
+                "  Line 2: N integers\n"
+                "Output: rotated array on one line\n\n"
+                "Example 1:\nInput:\n7 3\n1 2 3 4 5 6 7\nOutput:\n5 6 7 1 2 3 4\n\n"
+                "Example 2:\nInput:\n4 2\n-1 -100 3 99\nOutput:\n3 99 -1 -100"
+            ),
+            [
+                {"stdin": "7 3\n1 2 3 4 5 6 7\n", "expected_stdout": "5 6 7 1 2 3 4"},
+                {"stdin": "4 2\n-1 -100 3 99\n", "expected_stdout": "3 99 -1 -100"},
+            ],
+            [
+                {"stdin": "1 0\n5\n", "expected_stdout": "5"},
+                {"stdin": "3 3\n1 2 3\n", "expected_stdout": "1 2 3"},
+                {"stdin": "5 1\n9 8 7 6 5\n", "expected_stdout": "5 9 8 7 6"},
+            ],
+            starter="n, k = map(int, input().split())\narr = list(map(int, input().split()))\n# print rotated array\n",
+            marks=20,
+            time_seconds=900,
+        ),
+        _coding(
+            (
+                "Min Stack Operations Simulation\n"
+                "Process operations on a stack that also supports getMin in O(1).\n"
+                "Operations: PUSH x | POP | TOP | MIN\n\n"
+                "Input:\n"
+                "  Line 1: Q\n"
+                "  Next Q lines: operations (stack never invalid)\n"
+                "Output: for each TOP/MIN, print the value on its own line\n\n"
+                "Example 1:\nInput:\n7\nPUSH 3\nPUSH 1\nMIN\nPUSH 2\nTOP\nPOP\nMIN\nOutput:\n1\n2\n1\n\n"
+                "Example 2:\nInput:\n4\nPUSH 5\nTOP\nMIN\nPOP\nOutput:\n5\n5"
+            ),
+            [
+                {
+                    "stdin": "7\nPUSH 3\nPUSH 1\nMIN\nPUSH 2\nTOP\nPOP\nMIN\n",
+                    "expected_stdout": "1\n2\n1",
+                },
+                {
+                    "stdin": "4\nPUSH 5\nTOP\nMIN\nPOP\n",
+                    "expected_stdout": "5\n5",
+                },
+            ],
+            [
+                {
+                    "stdin": "6\nPUSH 2\nPUSH 2\nMIN\nPOP\nMIN\nTOP\n",
+                    "expected_stdout": "2\n2\n2",
+                },
+                {
+                    "stdin": "5\nPUSH -1\nPUSH 0\nMIN\nTOP\nPOP\n",
+                    "expected_stdout": "-1\n0",
+                },
+            ],
+            starter="q = int(input())\n# process ops; print TOP/MIN results\n",
+            marks=30,
+        ),
     ]
+
+    pick_subj = _unique_bank_picker(subjective_bank)
+    pick_mcq = _unique_bank_picker(mcq_bank)
+    pick_msq = _unique_bank_picker(msq_bank)
+    pick_num = _unique_bank_picker(numerical_bank)
+    pick_code = _unique_bank_picker(coding_bank)
 
     out: list[dict] = []
     default_time = default_time_seconds()
-    for i, qtype in enumerate(type_plan):
+    for qtype in type_plan:
         if qtype == "mcq":
-            base = mcq_bank[i % len(mcq_bank)]
-            out.append(
-                {
-                    **base,
-                    "type": "mcq",
-                    "time_seconds": default_time,
-                    "marks": 10,
-                }
-            )
+            base = pick_mcq()
+            out.append({**base, "type": "mcq", "time_seconds": default_time, "marks": 10})
         elif qtype == "msq":
-            base = msq_bank[i % len(msq_bank)]
-            out.append(
-                {
-                    **base,
-                    "type": "msq",
-                    "time_seconds": default_time,
-                    "marks": 10,
-                }
-            )
+            base = pick_msq()
+            out.append({**base, "type": "msq", "time_seconds": default_time, "marks": 10})
         elif qtype == "numerical":
-            base = numerical_bank[i % len(numerical_bank)]
-            out.append(
-                {
-                    **base,
-                    "type": "numerical",
-                    "time_seconds": default_time,
-                    "marks": 10,
-                }
-            )
+            base = pick_num()
+            out.append({**base, "type": "numerical", "time_seconds": default_time, "marks": 10})
         elif qtype == "coding":
-            base = coding_bank[i % len(coding_bank)]
-            out.append(
-                {
-                    **base,
-                    "type": "coding",
-                }
-            )
+            base = pick_code()
+            out.append({**base, "type": "coding"})
         else:
             out.append(
                 {
-                    "text": subjective_bank[i % len(subjective_bank)],
+                    "text": pick_subj(),
                     "type": "subjective",
                     "time_seconds": default_time,
                     "marks": 10,
                 }
             )
+    return out
+
+
+def _question_fingerprint(item: dict | str) -> str:
+    text = question_text(item).lower()
+    text = re.sub(r"\s+", " ", text).strip()
+    # Ignore example blocks when comparing — same problem with different examples still dups.
+    text = re.split(r"\bexample\s*1\b", text, maxsplit=1)[0].strip()
+    return text[:180]
+
+
+def _dedupe_questions(questions: list[dict]) -> list[dict]:
+    """Keep first occurrence of each unique question within an assessment."""
+    seen: set[str] = set()
+    out: list[dict] = []
+    for item in questions:
+        key = _question_fingerprint(item)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
     return out
 
 
@@ -425,13 +757,22 @@ def _parse_questions_from_llm_text(
                     }
                 )
 
+    validated = _dedupe_questions(validated)
     if len(validated) < question_count:
+        seen = {_question_fingerprint(q) for q in validated}
         fallback = _fallback_question_dicts(
-            jd_text, question_count, difficulty, question_types
+            jd_text, question_count * 2, difficulty, question_types
         )
-        validated.extend(fallback[len(validated) :])
+        for item in fallback:
+            if len(validated) >= question_count:
+                break
+            key = _question_fingerprint(item)
+            if key in seen:
+                continue
+            seen.add(key)
+            validated.append(item)
 
-    return validated[:question_count]
+    return _dedupe_questions(validated)[:question_count]
 
 
 def generate_questions_from_jd(
@@ -450,22 +791,27 @@ def generate_questions_from_jd(
 
     system_prompt = (
         "You are a senior technical interviewer creating assessment questions. "
-        "Generate clear questions based ONLY on the job description. "
+        "Generate clear, NON-REPETITIVE questions based ONLY on the job description. "
         "Do not assume any candidate resume. "
+        "Prefer harder, modern interview questions when difficulty is Medium/Hard or count is high. "
+        "Avoid near-duplicate prompts — each question must test a distinct skill or concept. "
         "Support types: subjective (open-ended), mcq (one correct), "
         "msq (multi-select), numerical (exact/tolerance answer), "
         "coding (stdin/stdout programming problem). "
         "For mcq/msq provide 4 plausible options and correct_indices. "
         "For numerical provide correct_answer and optional tolerance. "
-        "For coding: create REAL interview-style DSA problems (HackerRank/LeetCode Easy–Medium), "
-        "NOT trivial sum/reverse tasks. Prefer hash maps, stacks, two pointers, sliding window, "
-        "prefix sums, or sorting. Include clear Input/Output format, constraints, "
+        "For coding: create REAL interview-style DSA problems (HackerRank/LeetCode Medium+), "
+        "NOT trivial sum/reverse/hello-world tasks. Prefer hash maps, stacks, heaps, two pointers, "
+        "sliding window, prefix sums, intervals, binary search, or greedy. "
+        "Each coding question text MUST include clear Input/Output format, constraints, and "
+        "exactly two worked examples formatted as:\n"
+        "Example 1:\nInput:\n...\nOutput:\n...\n\nExample 2:\nInput:\n...\nOutput:\n...\n"
         "languages subset of [c, cpp, python, java, javascript] (omit perl), "
         "minimal starter_code stubs (do NOT give the full solution), "
-        "public_tests (2-3) and hidden_tests (3-4) as [{stdin, expected_stdout}], "
-        "time_seconds 900-1500, marks 20-30. "
+        "public_tests (2-3) and hidden_tests (3-4) as [{stdin, expected_stdout}] matching the examples, "
+        "time_seconds 900-1500, marks 20-30, time_limit_ms around 5000. "
         "Coding problems must be solvable via stdin/stdout only. "
-        "Match difficulty: Easy = Easy DSA, Medium = LeetCode Easy/Medium, Hard = Medium DSA. "
+        "Match difficulty: Easy = Easy DSA, Medium = LeetCode Easy/Medium, Hard = Medium/Hard DSA. "
         "Do not include numbering prefixes in question text."
     )
     user_prompt = (
@@ -506,14 +852,18 @@ def generate_questions_from_jd(
         )
         content = response.choices[0].message.content or ""
     except Exception:
-        return _fallback_question_dicts(
-            jd_text, question_count, difficulty, question_types
-        )
+        return _dedupe_questions(
+            _fallback_question_dicts(
+                jd_text, question_count, difficulty, question_types
+            )
+        )[:question_count]
 
     if not content.strip():
-        return _fallback_question_dicts(
-            jd_text, question_count, difficulty, question_types
-        )
+        return _dedupe_questions(
+            _fallback_question_dicts(
+                jd_text, question_count, difficulty, question_types
+            )
+        )[:question_count]
 
     return _parse_questions_from_llm_text(
         content, question_count, jd_text, difficulty, question_types

@@ -420,7 +420,7 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     try {
       const blob = await stopSessionRecording();
 
-      if (!blob || blob.size < 1000) {
+      if (!blob || blob.size < 500) {
         console.log("[RECORDING] Blob too small, skipping upload:", blob?.size ?? 0);
         return { uploaded: false };
       }
@@ -444,7 +444,9 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
   ]);
 
   const startSessionRecording = useCallback((stream: MediaStream) => {
-    if (sessionRecorderRef.current) return;
+    if (sessionRecorderRef.current && sessionRecorderRef.current.state !== "inactive") {
+      return;
+    }
 
     const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
       ? "video/webm;codecs=vp9,opus"
@@ -458,7 +460,10 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
       ? new MediaRecorder(stream, { mimeType })
       : new MediaRecorder(stream);
 
-    sessionChunksRef.current = [];
+    // Keep prior chunks if we are recovering from an accidental stop.
+    if (!sessionChunksRef.current.length) {
+      sessionChunksRef.current = [];
+    }
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         sessionChunksRef.current.push(event.data);
@@ -654,6 +659,27 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     }
   }, [sessionId, loading, handleProctorResponse]);
 
+  // Session webcam recording: start once per mediaStream; do not tear down on
+  // proctor-interval effect re-runs (that previously stopped MediaRecorder mid-interview).
+  useEffect(() => {
+    if (!mediaStream) return;
+    startSessionRecording(mediaStream);
+    return () => {
+      if (shutdownRecordingRef.current) return;
+      // Keep chunks; only stop the recorder so tracks aren't held after unmount.
+      const sessionRec = sessionRecorderRef.current;
+      if (sessionRec && sessionRec.state !== "inactive") {
+        try {
+          sessionRec.stop();
+        } catch {
+          /* ignore */
+        }
+      }
+      sessionRecorderRef.current = null;
+      setIsSessionRecording(false);
+    };
+  }, [mediaStream, startSessionRecording]);
+
   useEffect(() => {
     setPenaltyPercent(0);
     setFlashMessage(null);
@@ -679,7 +705,6 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
         videoRef.current.srcObject = mediaStream;
         void videoRef.current.play().catch(() => {});
       }
-      startSessionRecording(mediaStream);
       stopAmbientMonitorRef.current = startAmbientAudioMonitor(
         mediaStream,
         handleLoudAudio,
@@ -705,13 +730,6 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
       if (audioRecorder && audioRecorder.state !== "inactive") {
         audioRecorder.stop();
       }
-      if (!shutdownRecordingRef.current) {
-        const sessionRec = sessionRecorderRef.current;
-        if (sessionRec && sessionRec.state !== "inactive") {
-          console.log("[RECORDING] Cleanup stopping session recorder");
-          sessionRec.stop();
-        }
-      }
       streamRef.current = null;
       if (videoRef.current) {
         videoRef.current.srcObject = null;
@@ -722,7 +740,6 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
     mediaStream,
     captureAndAnalyze,
     handleLoudAudio,
-    startSessionRecording,
   ]);
 
   // Viewport-fixed PiP (must live outside .card — backdrop-filter traps position:fixed).
@@ -1140,6 +1157,21 @@ export default forwardRef<InterviewRoomHandle, InterviewRoomProps>(
             </div>
           )}
         </div>
+
+        {isCoding && (question.public_tests?.length ?? 0) > 0 && (
+          <div className="coding-io-examples" aria-label="Sample input output examples">
+            <h4>Examples</h4>
+            {(question.public_tests ?? []).slice(0, 2).map((t, idx) => (
+              <div key={idx} className="coding-io-example">
+                <strong>Example {idx + 1}</strong>
+                <pre>Input:
+{t.stdin || "(empty)"}</pre>
+                <pre>Output:
+{t.expected_stdout || "(empty)"}</pre>
+              </div>
+            ))}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           {(qType === "mcq" || qType === "msq") && (

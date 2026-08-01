@@ -67,7 +67,7 @@ class GenerateQuestionsRequest(BaseModel):
     question_count: Optional[int] = Field(
         default=None,
         ge=1,
-        le=15,
+        le=50,
         description="Number of questions to generate (defaults to env setting).",
     )
 

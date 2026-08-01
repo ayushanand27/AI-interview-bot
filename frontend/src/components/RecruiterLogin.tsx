@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { authApi, setAccessToken, setRefreshToken } from "../api/client";
 import "../recruiter-portal.css";
+import PasswordInput from "./PasswordInput";
 
 type Mode = "login" | "register";
 
@@ -104,10 +105,9 @@ export default function RecruiterLogin() {
               autoComplete="email"
             />
             <label htmlFor="recruiter-login-password">Password</label>
-            <input
+            <PasswordInput
               id="recruiter-login-password"
               name="password"
-              type="password"
               required
               autoComplete="current-password"
             />
@@ -128,10 +128,9 @@ export default function RecruiterLogin() {
               autoComplete="email"
             />
             <label htmlFor="recruiter-register-password">Password</label>
-            <input
+            <PasswordInput
               id="recruiter-register-password"
               name="password"
-              type="password"
               required
               minLength={8}
               autoComplete="new-password"

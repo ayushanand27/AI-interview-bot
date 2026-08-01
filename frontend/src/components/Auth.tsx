@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { authApi, setAccessToken, setRefreshToken } from "../api/client";
 import type { UserResponse } from "../types/auth";
+import PasswordInput from "./PasswordInput";
 
 type AuthMode = "login" | "register";
 
@@ -213,10 +214,9 @@ export default function Auth({
 
             <div className="field">
               <label htmlFor="login_password">Password</label>
-              <input
+              <PasswordInput
                 id="login_password"
                 name="password"
-                type="password"
                 autoComplete="current-password"
                 minLength={8}
                 required
@@ -271,10 +271,9 @@ export default function Auth({
 
           <div className="field">
             <label htmlFor="register_password">Password</label>
-            <input
+            <PasswordInput
               id="register_password"
               name="password"
-              type="password"
               autoComplete="new-password"
               minLength={8}
               required

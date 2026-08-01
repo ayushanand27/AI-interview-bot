@@ -408,6 +408,13 @@ async def get_session_recording(
         if not owns:
             raise HTTPException(status_code=404, detail="Recording not available")
     else:
+        # Invite/exam recordings are recruiter-only.
+        row = await db.get(DBSession, session_id)
+        if row is not None and getattr(row, "invite_token", None):
+            raise HTTPException(
+                status_code=403,
+                detail="Recording is available to the recruiter only for invited assessments.",
+            )
         interview_service.verify_session_access(session_id, current_user.id)
 
     try:
@@ -462,7 +469,12 @@ async def get_my_recording(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await get_session_owner(session_id, db, current_user=current_user, token=token)
+    session = await get_session_owner(session_id, db, current_user=current_user, token=token)
+    if getattr(session, "invite_token", None) or token:
+        raise HTTPException(
+            status_code=403,
+            detail="Recording is available to the recruiter only for invited assessments.",
+        )
     try:
         path, media_type, download_name = interview_service.resolve_recording_file(
             session_id
@@ -487,8 +499,8 @@ async def get_my_recording(
     "/sessions/{session_id}/my-report",
     summary="Download candidate personal interview PDF report",
     description=(
-        "Returns a candidate-friendly PDF for the session owner. Does not include "
-        "hire/no-hire decisions or internal proctoring violation details."
+        "Returns a candidate-friendly PDF for open practice sessions. "
+        "Invite/exam reports are recruiter-only."
     ),
 )
 @limiter.limit(INTERVIEW_LIMIT)
@@ -502,6 +514,11 @@ async def get_my_report(
     session = await get_session_owner(
         session_id, db, current_user=current_user, token=token
     )
+    if getattr(session, "invite_token", None) or token:
+        raise HTTPException(
+            status_code=403,
+            detail="Full report is available to the recruiter only for invited assessments.",
+        )
     candidate_name, duration_minutes, interview_date = await _candidate_report_context(
         db, session_id
     )

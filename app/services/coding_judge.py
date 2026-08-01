@@ -217,7 +217,7 @@ def _execute_once(
             url,
             headers=_headers(),
             json=payload,
-            timeout=max(35.0, float(timeout_sec) + 20.0),
+            timeout=max(45.0, float(timeout_sec) + 25.0),
         )
     except httpx.TimeoutException as exc:
         raise CodingJudgeError(
@@ -238,15 +238,39 @@ def _execute_once(
             "Judge auth failed — subscribe to SandboxAPI Basic (Free) on RapidAPI and check the key.",
             retryable=False,
         )
+
+    data: dict[str, Any] | None = None
+    try:
+        parsed = response.json()
+        if isinstance(parsed, dict):
+            data = parsed
+    except Exception:
+        data = None
+
+    # SandboxAPI often returns HTTP 408 for execution timeouts (and sometimes
+    # compile/runtime failures) WITH a normal result body. Treat those as
+    # case results, not judge outages.
+    if data is not None and (
+        response.status_code < 400
+        or response.status_code == 408
+        or "status" in data
+        or "stdout" in data
+        or "stderr" in data
+    ):
+        if response.status_code >= 400 and response.status_code != 408:
+            logger.info(
+                "SandboxAPI HTTP %s with execution payload status=%s",
+                response.status_code,
+                data.get("status"),
+            )
+        return data
+
     if response.status_code >= 400:
         detail = response.text[:300]
         logger.warning("SandboxAPI error %s: %s", response.status_code, detail)
         raise CodingJudgeError("Judge temporarily unavailable — try again.")
 
-    data = response.json()
-    if not isinstance(data, dict):
-        raise CodingJudgeError("Judge returned an unexpected response.")
-    return data
+    raise CodingJudgeError("Judge returned an unexpected response.")
 
 
 def run_test_cases(
@@ -271,7 +295,8 @@ def run_test_cases(
         return RunSummary(passed=0, total=0, error="No test cases provided.")
 
     language_id = sandboxapi_language_id(language)
-    timeout_sec = max(1, min(int((time_limit_ms or 2000) / 1000) or 2, 30))
+    # Free SandboxAPI needs headroom for compile (esp. C/C++/Java). Floor at 5s.
+    timeout_sec = max(5, min(int((time_limit_ms or 5000) / 1000) or 5, 30))
 
     summary = RunSummary(total=len(tests))
     with httpx.Client() as client:
@@ -319,17 +344,39 @@ def run_test_cases(
                 case.memory = None
 
             exit_code = result.get("exit_code")
-            ok_status = status in ("", "completed", "Accepted", "accepted")
-            if ok_status and (exit_code in (None, 0)) and actual == expected_norm:
+            status_l = status.lower()
+            timed_out = status_l in ("timeout", "time_limit_exceeded") or response_is_timeout(
+                status_l, exit_code
+            )
+            compile_fail = status_l in ("compile_error", "compilation_error") or (
+                bool(case.stderr)
+                and "error:" in case.stderr.lower()
+                and actual == ""
+                and exit_code not in (0, None)
+            )
+            ok_status = status_l in ("", "completed", "accepted", "ok", "success")
+            if timed_out:
+                case.status = "Time Limit Exceeded"
+                case.passed = False
+            elif compile_fail:
+                case.status = "Compilation Error"
+                case.passed = False
+            elif ok_status and (exit_code in (None, 0)) and actual == expected_norm:
                 case.passed = True
                 case.status = "Accepted"
                 summary.passed += 1
             elif actual != expected_norm and ok_status and exit_code in (None, 0):
                 case.status = "Wrong Answer"
+            elif exit_code not in (None, 0) and not ok_status:
+                case.status = status or "Runtime Error"
             summary.cases.append(case)
             time.sleep(0.1)
 
     return summary
+
+
+def response_is_timeout(status_l: str, exit_code: Any) -> bool:
+    return status_l == "timeout" or (exit_code == -1 and status_l in ("", "timeout"))
 
 
 def judgment_from_run_summary(summary: RunSummary, *, marks: float) -> dict[str, Any]:

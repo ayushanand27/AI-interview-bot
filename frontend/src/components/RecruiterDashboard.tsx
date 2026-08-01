@@ -1096,17 +1096,20 @@ export default function RecruiterDashboard({
             <div className="rp-field-row">
               <div>
                 <label htmlFor="question-count">Questions</label>
-                <select
+                <input
                   id="question-count"
+                  type="number"
+                  min={1}
+                  max={50}
+                  step={1}
                   value={questionCount}
-                  onChange={(e) => setQuestionCount(Number(e.target.value))}
-                >
-                  <option value={2}>2</option>
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={15}>15</option>
-                  <option value={20}>20</option>
-                </select>
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    if (!Number.isFinite(n)) return;
+                    setQuestionCount(Math.min(50, Math.max(1, Math.round(n))));
+                  }}
+                />
+                <p className="rp-hint">Any count from 1 to 50</p>
               </div>
               <div>
                 <label htmlFor="difficulty">Difficulty</label>

@@ -254,7 +254,7 @@ export default function SetupForm({ loading, onStart }: SetupFormProps) {
           name="question_count"
           type="number"
           min={1}
-          max={15}
+          max={50}
           defaultValue={5}
           required
         />
