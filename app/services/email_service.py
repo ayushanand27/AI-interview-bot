@@ -130,7 +130,8 @@ def _send_email_with_attachment(
         return False
 
 
-def send_verification_email(to_email: str, name: str, token: str) -> str:
+def send_verification_email(to_email: str, name: str, token: str) -> tuple[str, bool]:
+    """Send verification email. Returns (link, delivered)."""
     link = f"{settings.effective_frontend_url}/verify-email?token={token}"
 
     subject = f"Verify your {settings.APP_NAME} account"
@@ -155,7 +156,7 @@ def send_verification_email(to_email: str, name: str, token: str) -> str:
     sent = _send_email(to_email, subject, html)
     if not sent:
         _log_console_fallback("Verification link", to_email, link)
-    return link
+    return link, sent
 
 
 def send_invite_welcome_password_email(to_email: str, name: str, token: str) -> bool:
@@ -300,7 +301,8 @@ def send_live_interview_invite_email(
     return sent
 
 
-def send_password_reset_email(to_email: str, name: str, token: str) -> str:
+def send_password_reset_email(to_email: str, name: str, token: str) -> tuple[str, bool]:
+    """Send password reset email. Returns (link, delivered)."""
     link = f"{settings.effective_frontend_url}/reset-password?token={token}"
 
     subject = f"Reset your {settings.APP_NAME} password"
@@ -329,7 +331,7 @@ def send_password_reset_email(to_email: str, name: str, token: str) -> str:
             logger.warning(
                 "[EMAIL] Password reset SMTP send failed — use console/UI link in local dev."
             )
-    return link
+    return link, sent
 
 
 def _format_integrity_level(integrity_level: str | None) -> str:

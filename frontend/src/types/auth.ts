@@ -19,6 +19,7 @@ export interface MessageResponse {
   message: string;
   verification_url?: string | null;
   reset_url?: string | null;
+  email_note?: string | null;
 }
 
 export interface VerifyEmailResponse {
@@ -32,6 +33,7 @@ export interface RegisterResponse {
   refresh_token: string;
   token_type?: string;
   verification_url?: string | null;
+  email_note?: string | null;
 }
 
 export interface ApiEnvelope<T> {

@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.exceptions import ConflictException, NotFoundException
+from app.core.exceptions import AIException, ConflictException, NotFoundException
 from app.db.interview_invite_model import InterviewInvite
 from app.schemas.recruiter_assessment import (
     AssessmentQuestion,
@@ -26,7 +26,7 @@ from app.schemas.recruiter_assessment import (
     UpdateAssessmentRequest,
 )
 from app.services.email_service import send_assessment_invite_email, smtp_delivery_hint
-from app.services.groq_client import get_groq_client
+from app.services.groq_client import groq_chat_completion
 from app.services.question_utils import (
     QUESTION_TYPES,
     default_time_seconds,
@@ -862,7 +862,7 @@ def _llm_fill_gaps(
         f"Job Description:\n{jd_text.strip()}\n"
     )
     try:
-        response = get_groq_client().chat.completions.create(
+        response = groq_chat_completion(
             model=settings.GROQ_MODEL,
             temperature=0.7,
             messages=[
@@ -871,7 +871,8 @@ def _llm_fill_gaps(
             ],
         )
         content = response.choices[0].message.content or ""
-    except Exception:
+    except AIException:
+        # Bank-first path: fall back so recruiters still get a draft.
         return [
             _mark_origin(q, "ai")
             for q in _fallback_question_dicts(
@@ -890,6 +891,13 @@ def _llm_fill_gaps(
     parsed = _parse_questions_from_llm_text(
         content, gap_count, jd_text, difficulty, list(dict.fromkeys(gap_types)) or None
     )
+    if not parsed:
+        return [
+            _mark_origin(q, "ai")
+            for q in _fallback_question_dicts(
+                jd_text, gap_count, difficulty, list(dict.fromkeys(gap_types))
+            )[:gap_count]
+        ]
     return [_mark_origin(q, "ai") for q in parsed]
 
 
@@ -995,9 +1003,8 @@ def generate_questions_from_jd_ai_only(
         "Return ONLY valid JSON with a questions array."
     )
 
-    content = ""
     try:
-        response = get_groq_client().chat.completions.create(
+        response = groq_chat_completion(
             model=settings.GROQ_MODEL,
             temperature=0.6,
             messages=[
@@ -1006,29 +1013,19 @@ def generate_questions_from_jd_ai_only(
             ],
         )
         content = response.choices[0].message.content or ""
-    except Exception:
-        return [
-            _mark_origin(q, "ai")
-            for q in _dedupe_questions(
-                _fallback_question_dicts(
-                    jd_text, question_count, difficulty, question_types
-                )
-            )[:question_count]
-        ]
+    except AIException:
+        raise
+    except Exception as exc:
+        raise AIException("Generation failed. Please try again.") from exc
 
     if not content.strip():
-        return [
-            _mark_origin(q, "ai")
-            for q in _dedupe_questions(
-                _fallback_question_dicts(
-                    jd_text, question_count, difficulty, question_types
-                )
-            )[:question_count]
-        ]
+        raise AIException("Generation failed. Please try again.")
 
     parsed = _parse_questions_from_llm_text(
         content, question_count, jd_text, difficulty, question_types
     )
+    if not parsed:
+        raise AIException("Generation failed. Please try again.")
     return [_mark_origin(q, "ai") for q in parsed]
 
 

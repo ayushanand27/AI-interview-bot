@@ -224,18 +224,27 @@ class RecruiterAnalyticsService:
                 review_flagged += 1
 
         completed_count = len(completed_summaries)
-        registered_or_started = max(funnel.registered, funnel.started, 1)
-        completion_rate = (
-            round((completed_count / registered_or_started) * 100.0, 1)
-            if funnel.registered or funnel.started
-            else 0.0
-        )
-        avg_score = round(sum(scores) / len(scores), 1) if scores else None
-        integrity_flag_rate = (
-            round((integrity_flagged / completed_count) * 100.0, 1)
-            if completed_count
-            else 0.0
-        )
+        if funnel.registered or funnel.started:
+            denominator = max(funnel.registered, funnel.started, 1)
+            completion_rate = round((completed_count / denominator) * 100.0, 1)
+            if completion_rate != completion_rate:  # NaN guard
+                completion_rate = 0.0
+        else:
+            completion_rate = 0.0
+        if scores:
+            avg_score = round(sum(scores) / len(scores), 1)
+            if avg_score != avg_score:  # NaN guard
+                avg_score = None
+        else:
+            avg_score = None
+        if completed_count:
+            integrity_flag_rate = round(
+                (integrity_flagged / completed_count) * 100.0, 1
+            )
+            if integrity_flag_rate != integrity_flag_rate:
+                integrity_flag_rate = 0.0
+        else:
+            integrity_flag_rate = 0.0
 
         per_assessment = self._per_assessment_metrics(
             invites, all_sessions, completed_summaries

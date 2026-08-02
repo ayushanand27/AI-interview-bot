@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import require_role
+from app.core.exceptions import BadRequestException
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.common import BaseResponse
@@ -187,7 +188,19 @@ async def parse_jd_pdf(
     filename = pdf.filename or "job-description.pdf"
     file_bytes = await pdf.read()
     validate_document_upload(file_bytes, pdf.content_type, filename)
-    jd_text = extract_text_from_document(file_bytes, filename)
+    try:
+        jd_text = extract_text_from_document(file_bytes, filename)
+    except ValueError as exc:
+        raise BadRequestException(str(exc)) from exc
+    except Exception as exc:
+        raise BadRequestException(
+            "Unable to parse document. Upload a text-based PDF, Word, or TXT file."
+        ) from exc
+    if not jd_text.strip():
+        raise BadRequestException(
+            "Unable to parse document - not enough extractable text. "
+            "Scanned or image-only files are not supported."
+        )
     return BaseResponse(
         success=True,
         message="Job description extracted successfully",

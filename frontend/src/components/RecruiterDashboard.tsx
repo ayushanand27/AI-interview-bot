@@ -179,9 +179,17 @@ function formatDate(iso: string): string {
   }
 }
 
-function formatScore(score: number | null): string {
-  if (score === null || Number.isNaN(score)) return "—";
-  return String(Math.round(score));
+function formatScore(score: number | null | undefined, digits = 0): string {
+  if (
+    score === null ||
+    score === undefined ||
+    Number.isNaN(score) ||
+    !Number.isFinite(score)
+  ) {
+    return "—";
+  }
+  if (digits <= 0) return String(Math.round(score));
+  return score.toFixed(digits);
 }
 
 function formatReviewStatus(status: string | null | undefined): string {
@@ -206,7 +214,9 @@ function reviewBadgeClass(status: string | null | undefined): string {
 }
 
 function formatPercent(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  if (value === null || value === undefined || Number.isNaN(value) || !Number.isFinite(value)) {
+    return "—";
+  }
   return `${value.toFixed(1)}%`;
 }
 
@@ -302,6 +312,7 @@ export default function RecruiterDashboard({
   const [reviewNotesDraft, setReviewNotesDraft] = useState("");
   const [analytics, setAnalytics] = useState<RecruiterAnalyticsResponse | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [exportingSessions, setExportingSessions] = useState(false);
   const [exportingAssessments, setExportingAssessments] = useState(false);
   const [filters, setFilters] = useState<RecruiterSessionFilters>({});
@@ -345,11 +356,15 @@ export default function RecruiterDashboard({
   function loadAnalytics(activeFilters?: RecruiterSessionFilters) {
     const query = activeFilters ?? filters;
     setAnalyticsLoading(true);
+    setAnalyticsError(null);
     recruiterApi
       .getAnalytics(query)
       .then((res) => setAnalytics(res.data ?? null))
-      .catch(() => {
-        /* analytics is supplementary */
+      .catch((err) => {
+        setAnalytics(null);
+        setAnalyticsError(
+          err instanceof Error ? err.message : "Failed to load analytics",
+        );
       })
       .finally(() => setAnalyticsLoading(false));
   }
@@ -486,16 +501,26 @@ export default function RecruiterDashboard({
     onError(null);
     try {
       const blob = await recruiterApi.downloadReport(row.session_id);
+      if (!blob || blob.size === 0) {
+        throw new Error("Report download returned an empty file.");
+      }
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `interview-report-${row.candidate_name.replace(/\s+/g, "-")}.pdf`;
+      const safeName = (row.candidate_name || "candidate")
+        .replace(/\s+/g, "-")
+        .replace(/[^\w.-]+/g, "");
+      link.download = `interview-report-${safeName || "candidate"}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Failed to download report");
+      onError(
+        err instanceof Error
+          ? err.message
+          : "Failed to download PDF report. Please try again.",
+      );
     } finally {
       setDownloadingId(null);
     }
@@ -555,7 +580,14 @@ export default function RecruiterDashboard({
           (jdMode === "paste" ? jdText.trim() : ""),
       );
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Failed to generate questions");
+      const message =
+        err instanceof Error ? err.message : "Generation failed. Please try again.";
+      onError(
+        /generat|timeout|rate limit|try again|unavailable/i.test(message)
+          ? message
+          : "Generation failed. Please try again.",
+      );
+      setEditableQuestions([]);
     } finally {
       setAssessmentLoading(false);
     }
@@ -1819,8 +1851,19 @@ export default function RecruiterDashboard({
 
         {analyticsLoading && !analytics ? (
           <p className="rp-muted-small rp-loading-inline">Loading analytics…</p>
+        ) : analyticsError && !analytics ? (
+          <p className="alert error" role="alert">
+            {analyticsError}
+          </p>
         ) : analytics ? (
           <>
+            {analytics.invite_count === 0 &&
+              analytics.completed_session_count === 0 && (
+                <p className="rp-muted-small" style={{ marginBottom: "0.75rem" }}>
+                  No sessions yet — metrics below stay at zero until candidates
+                  complete interviews.
+                </p>
+              )}
             <div className="rp-analytics-grid">
               <div className="rp-stat-card">
                 <span className="rp-stat-label">Completed</span>
@@ -1835,9 +1878,7 @@ export default function RecruiterDashboard({
               <div className="rp-stat-card">
                 <span className="rp-stat-label">Average score</span>
                 <strong className="rp-stat-value">
-                  {analytics.average_score === null
-                    ? "—"
-                    : analytics.average_score.toFixed(1)}
+                  {formatScore(analytics.average_score, 1)}
                 </strong>
               </div>
               <div className="rp-stat-card">
@@ -1862,12 +1903,12 @@ export default function RecruiterDashboard({
                 <div className="rp-funnel-list">
                   {(
                     [
-                      ["Created", analytics.funnel.created],
-                      ["Opened", analytics.funnel.opened],
-                      ["Registered", analytics.funnel.registered],
-                      ["Verified", analytics.funnel.verified],
-                      ["Started", analytics.funnel.started],
-                      ["Completed", analytics.funnel.completed],
+                      ["Created", analytics.funnel?.created ?? 0],
+                      ["Opened", analytics.funnel?.opened ?? 0],
+                      ["Registered", analytics.funnel?.registered ?? 0],
+                      ["Verified", analytics.funnel?.verified ?? 0],
+                      ["Started", analytics.funnel?.started ?? 0],
+                      ["Completed", analytics.funnel?.completed ?? 0],
                     ] as const
                   ).map(([label, value]) => (
                     <div key={label} className="rp-funnel-row">
@@ -1881,24 +1922,30 @@ export default function RecruiterDashboard({
               <div className="rp-analytics-panel">
                 <h3 className="rp-preview-title">Score distribution</h3>
                 <div className="rp-distribution-list">
-                  {Object.entries(analytics.score_distribution).map(([band, count]) => (
+                  {Object.entries(analytics.score_distribution ?? {}).map(([band, count]) => (
                     <div key={band} className="rp-distribution-row">
                       <span>{band}</span>
                       <strong>{count}</strong>
                     </div>
                   ))}
+                  {Object.keys(analytics.score_distribution ?? {}).length === 0 && (
+                    <p className="rp-muted-small">No scored sessions yet.</p>
+                  )}
                 </div>
               </div>
 
               <div className="rp-analytics-panel">
                 <h3 className="rp-preview-title">Integrity distribution</h3>
                 <div className="rp-distribution-list">
-                  {Object.entries(analytics.integrity_distribution).map(([level, count]) => (
+                  {Object.entries(analytics.integrity_distribution ?? {}).map(([level, count]) => (
                     <div key={level} className="rp-distribution-row">
                       <span>{level.replace(/_/g, " ")}</span>
                       <strong>{count}</strong>
                     </div>
                   ))}
+                  {Object.keys(analytics.integrity_distribution ?? {}).length === 0 && (
+                    <p className="rp-muted-small">No integrity data yet.</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1925,11 +1972,7 @@ export default function RecruiterDashboard({
                           <td>{item.used_count}</td>
                           <td>{item.started_count}</td>
                           <td>{item.completed_count}</td>
-                          <td>
-                            {item.average_score === null
-                              ? "—"
-                              : item.average_score.toFixed(1)}
-                          </td>
+                          <td>{formatScore(item.average_score, 1)}</td>
                           <td>{item.integrity_flag_count}</td>
                         </tr>
                       ))}

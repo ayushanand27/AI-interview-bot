@@ -260,6 +260,8 @@ async def live_room_ws(websocket: WebSocket, token: str):
                 msg = json.loads(raw)
             except json.JSONDecodeError:
                 continue
+            if not isinstance(msg, dict):
+                continue
             mtype = msg.get("type")
             if mtype == "code":
                 state["code"] = msg.get("code")

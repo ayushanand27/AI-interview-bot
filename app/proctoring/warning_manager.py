@@ -223,8 +223,16 @@ class WarningManager:
             self._reset_active_violation()
             return None
 
+        try:
+            conf = float(confidence)
+        except (TypeError, ValueError):
+            conf = 0.0
+        if conf != conf:  # NaN (e.g. poor lighting / bad frame math)
+            conf = 0.0
+        conf = max(0.0, min(1.0, conf))
+
         if violation_type not in ("no_face", "multiple_faces", "prohibited_object_detected"):
-            if confidence < self.MIN_VIOLATION_CONFIDENCE:
+            if conf < self.MIN_VIOLATION_CONFIDENCE:
                 return None
 
         now = time.time()
@@ -264,7 +272,15 @@ class WarningManager:
         return violation
 
     def calculate_score_penalty(self) -> float:
-        total = sum(v.penalty_percent for v in self.violations)
+        total = 0.0
+        for v in self.violations:
+            try:
+                p = float(v.penalty_percent)
+            except (TypeError, ValueError):
+                continue
+            if p != p or p == float("inf") or p == float("-inf"):  # NaN/inf
+                continue
+            total += max(0.0, p)
         return min(total, MAX_PENALTY_PERCENT)
 
     def _integrity_level(self, penalty_percent: float) -> str:
@@ -336,6 +352,9 @@ class WarningManager:
                 penalty = float(item.get("penalty_percent") or 0.0)
             except (TypeError, ValueError):
                 penalty = 0.0
+            if penalty != penalty or penalty == float("inf") or penalty < 0:
+                penalty = 0.0
+            penalty = min(penalty, MAX_PENALTY_PERCENT)
             message = str(item.get("message") or item.get("reason") or "")
             evidence = item.get("evidence_metadata")
             self.violations.append(

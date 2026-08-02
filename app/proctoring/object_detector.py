@@ -26,8 +26,9 @@ logger = logging.getLogger(__name__)
 CELL_PHONE_CONFIDENCE = 0.25
 OBJECT_DETECT_INTERVAL_SECONDS = 2.0
 YOLO_IMGSZ = 640
-WORKER_START_TIMEOUT_SECONDS = 60.0
-WORKER_DETECT_TIMEOUT_SECONDS = 45.0
+# Keep short so a slow/hung YOLO worker cannot stall analyze (and the interview).
+WORKER_START_TIMEOUT_SECONDS = 8.0
+WORKER_DETECT_TIMEOUT_SECONDS = 3.0
 MSG_PROHIBITED_OBJECT = "Cell phone detected near candidate — possible cheating aid"
 
 _lock = Lock()
@@ -35,6 +36,7 @@ _last_run_by_session: dict[str, float] = {}
 _proc: subprocess.Popen[str] | None = None
 _init_error: str | None = None
 _init_failed_at: float | None = None
+_detect_busy = False
 INIT_RETRY_SECONDS = 30.0
 
 
@@ -112,10 +114,20 @@ def _ensure_worker() -> None:
     print("[proctor] YOLOv8n phone service READY", flush=True)
 
 
-def get_object_detector():
-    with _lock:
+def get_object_detector(*, blocking: bool = True):
+    """Return detector or raise if worker unavailable.
+
+    blocking=False: fail soft immediately when another detect holds the lock
+    (keeps /analyze from stalling the interview).
+    """
+    acquired = _lock.acquire(blocking=blocking)
+    if not acquired:
+        raise ObjectDetectionUnavailableError("Object detector busy")
+    try:
         _ensure_worker()
         return ProhibitedObjectDetector()
+    finally:
+        _lock.release()
 
 
 def should_run_object_detection(session_id: str | None) -> bool:
@@ -161,11 +173,23 @@ class ProhibitedObjectDetector:
     """Send frames to the YOLO subprocess and collect cell-phone hits."""
 
     def detect_cell_phones(self, frame: np.ndarray) -> list[dict[str, Any]]:
+        global _detect_busy
+
         if frame is None or frame.size == 0:
             return []
 
-        with _lock:
-            _ensure_worker()
+        # Fail soft: never queue behind a slow detect — interview analyze must proceed.
+        if not _lock.acquire(blocking=False):
+            return []
+        if _detect_busy:
+            _lock.release()
+            return []
+        _detect_busy = True
+        try:
+            try:
+                _ensure_worker()
+            except ObjectDetectionUnavailableError:
+                return []
             assert _proc is not None and _proc.stdin and _proc.stdout
             ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
             if not ok:
@@ -184,7 +208,12 @@ class ProhibitedObjectDetector:
                         continue
                     line = line.strip()
                     if line.startswith("HITS "):
-                        hits = json.loads(line[5:])
+                        try:
+                            hits = json.loads(line[5:])
+                        except json.JSONDecodeError:
+                            return []
+                        if not isinstance(hits, list):
+                            return []
                         if hits:
                             print(f"[proctor] cell phone hit(s): {hits}", flush=True)
                         return hits
@@ -196,3 +225,6 @@ class ProhibitedObjectDetector:
             except Exception as exc:
                 print(f"[proctor] phone service failed: {exc}", flush=True)
                 return []
+        finally:
+            _detect_busy = False
+            _lock.release()

@@ -23,10 +23,18 @@ from app.core.exceptions import (
     NotFoundException,
 )
 from app.services.email_service import (
+    get_last_email_delivery_error,
     send_password_reset_email,
     send_verification_email,
 )
 from app.core.config import settings
+
+
+def _email_failure_note() -> str:
+    return (
+        get_last_email_delivery_error()
+        or "We could not send the email. Check SMTP settings or use the link below."
+    )
 
 
 class AuthService:
@@ -69,19 +77,32 @@ class AuthService:
         self.db.add(user)
         await self.db.flush()   # flush assigns the auto-generated ID without full commit
 
-        verification_url = send_verification_email(
+        verification_url, email_sent = send_verification_email(
             user.email, user.full_name, verification_token
         )
+        email_note = None if email_sent else _email_failure_note()
 
         # ── Step 4: Generate tokens with new user's ID ────
         access_token = create_access_token(user_id=user.id, role=user.role.value)
         refresh_token = create_refresh_token(user_id=user.id)
 
+        # Expose the verify link when SMTP fails so signup is not a dead end.
+        expose_link = (not settings.is_production) or (not email_sent)
+        if email_sent:
+            message = "Account created. Please check your email to verify your account."
+        else:
+            message = (
+                "Account created, but we could not send the verification email. "
+                f"{email_note}"
+            )
+
         return {
             "user": user,
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "verification_url": verification_url if not settings.is_production else None,
+            "verification_url": verification_url if expose_link else None,
+            "email_note": email_note,
+            "message": message,
         }
 
     async def login(self, data: LoginRequest) -> dict:
@@ -177,19 +198,32 @@ class AuthService:
         result = await self.db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
         reset_url: str | None = None
+        email_note: str | None = None
         if user:
             reset_token = str(uuid4())
             user.reset_token = reset_token
             user.reset_token_expiry = datetime.now(timezone.utc) + timedelta(hours=1)
             await self.db.flush()
-            reset_url = send_password_reset_email(
+            link, email_sent = send_password_reset_email(
                 user.email, user.full_name, reset_token
+            )
+            # Never expose reset links in production (avoids email-enumeration).
+            if not settings.is_production:
+                reset_url = link
+                if not email_sent:
+                    email_note = _email_failure_note()
+
+        message = "If this email exists, you will receive a reset link shortly."
+        if email_note and reset_url:
+            message = (
+                "If this email exists, use the reset link below — "
+                f"email delivery failed ({email_note})."
             )
 
         return {
-            "message": "If this email exists, you will receive a reset link shortly.",
-            # Local/dev only — production must not expose reset links in API responses.
-            "reset_url": reset_url if not settings.is_production else None,
+            "message": message,
+            "reset_url": reset_url,
+            "email_note": email_note,
         }
 
     async def reset_password(self, token: str, new_password: str) -> dict:
@@ -220,18 +254,36 @@ class AuthService:
         result = await self.db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
         if not user:
-            return {"message": "Verification email sent", "verification_url": None}
+            return {
+                "message": "If this email exists, a verification link will be sent.",
+                "verification_url": None,
+                "email_note": None,
+            }
 
         if user.is_verified:
-            return {"message": "Already verified", "verification_url": None}
+            return {
+                "message": "Already verified",
+                "verification_url": None,
+                "email_note": None,
+            }
 
         verification_token = str(uuid4())
         user.verification_token = verification_token
         user.verification_token_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
-        verification_url = send_verification_email(
+        verification_url, email_sent = send_verification_email(
             user.email, user.full_name, verification_token
         )
+        email_note = None if email_sent else _email_failure_note()
+        expose_link = (not settings.is_production) or (not email_sent)
+        if email_sent:
+            message = "Verification email sent"
+        else:
+            message = (
+                "We could not send the verification email. "
+                f"{email_note}"
+            )
         return {
-            "message": "Verification email sent",
-            "verification_url": verification_url if not settings.is_production else None,
+            "message": message,
+            "verification_url": verification_url if expose_link else None,
+            "email_note": email_note,
         }

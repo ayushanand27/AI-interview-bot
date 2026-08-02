@@ -34,7 +34,7 @@ async function requestDocumentFullscreen(): Promise<void> {
   }
 }
 
-function getMediaErrorMessage(err: unknown): string {
+export function getMediaErrorMessage(err: unknown): string {
   if (!window.isSecureContext) {
     return (
       "Camera and microphone require HTTPS or localhost. " +

@@ -1072,6 +1072,7 @@ class InterviewService:
         interview_date=None,
     ) -> tuple[bytes, str]:
         """Generate a candidate-facing PDF report for an authorized session."""
+        from app.core.exceptions import InternalServerException
         from app.services.report_service import (
             candidate_report_filename,
             generate_candidate_report_pdf,
@@ -1082,21 +1083,34 @@ class InterviewService:
                 "Report is only available after the interview has ended."
             )
 
-        pdf_bytes = generate_candidate_report_pdf(
-            session,
-            candidate_name=candidate_name,
-            duration_minutes=duration_minutes,
-            interview_date=interview_date,
-        )
-        filename = candidate_report_filename(session, candidate_name=candidate_name)
-        upsert_session_artifact(
-            artifact_type="candidate_report_pdf",
-            session_id=session.session_id,
-            storage_path=None,
-            mime_type="application/pdf",
-            file_size_bytes=len(pdf_bytes),
-            metadata_json={"filename": filename, "generated_on_demand": True},
-        )
+        try:
+            pdf_bytes = generate_candidate_report_pdf(
+                session,
+                candidate_name=candidate_name,
+                duration_minutes=duration_minutes,
+                interview_date=interview_date,
+            )
+            if not pdf_bytes or not pdf_bytes.startswith(b"%PDF"):
+                raise ValueError("PDF generator returned empty or invalid output")
+            filename = candidate_report_filename(session, candidate_name=candidate_name)
+        except InvalidSessionStateError:
+            raise
+        except Exception as exc:
+            raise InternalServerException(
+                "Failed to generate your interview PDF report. "
+                "Please try again later or contact support."
+            ) from exc
+        try:
+            upsert_session_artifact(
+                artifact_type="candidate_report_pdf",
+                session_id=session.session_id,
+                storage_path=None,
+                mime_type="application/pdf",
+                file_size_bytes=len(pdf_bytes),
+                metadata_json={"filename": filename, "generated_on_demand": True},
+            )
+        except Exception:
+            pass
         return pdf_bytes, filename
 
     def _maybe_send_completion_report_email(

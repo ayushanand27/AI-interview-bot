@@ -258,6 +258,8 @@ export default function App() {
     user: UserResponse;
     justRegistered?: boolean;
     verificationUrl?: string | null;
+    emailNote?: string | null;
+    registerMessage?: string | null;
   }) {
     setAccessTokenState(payload.accessToken);
     setRefreshToken(payload.refreshToken);
@@ -281,6 +283,13 @@ export default function App() {
       sessionStorage.setItem(REGISTER_VERIFY_NOTICE_KEY, "1");
       sessionStorage.removeItem(DISMISS_REGISTER_VERIFY_KEY);
       setRegisterVerificationNotice(true);
+      if (payload.emailNote || payload.registerMessage?.toLowerCase().includes("could not send")) {
+        setError(
+          payload.emailNote ||
+            payload.registerMessage ||
+            "Account created, but we could not send the verification email.",
+        );
+      }
       return;
     }
 
@@ -601,7 +610,9 @@ export default function App() {
       {registerVerificationNotice && (
         <div className="alert warning">
           <p>
-            Check your inbox for a verification link — this page updates after you verify.
+            {devVerificationUrl && error
+              ? "We could not send the verification email. Use the link below, or try Resend."
+              : "Check your inbox for a verification link — this page updates after you verify."}
           </p>
           <button
             type="button"
@@ -614,7 +625,7 @@ export default function App() {
           </button>
           {devVerificationUrl && (
             <p className="invite-meta" style={{ marginTop: "0.75rem", wordBreak: "break-all" }}>
-              Local dev link:{" "}
+              {error ? "Verification link: " : "Local dev link: "}
               <a href={devVerificationUrl}>{devVerificationUrl}</a>
             </p>
           )}

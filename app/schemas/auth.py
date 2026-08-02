@@ -84,6 +84,7 @@ class MessageResponse(BaseModel):
     message: str
     verification_url: str | None = None
     reset_url: str | None = None
+    email_note: str | None = None
 
 
 class VerifyEmailResponse(BaseModel):
@@ -98,3 +99,4 @@ class RegisterResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     verification_url: str | None = None
+    email_note: str | None = None

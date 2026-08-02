@@ -531,6 +531,14 @@ async def get_my_report(
         )
     except AppException:
         raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Failed to generate your interview PDF report. "
+                "Please try again later."
+            ),
+        ) from exc
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

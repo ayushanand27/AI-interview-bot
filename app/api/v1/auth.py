@@ -58,12 +58,16 @@ async def register(
 
     return BaseResponse(
         success=True,
-        message="Account created. Please check your email to verify your account.",
+        message=result.get(
+            "message",
+            "Account created. Please check your email to verify your account.",
+        ),
         data=RegisterResponse(
             user=UserResponse.model_validate(result["user"]),
             access_token=result["access_token"],
             refresh_token=result["refresh_token"],
             verification_url=result.get("verification_url"),
+            email_note=result.get("email_note"),
         )
     )
 
@@ -205,6 +209,7 @@ async def forgot_password(
     return MessageResponse(
         message=result["message"],
         reset_url=result.get("reset_url"),
+        email_note=result.get("email_note"),
     )
 
 
@@ -243,4 +248,5 @@ async def resend_verification(
     return MessageResponse(
         message=result["message"],
         verification_url=result.get("verification_url"),
+        email_note=result.get("email_note"),
     )

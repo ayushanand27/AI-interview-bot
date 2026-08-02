@@ -11,6 +11,8 @@ export interface AuthSuccess {
   user: UserResponse;
   justRegistered?: boolean;
   verificationUrl?: string | null;
+  emailNote?: string | null;
+  registerMessage?: string | null;
 }
 
 interface AuthProps {
@@ -78,6 +80,8 @@ export default function Auth({
         user: res.data.user,
         justRegistered: true,
         verificationUrl: res.data.verification_url,
+        emailNote: res.data.email_note,
+        registerMessage: res.message,
       });
     } catch (err) {
       onError(err instanceof Error ? err.message : "Registration failed");
@@ -99,12 +103,16 @@ export default function Auth({
       const result = await authApi.forgotPassword(email);
       if (result.reset_url) {
         setForgotMessage(
-          "SMTP email may not deliver right now. Use this local reset link:",
+          result.email_note
+            ? `Email delivery failed (${result.email_note}). Use this reset link:`
+            : result.message ||
+                "If this email exists, use this reset link (local/dev):",
         );
         setForgotResetUrl(result.reset_url);
       } else {
         setForgotMessage(
-          "If this email exists, check your inbox (and spam folder).",
+          result.message ||
+            "If this email exists, check your inbox (and spam folder).",
         );
       }
     } catch (err) {

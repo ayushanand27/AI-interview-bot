@@ -169,7 +169,11 @@ function parseErrorMessage(body: unknown, status: number): string {
 
     if (typeof record.message === "string" && record.message) {
 
-      return record.message;
+      const msg = record.message;
+      if (/email/i.test(msg) && /valid|not a valid/i.test(msg)) {
+        return "Please enter a valid email address.";
+      }
+      return msg;
 
     }
 
@@ -177,17 +181,34 @@ function parseErrorMessage(body: unknown, status: number): string {
 
     if (typeof detail === "string") {
 
+      if (/email/i.test(detail) && /valid|not a valid/i.test(detail)) {
+        return "Please enter a valid email address.";
+      }
       return detail;
 
     }
 
     if (Array.isArray(detail) && detail.length > 0) {
 
-      const first = detail[0] as { msg?: string };
+      const first = detail[0];
+      if (typeof first === "string" && first.trim()) {
+        if (/email/i.test(first) && /valid|not a valid/i.test(first)) {
+          return "Please enter a valid email address.";
+        }
+        return first;
+      }
 
-      if (typeof first?.msg === "string") {
+      const firstObj = first as { msg?: string; loc?: unknown[] };
 
-        return first.msg;
+      if (typeof firstObj?.msg === "string") {
+
+        const field = Array.isArray(firstObj.loc)
+          ? String(firstObj.loc[firstObj.loc.length - 1] ?? "")
+          : "";
+        if (field === "email" || /email/i.test(firstObj.msg)) {
+          return "Please enter a valid email address.";
+        }
+        return firstObj.msg.replace(/^Value error,\s*/i, "").trim() || firstObj.msg;
 
       }
 
@@ -203,7 +224,7 @@ function parseErrorMessage(body: unknown, status: number): string {
 
   if (status === 503) {
 
-    return "Service temporarily unavailable. Please try again.";
+    return "Generation failed. Please try again.";
 
   }
 
@@ -291,6 +312,22 @@ async function refreshAccessToken(): Promise<boolean> {
 
 
 
+function networkErrorMessage(err: unknown): string {
+  if (err instanceof TypeError) {
+    return (
+      "Network connection lost. Check your internet and try again. " +
+      "Your progress is saved — you can retry without starting over."
+    );
+  }
+  if (err instanceof Error && /failed to fetch|networkerror|load failed/i.test(err.message)) {
+    return (
+      "Network connection lost. Check your internet and try again. " +
+      "Your progress is saved — you can retry without starting over."
+    );
+  }
+  return err instanceof Error ? err.message : "Request failed";
+}
+
 async function request<T>(
 
   path: string,
@@ -303,23 +340,28 @@ async function request<T>(
 
   const isFormData = options?.body instanceof FormData;
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
 
-    ...options,
+      ...options,
 
-    headers: isFormData
+      headers: isFormData
 
-      ? authHeaders(options?.headers)
+        ? authHeaders(options?.headers)
 
-      : {
+        : {
 
-          "Content-Type": "application/json",
+            "Content-Type": "application/json",
 
-          ...authHeaders(options?.headers),
+            ...authHeaders(options?.headers),
 
-        },
+          },
 
-  });
+    });
+  } catch (err) {
+    throw new Error(networkErrorMessage(err));
+  }
 
 
 
@@ -760,19 +802,31 @@ export const recruiterApi = {
       form.append("jd_pdf", payload.jd_pdf);
     }
 
-    const response = await fetch(
-      `${API_BASE}/api/v1/recruiter/generate-questions`,
-      {
-        method: "POST",
-        headers: authHeaders(),
-        body: form,
-      },
-    );
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(parseErrorMessage(body, response.status));
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 90_000);
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/v1/recruiter/generate-questions`,
+        {
+          method: "POST",
+          headers: authHeaders(),
+          body: form,
+          signal: controller.signal,
+        },
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(parseErrorMessage(body, response.status));
+      }
+      return response.json() as Promise<ApiEnvelope<GenerateQuestionsResponse>>;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        throw new Error("Generation timed out. Please try again.");
+      }
+      throw err;
+    } finally {
+      window.clearTimeout(timeoutId);
     }
-    return response.json() as Promise<ApiEnvelope<GenerateQuestionsResponse>>;
   },
 
 

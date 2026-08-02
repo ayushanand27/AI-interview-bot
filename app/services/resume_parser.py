@@ -12,20 +12,31 @@ import fitz  # PyMuPDF
 from app.utils.file_validation import document_extension
 
 
+_UNABLE_TO_PARSE = (
+    "Unable to parse document. Upload a text-based PDF, Word (.doc/.docx), or TXT file "
+    "(scanned or image-only PDFs are not supported)."
+)
+
+
 def extract_text_from_document(file_bytes: bytes, filename: str) -> str:
     """Extract plain text from PDF, Word, or plain-text uploads."""
     if not file_bytes:
         raise ValueError("Uploaded file is empty.")
 
     ext = document_extension(filename)
-    if ext == ".pdf":
-        return extract_text_from_pdf(file_bytes)
-    if ext == ".docx":
-        return extract_text_from_docx(file_bytes)
-    if ext == ".doc":
-        return extract_text_from_doc(file_bytes)
-    if ext == ".txt":
-        return extract_text_from_txt(file_bytes)
+    try:
+        if ext == ".pdf":
+            return extract_text_from_pdf(file_bytes)
+        if ext == ".docx":
+            return extract_text_from_docx(file_bytes)
+        if ext == ".doc":
+            return extract_text_from_doc(file_bytes)
+        if ext == ".txt":
+            return extract_text_from_txt(file_bytes)
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError(_UNABLE_TO_PARSE) from exc
 
     raise ValueError(
         "Unsupported file type. Use PDF, Word (.doc/.docx), or plain text (.txt)."
@@ -40,7 +51,9 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     except Exception as exc:  # pragma: no cover - external parser errors
-        raise ValueError("Invalid PDF file.") from exc
+        raise ValueError(
+            "Unable to parse document - the PDF appears corrupt or invalid."
+        ) from exc
 
     try:
         parts: list[str] = []
@@ -50,7 +63,7 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
                 parts.append(text.strip())
         extracted = "\n\n".join(part for part in parts if part)
         if not extracted.strip():
-            raise ValueError("Could not extract text from the PDF.")
+            raise ValueError(_UNABLE_TO_PARSE)
         return extracted.strip()
     finally:
         doc.close()
@@ -68,12 +81,14 @@ def extract_text_from_docx(docx_bytes: bytes) -> str:
     try:
         doc = Document(io.BytesIO(docx_bytes))
     except Exception as exc:
-        raise ValueError("Invalid or corrupted DOCX file.") from exc
+        raise ValueError(
+            "Unable to parse document - the Word document appears corrupt or invalid."
+        ) from exc
 
     parts = [paragraph.text.strip() for paragraph in doc.paragraphs if paragraph.text.strip()]
     extracted = "\n".join(parts).strip()
     if not extracted:
-        raise ValueError("Could not extract text from the DOCX file.")
+        raise ValueError(_UNABLE_TO_PARSE)
     return extracted
 
 
@@ -109,8 +124,8 @@ def extract_text_from_doc(doc_bytes: bytes) -> str:
         return text.strip()
 
     raise ValueError(
-        "Could not extract text from the .doc file. "
-        "Convert it to .docx or .pdf, or install antiword on the server."
+        "Unable to parse document from this .doc file. "
+        "Convert it to .docx or PDF, or upload a TXT file."
     )
 
 

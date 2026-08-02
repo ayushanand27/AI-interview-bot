@@ -13,6 +13,8 @@ export default function RecruiterLogin() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotMessage, setForgotMessage] = useState<string | null>(null);
   const [forgotResetUrl, setForgotResetUrl] = useState<string | null>(null);
+  const [postRegisterNote, setPostRegisterNote] = useState<string | null>(null);
+  const [postRegisterLink, setPostRegisterLink] = useState<string | null>(null);
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -53,10 +55,21 @@ export default function RecruiterLogin() {
 
     setLoading(true);
     setError(null);
+    setPostRegisterNote(null);
+    setPostRegisterLink(null);
     try {
       const res = await authApi.register(fullName, email, password, "recruiter");
       setAccessToken(res.data.access_token);
       setRefreshToken(res.data.refresh_token);
+      if (res.data.email_note) {
+        setPostRegisterNote(
+          res.data.email_note ||
+            res.message ||
+            "Account created, but we could not send the verification email.",
+        );
+        setPostRegisterLink(res.data.verification_url ?? null);
+        return;
+      }
       window.location.href = "/recruiter/dashboard";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -78,12 +91,16 @@ export default function RecruiterLogin() {
       const result = await authApi.forgotPassword(email);
       if (result.reset_url) {
         setForgotMessage(
-          "SMTP email may not deliver right now. Use this local reset link:",
+          result.email_note
+            ? `Email delivery failed (${result.email_note}). Use this reset link:`
+            : result.message ||
+                "If this email exists, use this reset link (local/dev):",
         );
         setForgotResetUrl(result.reset_url);
       } else {
         setForgotMessage(
-          "If this email exists, check your inbox (and spam folder).",
+          result.message ||
+            "If this email exists, check your inbox (and spam folder).",
         );
       }
     } catch (err) {
@@ -134,7 +151,26 @@ export default function RecruiterLogin() {
 
         {error && <div className="rp-alert error">{error}</div>}
 
-        {showForgotPassword ? (
+        {postRegisterNote ? (
+          <div className="stack">
+            <div className="rp-alert info">{postRegisterNote}</div>
+            {postRegisterLink && (
+              <p style={{ wordBreak: "break-all", fontSize: "0.9rem" }}>
+                Verification link:{" "}
+                <a href={postRegisterLink}>{postRegisterLink}</a>
+              </p>
+            )}
+            <button
+              type="button"
+              className="rp-primary"
+              onClick={() => {
+                window.location.href = "/recruiter/dashboard";
+              }}
+            >
+              Continue to dashboard
+            </button>
+          </div>
+        ) : showForgotPassword ? (
           <form onSubmit={handleForgotPassword}>
             <h2 className="rp-section-title" style={{ marginTop: 0 }}>
               Reset password

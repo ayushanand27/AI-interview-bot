@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -14,6 +15,8 @@ from app.db.job_live_models import JobApplication, JobPosting
 from app.services.ats_scoring import score_resume_against_jd
 from app.services.object_storage import get_object_storage
 from app.services.resume_parser import extract_text_from_document
+
+logger = logging.getLogger(__name__)
 
 
 class JobService:
@@ -89,14 +92,36 @@ class JobService:
             resume_text = extract_text_from_document(resume_bytes, resume_filename)
         except ValueError as exc:
             raise BadRequestException(str(exc)) from exc
+        except Exception as exc:
+            logger.exception("Unexpected resume parse failure for job %s", token)
+            raise BadRequestException(
+                "Unable to parse resume. Upload a text-based PDF, Word, or TXT file."
+            ) from exc
         if len(resume_text.strip()) < 40:
-            raise BadRequestException("Could not extract enough text from resume")
+            raise BadRequestException(
+                "Unable to parse resume - not enough extractable text. "
+                "Scanned or image-only files are not supported."
+            )
 
-        detail = score_resume_against_jd(
-            resume_text,
-            job.jd_text,
-            enable_semantic=bool(settings.ATS_ENABLE_SEMANTIC),
-        )
+        try:
+            detail = score_resume_against_jd(
+                resume_text,
+                job.jd_text,
+                enable_semantic=bool(settings.ATS_ENABLE_SEMANTIC),
+            )
+        except Exception:
+            logger.exception("ATS scoring failed for job %s — saving score 0", token)
+            detail = {
+                "ats_score": 0.0,
+                "structure_score": 0.0,
+                "keyword_score": 0.0,
+                "matched_skills": [],
+                "missing_skills": [],
+                "jd_skills": [],
+                "fit_label": "Unable to score",
+                "semantic_enabled": False,
+                "scoring_error": True,
+            }
         storage_key = f"jobs/{job.token}/resumes/{uuid.uuid4().hex}_{resume_filename[-80:]}"
         try:
             get_object_storage().put_bytes(

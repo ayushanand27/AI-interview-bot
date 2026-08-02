@@ -50,6 +50,16 @@ export default function JobApplyPage({ token }: { token: string }) {
       setError("Please upload your resume (PDF/Word/TXT)");
       return;
     }
+    if (file.size === 0) {
+      setError("Uploaded file is empty. Please choose a valid resume file.");
+      return;
+    }
+    // Soft client guard aligned with backend MAX_FILE_SIZE_MB default (10).
+    const maxBytes = 10 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setError("File is too large (max 10 MB). Please upload a smaller resume.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -66,7 +76,14 @@ export default function JobApplyPage({ token }: { token: string }) {
         missing_skills: res.data.missing_skills ?? [],
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Apply failed");
+      const raw = err instanceof Error ? err.message : "Apply failed";
+      setError(
+        /unable to parse|extract|empty|corrupt|invalid pdf|scanned|image-only/i.test(
+          raw,
+        )
+          ? raw
+          : raw || "Unable to submit application. Please try again.",
+      );
     } finally {
       setLoading(false);
     }

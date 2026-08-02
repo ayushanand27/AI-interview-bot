@@ -16,6 +16,7 @@ if sys.platform == "win32":
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -118,6 +119,41 @@ async def app_exception_handler(request: Request, exc: AppException):
             "message": exc.message,
             "status_code": exc.status_code,
             "detail": exc.detail,
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Return a clear, non-blank message for invalid email/body fields."""
+    messages: list[str] = []
+    for err in exc.errors():
+        loc = err.get("loc") or ()
+        field = str(loc[-1]) if loc else "field"
+        msg = str(err.get("msg") or "Invalid value")
+        lower = msg.lower()
+        if "email" in lower or field == "email":
+            messages.append("Please enter a valid email address.")
+        elif "password" in field.lower():
+            messages.append(msg.replace("Value error, ", "").strip() or msg)
+        else:
+            clean = msg.replace("Value error, ", "").strip()
+            messages.append(f"{field}: {clean}" if field not in clean else clean)
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    unique = []
+    for m in messages:
+        if m not in seen:
+            seen.add(m)
+            unique.append(m)
+    message = unique[0] if unique else "Invalid request. Please check your input."
+    return JSONResponse(
+        status_code=422,
+        content={
+            "success": False,
+            "message": message,
+            "status_code": 422,
+            "detail": unique,
         },
     )
 

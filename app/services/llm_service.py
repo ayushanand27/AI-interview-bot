@@ -6,12 +6,10 @@ import json
 import re
 from typing import Any, Optional
 
-from groq import APIConnectionError, APIError, RateLimitError
-
 from app.core.config import get_settings
 from app.core.exceptions import AIException
 from app.services.assessment_service import _parse_questions_from_llm_text
-from app.services.groq_client import get_groq_client
+from app.services.groq_client import groq_chat_completion
 
 
 class LLMService:
@@ -70,7 +68,7 @@ class LLMService:
         )
 
         try:
-            response = get_groq_client().chat.completions.create(
+            response = groq_chat_completion(
                 model=self._model,
                 temperature=0.7,
                 messages=[
@@ -79,17 +77,15 @@ class LLMService:
                 ],
             )
             content = response.choices[0].message.content or ""
-        except (RateLimitError, APIConnectionError, APIError) as exc:
-            raise AIException(
-                "Question generation is temporarily unavailable. Please try again in a moment."
-            ) from exc
+        except AIException:
+            raise
         except Exception as exc:
             raise AIException(
-                "Question generation failed. Please try again in a moment."
+                "Generation failed. Please try again."
             ) from exc
 
         if not content.strip():
-            raise AIException("Question generation returned no questions. Please try again.")
+            raise AIException("Generation failed. Please try again.")
 
         jd_hint = job_description or resume_text or role_title
         # Mock/candidate interviews are oral/subjective; recruiter assessments
@@ -103,7 +99,7 @@ class LLMService:
         )
 
         if not questions:
-            raise AIException("Question generation returned no questions. Please try again.")
+            raise AIException("Generation failed. Please try again.")
 
         return questions[:question_count]
 
@@ -163,7 +159,7 @@ class LLMService:
         )
 
         try:
-            response = get_groq_client().chat.completions.create(
+            response = groq_chat_completion(
                 model=self._model,
                 temperature=0.6,
                 messages=[
@@ -172,16 +168,14 @@ class LLMService:
                 ],
             )
             content = response.choices[0].message.content or ""
-        except (RateLimitError, APIConnectionError, APIError) as exc:
-            raise AIException(
-                "Follow-up question generation is temporarily unavailable."
-            ) from exc
+        except AIException:
+            raise
         except Exception as exc:
-            raise AIException("Follow-up question generation failed.") from exc
+            raise AIException("Generation failed. Please try again.") from exc
 
         text = content.strip()
         if not text:
-            raise AIException("Follow-up question generation returned empty content.")
+            raise AIException("Generation failed. Please try again.")
 
         try:
             payload = json.loads(text)
@@ -206,7 +200,7 @@ class LLMService:
         cleaned = re.sub(r"^\d+[\).\s]+", "", cleaned).strip()
         if cleaned:
             return cleaned
-        raise AIException("Follow-up question generation returned no question.")
+        raise AIException("Generation failed. Please try again.")
 
 
 _llm_service: LLMService | None = None

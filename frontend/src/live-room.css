@@ -112,6 +112,31 @@
   background: #a3a3a3;
 }
 
+.live-room-status-dot.is-warn {
+  background: #d97706;
+  animation: live-room-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes live-room-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.live-room-conn-banner {
+  margin: 0 1rem 0.75rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  background: rgba(217, 119, 6, 0.12);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  color: #92400e;
+  font-size: 0.875rem;
+}
+
 .live-room-header-actions {
   display: flex;
   align-items: center;

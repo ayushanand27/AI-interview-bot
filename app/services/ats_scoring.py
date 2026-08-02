@@ -246,8 +246,22 @@ def score_resume_against_jd(
     (no MiniLM/torch). Overall = 35% structure + 65% keywords.
     """
     _ = enable_semantic  # reserved for paid-tier worker
+    if not (resume_text or "").strip():
+        return {
+            "ats_score": 0.0,
+            "structure_score": 0.0,
+            "keyword_score": 0.0,
+            "matched_skills": [],
+            "missing_skills": [],
+            "jd_skills": [],
+            "structure": {"score": 0.0, "checks": [], "sections_found": [], "word_count": 0},
+            "keywords": {"score": 0.0, "matched": [], "missing": [], "jd_skills": []},
+            "fit_label": "Unable to score",
+            "semantic_enabled": False,
+        }
+
     structure = _structure_score(resume_text)
-    skills = extract_skills_from_jd(jd_text)
+    skills = extract_skills_from_jd(jd_text or "")
     keywords = _keyword_score(resume_text, skills)
     overall = round(
         structure["score"] * STRUCTURE_WEIGHT + keywords["score"] * KEYWORD_WEIGHT,

@@ -116,13 +116,31 @@ export default function PrivacyPolicy() {
         confirm: true,
         delete_files: deleteFiles,
       });
-      setStatus({
-        kind: "ok",
-        text:
-          typeof res.message === "string"
-            ? res.message
-            : "Delete/anonymize request completed.",
-      });
+      const note =
+        (typeof res.message === "string" && res.message) ||
+        (typeof res.note === "string" && res.note) ||
+        "Delete/anonymize request completed.";
+      const files =
+        typeof res.deleted_file_count === "number"
+          ? ` Files removed: ${res.deleted_file_count}.`
+          : "";
+      const touched =
+        typeof res.sessions_touched === "number" ||
+        typeof res.verifications_touched === "number"
+          ? ` Sessions: ${Number(res.sessions_touched ?? 0)}, verifications: ${Number(res.verifications_touched ?? 0)}.`
+          : "";
+      const errs = Array.isArray(res.errors) ? res.errors.filter(Boolean) : [];
+      if (res.success === false || errs.length > 0) {
+        setStatus({
+          kind: "err",
+          text: `${note}${files}${touched} Errors: ${errs.slice(0, 3).map(String).join("; ") || "partial failure"}`,
+        });
+      } else {
+        setStatus({
+          kind: "ok",
+          text: `${note}${files}${touched}`,
+        });
+      }
     } catch (err) {
       setStatus({
         kind: "err",
@@ -205,13 +223,26 @@ export default function PrivacyPolicy() {
         confirm: true,
         delete_files: adminDeleteFiles,
       });
-      setStatus({
-        kind: "ok",
-        text:
-          typeof res.message === "string"
-            ? res.message
-            : `Anonymized data for ${email}.`,
-      });
+      const note =
+        (typeof res.message === "string" && res.message) ||
+        (typeof res.note === "string" && res.note) ||
+        `Anonymized data for ${email}.`;
+      const files =
+        typeof res.deleted_file_count === "number"
+          ? ` Files removed: ${res.deleted_file_count}.`
+          : "";
+      const errs = Array.isArray(res.errors) ? res.errors.filter(Boolean) : [];
+      if (res.success === false || errs.length > 0) {
+        setStatus({
+          kind: "err",
+          text: `${note}${files} Errors: ${errs.slice(0, 3).map(String).join("; ") || "partial failure"}`,
+        });
+      } else {
+        setStatus({
+          kind: "ok",
+          text: `${note}${files}`,
+        });
+      }
     } catch (err) {
       setStatus({
         kind: "err",

@@ -11,7 +11,7 @@ from sqlalchemy import cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.types import String
 
-from app.core.exceptions import NotFoundException
+from app.core.exceptions import InternalServerException, NotFoundException
 from app.db.candidate_verification_model import CandidateVerification
 from app.db.evidence_model import IdentityVerificationAttempt
 from app.db.interview_invite_model import InterviewInvite
@@ -106,39 +106,51 @@ def _candidate_display_name(
     return stem.replace("_", " ").replace("-", " ").strip().title()
 
 
-def _extract_final_score(final_score: Optional[dict[str, Any]]) -> tuple[Optional[float], Optional[str]]:
-    if not final_score:
+def _as_score_dict(final_score: Any) -> dict[str, Any] | None:
+    """Normalize final_score JSON; tolerate corrupt/partial session payloads."""
+    if isinstance(final_score, dict):
+        return final_score
+    if isinstance(final_score, (int, float)):
+        return {"final_score": float(final_score)}
+    return None
+
+
+def _extract_final_score(final_score: Any) -> tuple[Optional[float], Optional[str]]:
+    payload = _as_score_dict(final_score)
+    if not payload:
         return None, None
-    score = final_score.get("final_score")
+    score = payload.get("final_score")
     if score is None:
-        score = final_score.get("candidate_score")
-    recommendation = final_score.get("recommendation")
+        score = payload.get("candidate_score")
+    recommendation = payload.get("recommendation")
     if isinstance(score, (int, float)):
         return float(score), recommendation if isinstance(recommendation, str) else None
     return None, recommendation if isinstance(recommendation, str) else None
 
 
-def _extract_original_score(final_score: Optional[dict[str, Any]]) -> Optional[float]:
-    if not final_score:
+def _extract_original_score(final_score: Any) -> Optional[float]:
+    payload = _as_score_dict(final_score)
+    if not payload:
         return None
-    raw = final_score.get("original_score")
+    raw = payload.get("original_score")
     if raw is None:
-        raw = final_score.get("final_score")
+        raw = payload.get("final_score")
     if raw is None:
-        raw = final_score.get("candidate_score")
+        raw = payload.get("candidate_score")
     if isinstance(raw, (int, float)):
         return float(raw)
     return None
 
 
-def _extract_adjusted_score(final_score: Optional[dict[str, Any]]) -> Optional[float]:
-    if not final_score:
+def _extract_adjusted_score(final_score: Any) -> Optional[float]:
+    payload = _as_score_dict(final_score)
+    if not payload:
         return None
-    raw = final_score.get("adjusted_final_score")
+    raw = payload.get("adjusted_final_score")
     if raw is None:
-        raw = final_score.get("final_score")
+        raw = payload.get("final_score")
     if raw is None:
-        raw = final_score.get("candidate_score")
+        raw = payload.get("candidate_score")
     if isinstance(raw, (int, float)):
         return float(raw)
     return None
@@ -385,7 +397,7 @@ def _session_to_detail(
         duration_minutes=_duration_minutes(row),
         total_questions=int(row.total_questions or len(questions)),
         answered_count=len(answers),
-        final_score=row.final_score,
+        final_score=_as_score_dict(row.final_score),
         original_score=_extract_original_score(row.final_score),
         adjusted_score=_extract_adjusted_score(row.final_score),
         integrity_penalty_percent=penalty,
@@ -463,21 +475,37 @@ class RecruiterService:
         row = await self._get_owned_completed_row(recruiter_id, session_id)
         identity_attempt = await self._get_latest_identity_attempt(session_id)
         names = await self._candidate_names_for_sessions([session_id])
-        detail = _session_to_detail(
-            row,
-            identity_attempt,
-            verification_name=names.get(_uuid_key(session_id)),
-        )
-        pdf_bytes = generate_session_report_pdf(detail, _build_proctoring_summary(row))
-        filename = report_filename(detail)
-        upsert_session_artifact(
-            artifact_type="recruiter_report_pdf",
-            session_id=session_id,
-            storage_path=None,
-            mime_type="application/pdf",
-            file_size_bytes=len(pdf_bytes),
-            metadata_json={"filename": filename, "generated_on_demand": True},
-        )
+        try:
+            detail = _session_to_detail(
+                row,
+                identity_attempt,
+                verification_name=names.get(_uuid_key(session_id)),
+            )
+            pdf_bytes = generate_session_report_pdf(
+                detail, _build_proctoring_summary(row)
+            )
+            if not pdf_bytes or not pdf_bytes.startswith(b"%PDF"):
+                raise ValueError("PDF generator returned empty or invalid output")
+            filename = report_filename(detail)
+        except NotFoundException:
+            raise
+        except Exception as exc:
+            raise InternalServerException(
+                "Failed to generate interview PDF report. "
+                "The session may have incomplete data — try again or contact support."
+            ) from exc
+        try:
+            upsert_session_artifact(
+                artifact_type="recruiter_report_pdf",
+                session_id=session_id,
+                storage_path=None,
+                mime_type="application/pdf",
+                file_size_bytes=len(pdf_bytes),
+                metadata_json={"filename": filename, "generated_on_demand": True},
+            )
+        except Exception:
+            # Artifact index is best-effort; do not block the download.
+            pass
         return pdf_bytes, filename
 
     async def set_human_review_flag(

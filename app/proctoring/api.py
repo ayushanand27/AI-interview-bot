@@ -207,7 +207,8 @@ def analyze_frame(request: Request, req: FrameRequest):
     phone_recorded = False
     if should_run_object_detection(req.session_id):
         try:
-            detector = get_object_detector()
+            # Non-blocking: YOLO lag/busy must not hang the interview analyze path.
+            detector = get_object_detector(blocking=False)
             phone_hits = detector.detect_cell_phones(frame)
             for hit in phone_hits:
                 recorded = warning_mgr.record_client_violation(

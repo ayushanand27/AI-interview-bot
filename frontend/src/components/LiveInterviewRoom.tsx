@@ -27,6 +27,9 @@ const LANG_OPTIONS = [
   { value: "c", label: "C" },
 ] as const;
 
+const WS_RECONNECT_BASE_MS = 1000;
+const WS_RECONNECT_MAX_MS = 15000;
+
 type CaseResult = {
   passed: boolean;
   status?: string;
@@ -42,6 +45,8 @@ type RunPayload = {
   error?: string | null;
   cases?: CaseResult[];
 };
+
+type WsConnState = "connecting" | "connected" | "reconnecting" | "disconnected";
 
 interface LiveInterviewRoomProps {
   token: string;
@@ -86,16 +91,29 @@ export default function LiveInterviewRoom({
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [sideTab, setSideTab] = useState<"problem" | "chat">("problem");
-  const [wsConnected, setWsConnected] = useState(false);
+  const [wsConn, setWsConn] = useState<WsConnState>("connecting");
   const wsRef = useRef<WebSocket | null>(null);
   const applyingRemote = useRef(false);
   const languageRef = useRef(language);
+  const codeRef = useRef(code);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const intentionalCloseRef = useRef(false);
+  const reconnectAttemptRef = useRef(0);
+  const reconnectTimerRef = useRef<number | null>(null);
+  const statusRef = useRef(status);
   const name = displayName || (role === "recruiter" ? "Recruiter" : "Candidate");
 
   useEffect(() => {
     languageRef.current = language;
   }, [language]);
+
+  useEffect(() => {
+    codeRef.current = code;
+  }, [code]);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   useEffect(() => {
     jobsLiveApi
@@ -116,44 +134,207 @@ export default function LiveInterviewRoom({
   }, [token]);
 
   useEffect(() => {
-    const url = jobsLiveApi.liveWsUrl(token, role, name);
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
-    ws.onopen = () => setWsConnected(true);
-    ws.onclose = () => setWsConnected(false);
-    ws.onerror = () => setWsConnected(false);
-    ws.onmessage = (ev) => {
+    intentionalCloseRef.current = false;
+    reconnectAttemptRef.current = 0;
+
+    function clearReconnectTimer() {
+      if (reconnectTimerRef.current != null) {
+        window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+    }
+
+    function scheduleReconnect() {
+      if (intentionalCloseRef.current || statusRef.current === "ended") return;
+      clearReconnectTimer();
+      const attempt = reconnectAttemptRef.current;
+      const delay = Math.min(
+        WS_RECONNECT_BASE_MS * 2 ** attempt,
+        WS_RECONNECT_MAX_MS,
+      );
+      reconnectAttemptRef.current = attempt + 1;
+      setWsConn("reconnecting");
+      reconnectTimerRef.current = window.setTimeout(() => {
+        connect();
+      }, delay);
+    }
+
+    function handleMessage(ev: MessageEvent) {
+      let msg: Record<string, unknown>;
       try {
-        const msg = JSON.parse(ev.data);
-        if (msg.type === "hello" && msg.state) {
-          if (msg.state.code != null && msg.state.code !== "") {
+        const parsed: unknown = JSON.parse(String(ev.data));
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          return;
+        }
+        msg = parsed as Record<string, unknown>;
+      } catch {
+        return;
+      }
+
+      const type = msg.type;
+      if (type === "hello") {
+        const state = msg.state;
+        if (state && typeof state === "object" && !Array.isArray(state)) {
+          const s = state as Record<string, unknown>;
+          if (typeof s.code === "string" && s.code !== "") {
             applyingRemote.current = true;
-            setCode(msg.state.code);
+            setCode(s.code);
           }
-          if (msg.state.language) setLanguage(msg.state.language);
-          if (msg.state.chat) setChat(msg.state.chat);
-          if (msg.state.presence) setPresence(msg.state.presence);
+          if (typeof s.language === "string" && s.language) {
+            setLanguage(s.language);
+          }
+          if (Array.isArray(s.chat)) {
+            setChat(
+              s.chat.filter(
+                (m): m is { from: string; text: string; role?: string } =>
+                  !!m &&
+                  typeof m === "object" &&
+                  typeof (m as { from?: unknown }).from === "string" &&
+                  typeof (m as { text?: unknown }).text === "string",
+              ),
+            );
+          }
+          if (s.presence && typeof s.presence === "object" && !Array.isArray(s.presence)) {
+            setPresence(s.presence as Record<string, string>);
+          }
         }
-        if (msg.type === "code" && msg.from !== role) {
-          applyingRemote.current = true;
-          setCode(msg.code || "");
-          if (msg.language) setLanguage(msg.language);
+        // After reconnect, push our local code if server has none / we have edits.
+        const ws = wsRef.current;
+        if (ws?.readyState === WebSocket.OPEN) {
+          const localCode = codeRef.current;
+          const localLang = languageRef.current;
+          const serverCode =
+            state && typeof state === "object" && !Array.isArray(state)
+              ? (state as { code?: unknown }).code
+              : null;
+          if (
+            localCode &&
+            (serverCode == null ||
+              serverCode === "" ||
+              serverCode === localCode)
+          ) {
+            ws.send(
+              JSON.stringify({
+                type: "code",
+                code: localCode,
+                language: localLang,
+              }),
+            );
+          }
         }
-        if (msg.type === "chat" && msg.message) {
-          setChat((prev) => [...prev, msg.message]);
+        return;
+      }
+      if (type === "code" && msg.from !== role) {
+        applyingRemote.current = true;
+        setCode(typeof msg.code === "string" ? msg.code : "");
+        if (typeof msg.language === "string" && msg.language) {
+          setLanguage(msg.language);
         }
-        if (msg.type === "presence") {
-          setPresence(msg.presence || {});
+        return;
+      }
+      if (type === "chat" && msg.message && typeof msg.message === "object") {
+        const m = msg.message as { from?: unknown; text?: unknown; role?: unknown };
+        if (typeof m.from === "string" && typeof m.text === "string") {
+          const from = m.from;
+          const text = m.text;
+          const roleLabel = typeof m.role === "string" ? m.role : undefined;
+          setChat((prev) => [...prev, { from, text, role: roleLabel }]);
         }
+        return;
+      }
+      if (type === "presence") {
+        if (
+          msg.presence &&
+          typeof msg.presence === "object" &&
+          !Array.isArray(msg.presence)
+        ) {
+          setPresence(msg.presence as Record<string, string>);
+        }
+      }
+    }
+
+    function connect() {
+      if (intentionalCloseRef.current) return;
+      clearReconnectTimer();
+
+      const prev = wsRef.current;
+      if (prev) {
+        prev.onopen = null;
+        prev.onclose = null;
+        prev.onerror = null;
+        prev.onmessage = null;
+        try {
+          prev.close();
+        } catch {
+          /* ignore */
+        }
+        wsRef.current = null;
+      }
+
+      setWsConn(reconnectAttemptRef.current > 0 ? "reconnecting" : "connecting");
+      const url = jobsLiveApi.liveWsUrl(token, role, name);
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(url);
+      } catch {
+        scheduleReconnect();
+        return;
+      }
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        reconnectAttemptRef.current = 0;
+        setWsConn("connected");
+      };
+      ws.onmessage = handleMessage;
+      ws.onerror = () => {
+        // onclose will schedule reconnect
+        setWsConn((cur) => (cur === "connected" ? "disconnected" : cur));
+      };
+      ws.onclose = () => {
+        if (wsRef.current === ws) {
+          wsRef.current = null;
+        }
+        if (intentionalCloseRef.current || statusRef.current === "ended") {
+          setWsConn("disconnected");
+          return;
+        }
+        scheduleReconnect();
+      };
+    }
+
+    connect();
+
+    return () => {
+      intentionalCloseRef.current = true;
+      clearReconnectTimer();
+      const ws = wsRef.current;
+      wsRef.current = null;
+      if (ws) {
+        ws.onopen = null;
+        ws.onclose = null;
+        ws.onerror = null;
+        ws.onmessage = null;
+        try {
+          ws.close();
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, [token, role, name]);
+
+  useEffect(() => {
+    if (status === "ended") {
+      intentionalCloseRef.current = true;
+      try {
+        wsRef.current?.close();
       } catch {
         /* ignore */
       }
-    };
-    return () => {
-      ws.close();
-      wsRef.current = null;
-    };
-  }, [token, role, name]);
+      setWsConn("disconnected");
+    }
+  }, [status]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -163,6 +344,14 @@ export default function LiveInterviewRoom({
     const parts = Object.entries(presence).map(([r, n]) => `${r}: ${n}`);
     return parts.length ? parts.join(" · ") : "Waiting for peers…";
   }, [presence]);
+
+  const connectionLabel = useMemo(() => {
+    if (status === "ended") return "Ended";
+    if (wsConn === "connected") return presenceLabel;
+    if (wsConn === "reconnecting") return "Disconnected — reconnecting…";
+    if (wsConn === "connecting") return "Connecting…";
+    return "Disconnected";
+  }, [status, wsConn, presenceLabel]);
 
   // Clear the remote-apply guard after React/Monaco settle so the next local
   // keystroke is broadcast (do not consume it inside broadcastCode).
@@ -225,9 +414,11 @@ export default function LiveInterviewRoom({
       wsRef.current.send(
         JSON.stringify({ type: "chat", text: chatInput.trim() }),
       );
+      setChatInput("");
+      setSideTab("chat");
+      return;
     }
-    setChatInput("");
-    setSideTab("chat");
+    setError("Not connected — wait for reconnect, then send again.");
   }
 
   async function endRoom() {
@@ -265,13 +456,17 @@ export default function LiveInterviewRoom({
           >
             {role}
           </span>
-          <span className="live-room-status">
+          <span className="live-room-status" role="status">
             <span
               className={`live-room-status-dot ${
-                wsConnected && status !== "ended" ? "" : "is-idle"
+                wsConn === "connected" && status !== "ended"
+                  ? ""
+                  : wsConn === "reconnecting" || wsConn === "connecting"
+                    ? "is-warn"
+                    : "is-idle"
               }`}
             />
-            {status === "ended" ? "Ended" : presenceLabel}
+            {connectionLabel}
           </span>
         </div>
         <div className="live-room-header-actions">
@@ -294,6 +489,15 @@ export default function LiveInterviewRoom({
         Live collaborative rooms are not proctored — Meet/Zoom handles video.
         Async assessments (invite links) are proctored.
       </p>
+
+      {(wsConn === "reconnecting" || wsConn === "disconnected") &&
+        status !== "ended" && (
+          <p className="live-room-conn-banner" role="status">
+            {wsConn === "reconnecting"
+              ? "Connection lost — reconnecting with backoff. Chat and code will resync when connected."
+              : "Disconnected from the live room. Waiting to reconnect…"}
+          </p>
+        )}
 
       {error && <p className="live-room-error">{error}</p>}
 
@@ -348,10 +552,19 @@ export default function LiveInterviewRoom({
                   <input
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="Type a message…"
+                    placeholder={
+                      wsConn === "connected"
+                        ? "Type a message…"
+                        : "Waiting for connection…"
+                    }
                     aria-label="Chat message"
+                    disabled={status === "ended"}
                   />
-                  <button type="submit" className="live-room-btn live-room-btn-primary">
+                  <button
+                    type="submit"
+                    className="live-room-btn live-room-btn-primary"
+                    disabled={status === "ended" || wsConn !== "connected"}
+                  >
                     Send
                   </button>
                 </form>

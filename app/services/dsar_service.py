@@ -79,9 +79,14 @@ async def collect_candidate_export(
         )
         verifications = list(result.scalars().all())
         # Include invite-linked sessions not owned by the user account.
-        session_ids = {
-            UUID(v.session_id) for v in verifications if v.session_id
-        }
+        session_ids: set[UUID] = set()
+        for v in verifications:
+            if not v.session_id:
+                continue
+            try:
+                session_ids.add(UUID(str(v.session_id)))
+            except (TypeError, ValueError):
+                continue
         existing = {s.session_id for s in sessions}
         missing = [sid for sid in session_ids if sid not in existing]
         if missing:
@@ -296,17 +301,28 @@ async def anonymize_candidate_data(
 
     await db.flush()
 
+    note = (
+        "PII anonymized; identity images and recordings deleted when present. "
+        "Session score metadata may remain for recruiter audit."
+    )
+    errors = list(errors)
+    success = len(errors) == 0
+    if not success:
+        note = (
+            "Anonymization completed with some file-deletion errors. "
+            "Database PII was redacted; see errors for storage failures."
+        )
+
     return {
+        "success": success,
+        "message": note,
         "anonymized_at": datetime.now(timezone.utc).isoformat(),
         "deleted_files": deleted_files,
         "deleted_file_count": len(deleted_files),
         "sessions_touched": len(payload.get("sessions", [])),
         "verifications_touched": len(payload.get("candidate_verifications", [])),
         "errors": errors,
-        "note": (
-            "PII anonymized; identity images and recordings deleted when present. "
-            "Session score metadata may remain for recruiter audit."
-        ),
+        "note": note,
     }
 
 

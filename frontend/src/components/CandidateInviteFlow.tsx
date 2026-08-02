@@ -3,11 +3,14 @@ import {
   authApi,
   interviewApi,
   inviteApi,
+  loadStoredRefreshToken,
   setAccessToken,
   setRefreshToken,
 } from "../api/client";
 import InterviewRoom, { type InterviewRoomHandle } from "./InterviewRoom";
-import PreInterviewChecklist from "./PreInterviewChecklist";
+import PreInterviewChecklist, {
+  getMediaErrorMessage,
+} from "./PreInterviewChecklist";
 import Summary from "./Summary";
 import PasswordInput from "./PasswordInput";
 import type { InviteValidInfo } from "../types/invite";
@@ -28,6 +31,50 @@ type InviteStep =
   | "checklist"
   | "interview"
   | "summary";
+
+const INVITE_PROGRESS_KEY = (token: string) => `invite-progress:${token}`;
+
+type PersistedInviteProgress = {
+  sessionId: string;
+  step: InviteStep;
+  candidateEmail: string;
+  identityVerified: boolean;
+};
+
+function readInviteProgress(token: string): PersistedInviteProgress | null {
+  try {
+    const raw = sessionStorage.getItem(INVITE_PROGRESS_KEY(token));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedInviteProgress;
+    if (!parsed?.sessionId || !parsed?.step) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeInviteProgress(
+  token: string,
+  progress: PersistedInviteProgress,
+): void {
+  try {
+    sessionStorage.setItem(INVITE_PROGRESS_KEY(token), JSON.stringify(progress));
+  } catch {
+    /* quota */
+  }
+}
+
+function clearInviteProgress(token: string): void {
+  try {
+    sessionStorage.removeItem(INVITE_PROGRESS_KEY(token));
+  } catch {
+    /* ignore */
+  }
+}
+
+function inviteAllowsResumeLogin(reason: string): boolean {
+  return /expired|usage limit/i.test(reason);
+}
 
 type DetailsMode = "register" | "login";
 
@@ -111,9 +158,47 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
 
   useEffect(() => {
     let cancelled = false;
-    inviteApi
-      .checkInvite(token)
-      .then((res) => {
+
+    async function boot() {
+      // Refresh mid-session: restore tokens + jump past welcome if draft/progress exists.
+      const saved = readInviteProgress(token);
+      const refresh = loadStoredRefreshToken();
+      if (saved && refresh) {
+        try {
+          const tokens = await authApi.refresh(refresh);
+          if (cancelled) return;
+          setAccessToken(tokens.data.access_token);
+          setRefreshToken(tokens.data.refresh_token);
+          setSessionId(saved.sessionId);
+          setCandidateEmail(saved.candidateEmail || "");
+          setIdentityVerified(saved.identityVerified);
+          if (
+            saved.identityVerified ||
+            saved.step === "checklist" ||
+            saved.step === "interview"
+          ) {
+            setInfo(
+              "Session restored after refresh. Re-check camera and mic — your answer draft was kept.",
+            );
+            setStep("checklist");
+            // Still load invite meta in background for display; ignore failures.
+            void inviteApi.checkInvite(token).then((res) => {
+              if (!cancelled && res.valid) setInviteInfo(res);
+            });
+            return;
+          }
+          setStep("identity");
+          void inviteApi.checkInvite(token).then((res) => {
+            if (!cancelled && res.valid) setInviteInfo(res);
+          });
+          return;
+        } catch {
+          /* fall through to normal invite check */
+        }
+      }
+
+      try {
+        const res = await inviteApi.checkInvite(token);
         if (cancelled) return;
         if (res.valid) {
           setInviteInfo(res);
@@ -122,19 +207,39 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
           setInvalidReason(res.reason);
           setStep("invalid");
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         if (!cancelled) {
           setInvalidReason(
             err instanceof Error ? err.message : "Unable to validate invite link",
           );
           setStep("invalid");
         }
-      });
+      }
+    }
+
+    void boot();
     return () => {
       cancelled = true;
     };
   }, [token]);
+
+  // Persist progress so refresh mid-flow is never a dead end.
+  useEffect(() => {
+    if (!sessionId) return;
+    if (
+      step !== "identity" &&
+      step !== "checklist" &&
+      step !== "interview"
+    ) {
+      return;
+    }
+    writeInviteProgress(token, {
+      sessionId,
+      step,
+      candidateEmail,
+      identityVerified,
+    });
+  }, [token, sessionId, step, candidateEmail, identityVerified]);
 
   useEffect(() => {
     return () => {
@@ -167,14 +272,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
         }
       } catch (err) {
         if (!cancelled) {
-          const insecure = !window.isSecureContext;
-          setError(
-            insecure
-              ? "Webcam requires HTTPS or localhost. Open http://127.0.0.1:5173 (not your LAN IP) for local testing."
-              : err instanceof Error
-                ? err.message
-                : "Could not access webcam for selfie capture.",
-          );
+          setError(getMediaErrorMessage(err));
         }
       }
     })();
@@ -439,6 +537,7 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
     setRecordingSaved(uploaded);
     setSummary(ended);
     releaseInterviewMediaStream();
+    clearInviteProgress(token);
     setStep("summary");
   }
 
@@ -546,14 +645,31 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
   }
 
   if (step === "invalid") {
+    const canResume = inviteAllowsResumeLogin(invalidReason);
     return (
       <div className="invite-flow card status-panel">
         <h2 className="section-title">Invite unavailable</h2>
         <p className="invite-meta">
           {invalidReason || "This link has expired or is invalid"}
         </p>
-        <div className="actions" style={{ marginTop: "1.25rem" }}>
-          <a href="/" className="primary" style={{ textDecoration: "none" }}>
+        <div className="actions" style={{ marginTop: "1.25rem", gap: "0.75rem" }}>
+          {canResume && (
+            <button
+              type="button"
+              className="primary"
+              onClick={() => {
+                setDetailsMode("login");
+                setError(null);
+                setInfo(
+                  "If you already started this interview, log in with the same email to continue.",
+                );
+                setStep("details");
+              }}
+            >
+              Already started? Log in
+            </button>
+          )}
+          <a href="/" className="secondary" style={{ textDecoration: "none" }}>
             Back to home
           </a>
         </div>
@@ -933,9 +1049,102 @@ export default function CandidateInviteFlow({ token }: CandidateInviteFlowProps)
               candidateEmail={candidateEmail}
             />
           ) : (
-            <div className="card loading">Loading next question…</div>
+            <div className="card status-panel">
+              <h2 className="section-title">
+                {currentQuestion.is_complete
+                  ? "Interview complete"
+                  : "Could not load the next question"}
+              </h2>
+              <p className="invite-meta">
+                {currentQuestion.is_complete
+                  ? "All questions are done. Finish to see your summary."
+                  : "Something went wrong loading the next question. You can retry or end and save progress."}
+              </p>
+              {error && <div className="alert error">{error}</div>}
+              <div className="actions" style={{ marginTop: "1rem", gap: "0.75rem" }}>
+                {!currentQuestion.is_complete && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={loading}
+                    onClick={() => {
+                      void (async () => {
+                        setLoading(true);
+                        setError(null);
+                        try {
+                          const next =
+                            await interviewApi.getCurrentQuestion(sessionId);
+                          setCurrentQuestion(next);
+                        } catch (err) {
+                          setError(
+                            err instanceof Error
+                              ? err.message
+                              : "Failed to load question",
+                          );
+                        } finally {
+                          setLoading(false);
+                        }
+                      })();
+                    }}
+                  >
+                    {loading ? "Retrying…" : "Retry"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={loading}
+                  onClick={() => {
+                    void (async () => {
+                      setLoading(true);
+                      setError(null);
+                      try {
+                        if (currentQuestion.is_complete) {
+                          await finishInterview();
+                        } else {
+                          await handleEndEarly();
+                        }
+                      } catch (err) {
+                        setError(
+                          err instanceof Error
+                            ? err.message
+                            : "Failed to finish interview",
+                        );
+                      } finally {
+                        setLoading(false);
+                      }
+                    })();
+                  }}
+                >
+                  {loading ? "Please wait…" : "Finish interview"}
+                </button>
+              </div>
+            </div>
           )}
         </>
+      )}
+
+      {step === "interview" && sessionId && !currentQuestion && (
+        <div className="card status-panel">
+          <h2 className="section-title">Session interrupted</h2>
+          <p className="invite-meta">
+            We could not restore the current question. Return to the checklist to
+            continue — your drafted answers are kept in this browser.
+          </p>
+          {error && <div className="alert error">{error}</div>}
+          <div className="actions" style={{ marginTop: "1rem" }}>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => {
+                setError(null);
+                setStep("checklist");
+              }}
+            >
+              Back to checklist
+            </button>
+          </div>
+        </div>
       )}
 
       {step === "summary" && summary && sessionId && (

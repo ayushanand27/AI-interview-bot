@@ -87,13 +87,25 @@ class InviteService:
         return recruiter.full_name
 
     def _validate_invite_row(
-        self, invite: InterviewInvite | None
+        self,
+        invite: InterviewInvite | None,
+        *,
+        for_new_use: bool = True,
     ) -> InviteInvalidResponse | None:
+        """Validate invite availability.
+
+        for_new_use=True: block expired / maxed invites (check + first attach).
+        for_new_use=False: allow an in-progress candidate to resume / verify
+        even after their seat consumed the max-uses counter.
+        """
         if invite is None:
             return InviteInvalidResponse(reason="This invite link is invalid.")
 
         if getattr(invite, "deleted_at", None) is not None:
             return InviteInvalidResponse(reason="This invite link is no longer available.")
+
+        if not for_new_use:
+            return None
 
         now = datetime.now(timezone.utc)
         expiry = invite.expiry_at
@@ -104,7 +116,9 @@ class InviteService:
             return InviteInvalidResponse(reason="This link has expired.")
 
         if invite.used_count >= invite.max_uses:
-            return InviteInvalidResponse(reason="This invite link has reached its usage limit.")
+            return InviteInvalidResponse(
+                reason="This invite link has reached its usage limit."
+            )
 
         return None
 
@@ -234,17 +248,22 @@ class InviteService:
         self, token: str, data: InviteRegisterRequest
     ) -> InviteRegisterResponse:
         invite = await self._get_invite(token)
-        invalid = self._validate_invite_row(invite)
-        if invalid is not None:
-            raise BadRequestException(invalid.reason)
 
-        assert invite is not None
-
+        # Resume an existing seat even when max-uses is exhausted.
         existing_registration = await self._resume_existing_registration(
             token, str(data.email)
         )
         if existing_registration is not None:
+            invalid_resume = self._validate_invite_row(invite, for_new_use=False)
+            if invalid_resume is not None:
+                raise BadRequestException(invalid_resume.reason)
             return existing_registration
+
+        invalid = self._validate_invite_row(invite, for_new_use=True)
+        if invalid is not None:
+            raise BadRequestException(invalid.reason)
+
+        assert invite is not None
 
         email_lower = str(data.email).strip().lower()
         existing_user = await self.db.execute(
@@ -301,11 +320,6 @@ class InviteService:
         self, token: str, data: InviteLoginRequest
     ) -> InviteRegisterResponse:
         invite = await self._get_invite(token)
-        invalid = self._validate_invite_row(invite)
-        if invalid is not None:
-            raise BadRequestException(invalid.reason)
-
-        assert invite is not None
 
         result = await self.db.execute(
             select(User).where(func.lower(User.email) == str(data.email).strip().lower())
@@ -331,7 +345,16 @@ class InviteService:
             token, str(data.email)
         )
         if existing_registration is not None:
+            invalid_resume = self._validate_invite_row(invite, for_new_use=False)
+            if invalid_resume is not None:
+                raise BadRequestException(invalid_resume.reason)
             return existing_registration
+
+        invalid = self._validate_invite_row(invite, for_new_use=True)
+        if invalid is not None:
+            raise BadRequestException(invalid.reason)
+
+        assert invite is not None
 
         return await self._attach_candidate_to_invite(
             invite=invite,
@@ -346,7 +369,8 @@ class InviteService:
         self, token: str, data: InviteVerifyIdentityRequest
     ) -> InviteVerifyIdentityResponse:
         invite = await self._get_invite(token)
-        invalid = self._validate_invite_row(invite)
+        # Identity verify is mid-flow after registration — do not apply max-uses.
+        invalid = self._validate_invite_row(invite, for_new_use=False)
         if invalid is not None:
             raise BadRequestException(invalid.reason)
 

@@ -62,7 +62,9 @@ def _escape(text: str) -> str:
     )
 
 
-def _format_date(dt: datetime) -> str:
+def _format_date(dt: datetime | None) -> str:
+    if dt is None:
+        return "Not available"
     if isinstance(dt, datetime):
         return dt.strftime("%Y-%m-%d %H:%M UTC")
     return str(dt)
@@ -209,8 +211,18 @@ def generate_session_report_pdf(
     story: list = []
 
     story.append(Paragraph("Interview Report", styles["title"]))
-    story.append(Paragraph(f"<b>Candidate:</b> {_escape(detail.candidate_name)}", styles["body"]))
-    story.append(Paragraph(f"<b>Role:</b> {_escape(detail.role_title)}", styles["body"]))
+    story.append(
+        Paragraph(
+            f"<b>Candidate:</b> {_escape(detail.candidate_name or 'Unknown Candidate')}",
+            styles["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            f"<b>Role:</b> {_escape(detail.role_title or '—')}",
+            styles["body"],
+        )
+    )
     story.append(
         Paragraph(
             f"<b>Date:</b> {_escape(_format_date(detail.date))}",
@@ -242,15 +254,17 @@ def generate_session_report_pdf(
                 styles["body"],
             )
         )
-    if detail.integrity_penalty_percent > 0:
+    penalty = detail.integrity_penalty_percent or 0.0
+    if penalty > 0:
         story.append(
             Paragraph(
-                f"Integrity penalty: <b>-{detail.integrity_penalty_percent}%</b>",
+                f"Integrity penalty: <b>-{penalty}%</b>",
                 styles["body"],
             )
         )
     if detail.adjusted_score is not None:
-        rec = (detail.final_score or {}).get("recommendation")
+        final_payload = detail.final_score if isinstance(detail.final_score, dict) else {}
+        rec = final_payload.get("recommendation")
         rec_text = f" — Recommendation: {rec}" if rec else ""
         story.append(
             Paragraph(
@@ -258,7 +272,7 @@ def generate_session_report_pdf(
                 styles["body"],
             )
         )
-    elif detail.final_score:
+    elif isinstance(detail.final_score, dict) and detail.final_score:
         overall = detail.final_score.get("final_score", detail.final_score.get("candidate_score"))
         if overall is not None:
             rec = detail.final_score.get("recommendation")
@@ -266,6 +280,8 @@ def generate_session_report_pdf(
             story.append(
                 Paragraph(f"<b>{overall}</b> / 100{rec_text}", styles["body"])
             )
+        else:
+            story.append(Paragraph("No overall score available.", styles["muted"]))
     else:
         story.append(Paragraph("No overall score available.", styles["muted"]))
 
@@ -298,16 +314,25 @@ def generate_session_report_pdf(
     else:
         story.append(Paragraph("Recording available: <b>No</b>", styles["body"]))
 
-    for item in detail.transcript:
+    for item in detail.transcript or []:
         story.append(Spacer(1, 0.12 * inch))
         story.append(Paragraph(f"Question {item.index}", styles["heading"]))
-        story.append(Paragraph(_escape(item.question), styles["body"]))
+        story.append(Paragraph(_escape(item.question or "(question unavailable)"), styles["body"]))
         story.append(Paragraph("<b>Answer</b>", styles["body"]))
         answer = item.answer if item.answer else "(not answered)"
         story.append(Paragraph(_escape(answer), styles["body"]))
         story.append(Paragraph("<b>Judge feedback</b>", styles["body"]))
         for line in _judgment_feedback(item):
             story.append(Paragraph(_escape(line), styles["body"]))
+
+    if not detail.transcript:
+        story.append(Spacer(1, 0.12 * inch))
+        story.append(
+            Paragraph(
+                "No questions or answers were recorded for this session.",
+                styles["muted"],
+            )
+        )
 
     doc.build(story)
     buffer.seek(0)
@@ -316,7 +341,8 @@ def generate_session_report_pdf(
 
 def report_filename(detail: RecruiterSessionDetail) -> str:
     safe_name = "".join(
-        c if c.isalnum() or c in "-_" else "-" for c in detail.candidate_name
+        c if c.isalnum() or c in "-_" else "-"
+        for c in (detail.candidate_name or "candidate")
     ).strip("-") or "candidate"
     session_short = str(detail.session_id).replace("-", "")[:8]
     return f"interview-report-{safe_name}-{session_short}.pdf"
@@ -385,7 +411,7 @@ def _integrity_status_label(session: InterviewSession) -> str:
 
 def _question_scores(session: InterviewSession) -> list[float]:
     scores: list[float] = []
-    for judgment_raw in session.answer_judgments:
+    for judgment_raw in session.answer_judgments or []:
         if not isinstance(judgment_raw, dict) or judgment_raw.get("error"):
             continue
         raw = judgment_raw.get("weighted_total")
@@ -397,7 +423,7 @@ def _question_scores(session: InterviewSession) -> list[float]:
 def _aggregate_feedback(session: InterviewSession) -> tuple[list[str], list[str]]:
     strengths: list[str] = []
     improvements: list[str] = []
-    for judgment_raw in session.answer_judgments:
+    for judgment_raw in session.answer_judgments or []:
         if not isinstance(judgment_raw, dict):
             continue
         for item in judgment_raw.get("strengths") or []:
@@ -434,7 +460,10 @@ def generate_candidate_report_pdf(
 
     name = candidate_name or _candidate_display_name(session)
     report_date = interview_date or session.created_at
-    final = session.final_score or {}
+    final_raw = session.final_score
+    final: dict[str, Any] = final_raw if isinstance(final_raw, dict) else {}
+    if isinstance(final_raw, (int, float)):
+        final = {"final_score": float(final_raw)}
     display_score = final.get("original_score")
     if display_score is None:
         display_score = final.get("final_score", final.get("candidate_score"))
@@ -450,7 +479,10 @@ def generate_candidate_report_pdf(
     story.append(Spacer(1, 0.1 * inch))
     story.append(Paragraph(f"<b>Candidate Name:</b> {_escape(name)}", styles["body"]))
     story.append(
-        Paragraph(f"<b>Role Applied For:</b> {_escape(session.role_title)}", styles["body"])
+        Paragraph(
+            f"<b>Role Applied For:</b> {_escape(session.role_title or '—')}",
+            styles["body"],
+        )
     )
     story.append(
         Paragraph(
@@ -492,11 +524,21 @@ def generate_candidate_report_pdf(
     story.append(PageBreak())
     story.append(Paragraph("Detailed Feedback", styles["title"]))
 
-    for i, question in enumerate(session.questions):
-        answer = session.answers[i] if i < len(session.answers) else ""
-        judgment_raw = (
-            session.answer_judgments[i] if i < len(session.answer_judgments) else None
+    questions = list(session.questions or [])
+    answers = list(session.answers or [])
+    judgments = list(session.answer_judgments or [])
+
+    if not questions:
+        story.append(
+            Paragraph(
+                "No questions were recorded for this interview.",
+                styles["muted"],
+            )
         )
+
+    for i, question in enumerate(questions):
+        answer = answers[i] if i < len(answers) else ""
+        judgment_raw = judgments[i] if i < len(judgments) else None
         judgment = judgment_raw if isinstance(judgment_raw, dict) else None
 
         story.append(Spacer(1, 0.1 * inch))
@@ -537,7 +579,7 @@ def generate_candidate_report_pdf(
     story.append(
         Paragraph("Thank you for completing this interview.", styles["body"])
     )
-    answered = len(session.answers)
+    answered = len(answers)
     story.append(
         Paragraph(f"<b>Total questions answered:</b> {answered}", styles["body"])
     )
