@@ -109,7 +109,9 @@ async def login(
     status_code=200,
     summary="Refresh access token",
 )
+@limiter.limit(AUTH_LOGIN_LIMIT)
 async def refresh_token(
+    request: Request,
     data: RefreshRequest,
     db: AsyncSession = Depends(get_db),
 ):

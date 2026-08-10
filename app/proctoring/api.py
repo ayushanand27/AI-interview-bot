@@ -242,19 +242,22 @@ def analyze_frame(request: Request, req: FrameRequest):
 
 
 @router.get("/warnings")
-def get_warnings(session_id: Optional[str] = None):
+@limiter.limit(PROCTOR_ANALYZE_LIMIT)
+def get_warnings(request: Request, session_id: Optional[str] = None):
     warning_mgr = get_warning_manager(session_id)
     return warning_mgr.get_integrity_report()
 
 
 @router.get("/integrity-report")
-def integrity_report(session_id: Optional[str] = None):
+@limiter.limit(PROCTOR_ANALYZE_LIMIT)
+def integrity_report(request: Request, session_id: Optional[str] = None):
     warning_mgr = get_warning_manager(session_id)
     return warning_mgr.get_integrity_report()
 
 
 @router.post("/audio-violation")
-def report_audio_violation(body: AudioViolationRequest):
+@limiter.limit(PROCTOR_ANALYZE_LIMIT)
+def report_audio_violation(request: Request, body: AudioViolationRequest):
     """Client-reported integrity events (ambient audio, tab switch, etc.)."""
     warning_mgr = get_warning_manager(body.session_id)
     violation = warning_mgr.record_client_violation(
@@ -277,7 +280,8 @@ def report_audio_violation(body: AudioViolationRequest):
 
 
 @router.post("/verify-environment")
-def verify_environment(body: VerifyEnvironmentRequest):
+@limiter.limit(PROCTOR_ANALYZE_LIMIT)
+def verify_environment(request: Request, body: VerifyEnvironmentRequest):
     """
     Pre-interview environment check from the client.
     Logs findings to the session proctoring state and blocks unsafe setups.
@@ -372,7 +376,8 @@ def verify_environment(body: VerifyEnvironmentRequest):
 
 
 @router.post("/reset")
-def reset_session(body: ResetRequest | None = None):
+@limiter.limit(PROCTOR_ANALYZE_LIMIT)
+def reset_session(request: Request, body: ResetRequest | None = None):
     session_id = body.session_id if body else None
     removed = remove_warning_manager(session_id)
     clear_object_detection_schedule(session_id)

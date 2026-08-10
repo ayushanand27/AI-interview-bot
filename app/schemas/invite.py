@@ -1,9 +1,14 @@
 """Schemas for candidate invite link flow."""
 
-from typing import Literal, Optional, Union
+from typing import Annotated, Literal, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
+
+# Generous bound for a base64-encoded JPEG frame (~6MB raw image before encoding).
+_MAX_B64_IMAGE_LEN = 8_000_000
+_MAX_SELFIE_FRAMES = 10
+_B64Image = Annotated[str, Field(max_length=_MAX_B64_IMAGE_LEN)]
 
 
 class InviteValidResponse(BaseModel):
@@ -43,10 +48,12 @@ class InviteLoginRequest(BaseModel):
 
 
 class InviteVerifyIdentityRequest(BaseModel):
-    id_image_base64: str
-    selfie_base64: str
-    selfie_frames_base64: list[str] = Field(default_factory=list)
-    liveness_actions: list[str] = Field(default_factory=list)
+    id_image_base64: _B64Image
+    selfie_base64: _B64Image
+    selfie_frames_base64: list[_B64Image] = Field(
+        default_factory=list, max_length=_MAX_SELFIE_FRAMES
+    )
+    liveness_actions: list[str] = Field(default_factory=list, max_length=20)
     session_id: UUID
 
 

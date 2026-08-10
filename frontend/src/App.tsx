@@ -202,6 +202,15 @@ export default function App() {
     }
   }
 
+  return <CandidatePracticeApp />;
+}
+
+// Split out from App() so its ~15 hooks are never conditionally skipped —
+// App() only ever renders one component type per pathname, so React never
+// sees a hook-count mismatch across re-renders (e.g. browser back/forward
+// between /recruiter and /) the way it would if these hooks lived inline
+// after App()'s early-return route checks.
+function CandidatePracticeApp() {
   const [accessToken, setAccessTokenState] = useState<string | null>(null);
   const [user, setUser] = useState<UserResponse | null>(null);
   const [phase, setPhase] = useState<AppPhase>("setup");

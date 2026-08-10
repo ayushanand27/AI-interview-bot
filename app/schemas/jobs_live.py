@@ -10,7 +10,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 class CreateJobRequest(BaseModel):
     title: str = Field(..., min_length=2, max_length=255)
-    jd_text: str = Field(..., min_length=20)
+    jd_text: str = Field(..., min_length=20, max_length=20_000)
 
 
 class JobSummary(BaseModel):
@@ -91,7 +91,7 @@ class LiveRoomPublic(BaseModel):
 
 class LiveRunTestsRequest(BaseModel):
     language: str = "python"
-    source: str
+    source: str = Field(..., max_length=100_000)
     public_tests: list[dict[str, str]] | None = None
 
 

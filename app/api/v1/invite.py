@@ -1,8 +1,14 @@
 """Candidate invite link API — validation, registration, identity verification."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.limiter import (
+    IDENTITY_VERIFY_LIMIT,
+    INVITE_LOGIN_LIMIT,
+    INVITE_REGISTER_LIMIT,
+    limiter,
+)
 from app.db.session import get_db
 from app.schemas.common import BaseResponse
 from app.schemas.invite import (
@@ -36,7 +42,9 @@ async def get_invite(
     response_model=BaseResponse[InviteRegisterResponse],
     summary="Register candidate details and create interview session",
 )
+@limiter.limit(INVITE_REGISTER_LIMIT)
 async def register_invite_candidate(
+    request: Request,
     token: str,
     data: InviteRegisterRequest,
     db: AsyncSession = Depends(get_db),
@@ -55,7 +63,9 @@ async def register_invite_candidate(
     response_model=BaseResponse[InviteRegisterResponse],
     summary="Log in an existing candidate and attach them to this invite session",
 )
+@limiter.limit(INVITE_LOGIN_LIMIT)
 async def login_invite_candidate(
+    request: Request,
     token: str,
     data: InviteLoginRequest,
     db: AsyncSession = Depends(get_db),
@@ -74,7 +84,9 @@ async def login_invite_candidate(
     response_model=BaseResponse[InviteVerifyIdentityResponse],
     summary="Verify candidate identity using ID photo and selfie",
 )
+@limiter.limit(IDENTITY_VERIFY_LIMIT)
 async def verify_invite_identity(
+    request: Request,
     token: str,
     data: InviteVerifyIdentityRequest,
     db: AsyncSession = Depends(get_db),

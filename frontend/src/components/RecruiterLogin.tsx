@@ -250,7 +250,7 @@ export default function RecruiterLogin() {
         ) : (
           <form onSubmit={handleRegister}>
             <label htmlFor="recruiter-company">Company</label>
-            <input id="recruiter-company" name="company_name" required />
+            <input id="recruiter-company" name="company_name" required maxLength={200} />
             <label htmlFor="recruiter-register-email">Email</label>
             <input
               id="recruiter-register-email"
@@ -268,7 +268,7 @@ export default function RecruiterLogin() {
               autoComplete="new-password"
             />
             <label htmlFor="recruiter-phone">Phone (optional)</label>
-            <input id="recruiter-phone" name="phone" type="tel" />
+            <input id="recruiter-phone" name="phone" type="tel" maxLength={30} />
             <button type="submit" className="rp-primary" disabled={loading}>
               {loading ? "Creating…" : "Create account"}
             </button>

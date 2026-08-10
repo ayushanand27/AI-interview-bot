@@ -1,10 +1,8 @@
 """Privacy / DSAR endpoints — export and delete/anonymize candidate data."""
 
-from __future__ import annotations
-
 import logging
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +13,7 @@ from app.core.exceptions import (
     InternalServerException,
     NotFoundException,
 )
+from app.core.limiter import PRIVACY_LIMIT, limiter
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.services.dsar_service import (
@@ -45,7 +44,9 @@ class AdminDsarExportRequest(BaseModel):
 
 
 @router.get("/export")
+@limiter.limit(PRIVACY_LIMIT)
 async def export_my_data(
+    request: Request,
     format: str = Query("json", pattern="^(json|zip)$"),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -73,7 +74,9 @@ async def export_my_data(
 
 
 @router.post("/delete-request")
+@limiter.limit(PRIVACY_LIMIT)
 async def delete_my_data(
+    request: Request,
     body: DsarDeleteRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -104,7 +107,9 @@ async def delete_my_data(
 
 
 @router.post("/admin/export")
+@limiter.limit(PRIVACY_LIMIT)
 async def admin_export_by_email(
+    request: Request,
     body: AdminDsarExportRequest,
     format: str = Query("json", pattern="^(json|zip)$"),
     current_user: User = Depends(require_role(UserRole.RECRUITER)),
@@ -148,7 +153,9 @@ async def admin_export_by_email(
 
 
 @router.post("/admin/delete-request")
+@limiter.limit(PRIVACY_LIMIT)
 async def admin_delete_by_email(
+    request: Request,
     body: AdminDsarExportRequest,
     confirm: bool = Query(False),
     delete_files: bool = Query(True),

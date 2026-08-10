@@ -11,7 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.dependencies import require_role
 from app.core.exceptions import NotFoundException
-from app.core.limiter import EMAIL_SEND_LIMIT, RECRUITER_WRITE_LIMIT, limiter
+from app.core.limiter import (
+    CODING_RUN_LIMIT,
+    EMAIL_SEND_LIMIT,
+    RECRUITER_WRITE_LIMIT,
+    limiter,
+)
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.common import BaseResponse
@@ -124,7 +129,9 @@ async def get_live_room(token: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/rooms/{token}/run-tests", response_model=BaseResponse[dict])
+@limiter.limit(CODING_RUN_LIMIT)
 async def run_live_tests(
+    request: Request,
     token: str,
     body: LiveRunTestsRequest,
     db: AsyncSession = Depends(get_db),
@@ -238,7 +245,17 @@ async def _broadcast(token: str, payload: dict, exclude: WebSocket | None = None
 
 
 @router.websocket("/ws/{token}")
-async def live_room_ws(websocket: WebSocket, token: str):
+async def live_room_ws(
+    websocket: WebSocket,
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await LiveInterviewService(db).get_room(token)
+    except Exception:
+        await websocket.close(code=4404, reason="Room not found or expired")
+        return
+
     await websocket.accept()
     role = websocket.query_params.get("role", "candidate")
     name = websocket.query_params.get("name", role)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { interviewApi, recruiterApi } from "../api/client";
 import type {
   RecruiterAnalyticsResponse,
@@ -264,6 +264,8 @@ export default function RecruiterDashboard({
   onLogout,
 }: RecruiterDashboardProps) {
   const [sessions, setSessions] = useState<RecruiterSessionSummary[]>([]);
+  const sessionsRequestId = useRef(0);
+  const analyticsRequestId = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<RecruiterSessionDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -342,31 +344,53 @@ export default function RecruiterDashboard({
 
   function loadSessions(activeFilters?: RecruiterSessionFilters) {
     const query = activeFilters ?? filters;
+    const requestId = ++sessionsRequestId.current;
     onLoadingChange(true);
     onError(null);
     recruiterApi
       .listSessions(query)
-      .then((res) => setSessions(res.data ?? []))
-      .catch((err) => {
-        onError(err instanceof Error ? err.message : "Failed to load sessions");
+      .then((res) => {
+        if (requestId === sessionsRequestId.current) {
+          setSessions(res.data ?? []);
+        }
       })
-      .finally(() => onLoadingChange(false));
+      .catch((err) => {
+        if (requestId === sessionsRequestId.current) {
+          onError(err instanceof Error ? err.message : "Failed to load sessions");
+        }
+      })
+      .finally(() => {
+        if (requestId === sessionsRequestId.current) {
+          onLoadingChange(false);
+        }
+      });
   }
 
   function loadAnalytics(activeFilters?: RecruiterSessionFilters) {
     const query = activeFilters ?? filters;
+    const requestId = ++analyticsRequestId.current;
     setAnalyticsLoading(true);
     setAnalyticsError(null);
     recruiterApi
       .getAnalytics(query)
-      .then((res) => setAnalytics(res.data ?? null))
-      .catch((err) => {
-        setAnalytics(null);
-        setAnalyticsError(
-          err instanceof Error ? err.message : "Failed to load analytics",
-        );
+      .then((res) => {
+        if (requestId === analyticsRequestId.current) {
+          setAnalytics(res.data ?? null);
+        }
       })
-      .finally(() => setAnalyticsLoading(false));
+      .catch((err) => {
+        if (requestId === analyticsRequestId.current) {
+          setAnalytics(null);
+          setAnalyticsError(
+            err instanceof Error ? err.message : "Failed to load analytics",
+          );
+        }
+      })
+      .finally(() => {
+        if (requestId === analyticsRequestId.current) {
+          setAnalyticsLoading(false);
+        }
+      });
   }
 
   function refreshDashboard(activeFilters?: RecruiterSessionFilters) {

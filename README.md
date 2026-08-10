@@ -12,7 +12,7 @@ AI-powered hiring flow: **Jobs → ATS shortlist → Assessment invites → Live
 | **Health** | https://ai-interview-bot.duckdns.org/health |
 | **Recruiter** | https://ai-interview-bot.duckdns.org/recruiter |
 | **Host** | AWS EC2 `t3.micro` (Ubuntu 24.04, Mumbai) + nginx + Let's Encrypt |
-| **Stack** | FastAPI + React (Vite) + SQLite (prod) / Postgres (local) + Groq |
+| **Stack** | FastAPI + React (Vite) + Postgres (RDS, prod) / Postgres (Docker, local) + Groq |
 
 > Webcam / microphone need a **secure context** (`https://` or `localhost`). The live site uses free DuckDNS + Let's Encrypt SSL.
 
@@ -156,10 +156,21 @@ PM2 → uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 1
 |---|---|
 | FastAPI + Python | API, auth, interviews, objective grading, reports |
 | React + Vite + TypeScript | Candidate + recruiter UI |
-| Postgres (local Docker) / SQLite (EC2) | Data |
+| Postgres (RDS in prod / Docker locally) | Data — SQLite also supported as a fallback URL |
 | Groq | Questions, subjective judging, Whisper transcription |
 | MediaPipe + YOLOv8n + OpenCV | Proctoring / identity |
 | nginx + PM2 | Reverse proxy + process manager |
+
+---
+
+## Security & hardening
+
+- **Rate limiting** (slowapi) on every endpoint that costs money or can be abused: auth (register/login/refresh), job/live/assessment creation, LLM question generation, all email-send endpoints, identity verification, DSAR export, and the public API docs.
+- **Security response headers**: HSTS (prod), X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and a Permissions-Policy that explicitly still allows camera/microphone for proctoring.
+- **Validation errors are humanized** server-side (`app/main.py`'s `validation_exception_handler`) so a raw Pydantic message never reaches a recruiter or candidate — every 422 response reads like "Title must be at least 2 characters," not a stack-trace-flavored string.
+- `/docs`, `/redoc`, `/openapi.json` stay public (useful for demoing the API) but are rate-limited rather than wide open.
+- Passwords hashed with `bcrypt` (12 rounds) directly — no `passlib`.
+- CI (`.github/workflows/ci.yml`) runs the backend test suite and a frontend typecheck/build/`npm audit` on every push and PR to `main`.
 
 ---
 
@@ -225,8 +236,12 @@ Open **http://127.0.0.1:5173** (prefer `127.0.0.1` over LAN IP for camera).
 ### Tests
 
 ```bash
-python scripts/full_test.py
+python -m pytest tests/ -q      # backend
+cd frontend && npm run build    # typecheck + frontend build
+python scripts/full_test.py     # end-to-end smoke script
 ```
+
+CI runs the same backend/frontend checks automatically on every push and PR to `main` (`.github/workflows/ci.yml`).
 
 ---
 
@@ -315,7 +330,7 @@ bash deploy/setup_https.sh YOUR_DOMAIN you@gmail.com
 ```env
 APP_ENV=production
 SECRET_KEY=long-random-hex
-DATABASE_URL=sqlite+aiosqlite:////var/www/ai-interview-bot/data/interview_bot.db
+DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@your-rds-endpoint.ap-south-1.rds.amazonaws.com:5432/postgres
 GROQ_API_KEY=gsk-...
 FRONTEND_URL=https://ai-interview-bot.duckdns.org
 ALLOWED_ORIGINS=https://ai-interview-bot.duckdns.org
@@ -327,7 +342,11 @@ SMTP_PASSWORD=your-app-password
 ATS_ENABLE_SEMANTIC=false
 ```
 
+SQLite fallback (single-file, no RDS needed): `DATABASE_URL=sqlite+aiosqlite:////var/www/ai-interview-bot/data/interview_bot.db`.
+
 Leave `VITE_API_URL` empty for same-origin nginx.
+
+**RDS note:** use a strong, randomly generated master password — not a short dictionary-word-plus-digits string. If you inherited a weak one, rotate it via AWS Console → RDS → Modify, then update `DATABASE_URL` here and restart PM2.
 
 ### Security group
 

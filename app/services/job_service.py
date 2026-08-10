@@ -130,6 +130,10 @@ class JobService:
                 content_type="application/octet-stream",
             )
         except Exception:
+            logger.exception(
+                "Resume storage failed for job %s — resume file will not be retrievable",
+                token,
+            )
             storage_key = None
 
         app_row = JobApplication(

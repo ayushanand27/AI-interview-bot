@@ -15,7 +15,9 @@ export default class ErrorBoundary extends Component<Props, State> {
   static getDerivedStateFromError(error: Error): State {
     return {
       hasError: true,
-      message: error.message || "Something went wrong.",
+      message: import.meta.env.DEV
+        ? error.message || "Something went wrong."
+        : "Something went wrong. Please reload the page.",
     };
   }
 

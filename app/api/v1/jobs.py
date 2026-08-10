@@ -61,22 +61,25 @@ async def list_jobs(
 ):
     service = JobService(db)
     jobs = await service.list_jobs(current_user.id)
-    out: list[JobSummary] = []
-    for job in jobs:
-        count = await db.scalar(
-            select(func.count())
-            .select_from(JobApplication)
-            .where(JobApplication.job_id == job.id)
+    job_ids = [job.id for job in jobs]
+    counts: dict[int, int] = {}
+    if job_ids:
+        rows = await db.execute(
+            select(JobApplication.job_id, func.count())
+            .where(JobApplication.job_id.in_(job_ids))
+            .group_by(JobApplication.job_id)
         )
-        out.append(
-            JobSummary(
-                token=job.token,
-                title=job.title,
-                apply_link=_apply_link(job.token),
-                created_at=job.created_at,
-                application_count=int(count or 0),
-            )
+        counts = dict(rows.all())
+    out = [
+        JobSummary(
+            token=job.token,
+            title=job.title,
+            apply_link=_apply_link(job.token),
+            created_at=job.created_at,
+            application_count=int(counts.get(job.id, 0)),
         )
+        for job in jobs
+    ]
     return BaseResponse(success=True, message="OK", data=out)
 
 

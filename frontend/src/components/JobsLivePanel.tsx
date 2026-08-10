@@ -102,9 +102,9 @@ export default function JobsLivePanel({
     jobsLiveApi
       .listLiveRooms()
       .then((res) => setLiveRooms(res.data ?? []))
-      .catch(() => {
-        /* ignore */
-      });
+      .catch((err) =>
+        onError(err instanceof Error ? err.message : "Failed to load live rooms"),
+      );
   }
 
   function refreshAssessments() {
@@ -261,7 +261,7 @@ export default function JobsLivePanel({
         email: opts?.candidateEmail,
         name: opts?.candidateName,
       });
-      window.open(`${res.data.join_link}?role=recruiter`, "_blank");
+      window.open(`${res.data.join_link}?role=recruiter`, "_blank", "noopener,noreferrer");
     } catch (err) {
       onError(err instanceof Error ? err.message : "Live room failed");
     } finally {
@@ -304,7 +304,7 @@ export default function JobsLivePanel({
   async function sendAssessmentInvite() {
     if (!assessApp) return;
     const email = assessEmail.trim().toLowerCase();
-    if (!email || !email.includes("@")) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       onError("Enter a valid candidate email.");
       return;
     }
@@ -475,6 +475,7 @@ export default function JobsLivePanel({
             id="live-title"
             value={liveTitle}
             onChange={(e) => setLiveTitle(e.target.value)}
+            maxLength={255}
           />
           <button
             type="button"

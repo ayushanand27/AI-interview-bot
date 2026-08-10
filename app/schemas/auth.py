@@ -1,14 +1,17 @@
 # app/schemas/auth.py
 # Request and response shapes for all auth endpoints
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.models.user import UserRole
 
 
 # ── Register ──────────────────────────────────────────────
 class RegisterRequest(BaseModel):
     """Data required to create a new account."""
-    full_name: str
+    # max_length matches User.full_name's VARCHAR(255) DB column — without
+    # this, an over-length value fails at the DB layer as a raw 500 instead
+    # of a friendly 422.
+    full_name: str = Field(..., min_length=1, max_length=255)
     email: EmailStr             # Pydantic validates email format automatically
     password: str
     role: UserRole = UserRole.CANDIDATE  # Defaults to candidate if not provided

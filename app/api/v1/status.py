@@ -1,8 +1,9 @@
 """Operational status — /api/v1/status"""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from app.core.config import settings
+from app.core.limiter import STATUS_LIMIT, limiter
 from app.proctoring.tracker_provider import is_proctoring_available
 from app.services.object_storage import get_object_storage
 from app.services.session_persistence import (
@@ -14,7 +15,8 @@ router = APIRouter(tags=["Status"])
 
 
 @router.get("/status")
-async def api_status() -> dict:
+@limiter.limit(STATUS_LIMIT)
+async def api_status(request: Request) -> dict:
     db_ok = await check_database_connected_async()
     session_count = await count_sessions_async() if db_ok else 0
     storage = get_object_storage()
