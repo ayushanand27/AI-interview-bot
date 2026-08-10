@@ -18,13 +18,14 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.config import settings
-from app.core.limiter import limiter
+from app.core.limiter import DOCS_LIMIT, limiter
 from app.core.exceptions import AppException
 from app.api.v1.router import api_router
 from app.proctoring.api import mountable_app as proctoring_app
@@ -78,15 +79,33 @@ app = FastAPI(
         "submit answer → next question → end session."
     ),
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
     lifespan=lifespan,
 )
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+
+@app.get("/openapi.json", include_in_schema=False)
+@limiter.limit(DOCS_LIMIT)
+async def openapi_json(request: Request):
+    return JSONResponse(app.openapi())
+
+
+@app.get("/docs", include_in_schema=False)
+@limiter.limit(DOCS_LIMIT)
+async def swagger_docs(request: Request):
+    return get_swagger_ui_html(openapi_url="/openapi.json", title=f"{app.title} — Docs")
+
+
+@app.get("/redoc", include_in_schema=False)
+@limiter.limit(DOCS_LIMIT)
+async def redoc_docs(request: Request):
+    return get_redoc_html(openapi_url="/openapi.json", title=f"{app.title} — ReDoc")
 
 # CORS — only configured frontend origins (see ALLOWED_ORIGINS in .env)
 app.add_middleware(
@@ -96,6 +115,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """Baseline security headers. Camera/mic stay allowed for self — proctoring needs them."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = (
+        "camera=(self), microphone=(self), geolocation=(), payment=()"
+    )
+    if settings.is_production:
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=63072000; includeSubDomains"
+        )
+    return response
 
 app.include_router(api_router)
 app.include_router(recruiter_assessment_router, prefix="/api/v1")

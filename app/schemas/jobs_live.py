@@ -101,7 +101,7 @@ class EndLiveRoomRequest(BaseModel):
 
 
 class SendLiveInvitesRequest(BaseModel):
-    emails: list[EmailStr] = Field(..., min_length=1)
+    emails: list[EmailStr] = Field(..., min_length=1, max_length=50)
     message: str | None = None
     candidate_name: str | None = None
 

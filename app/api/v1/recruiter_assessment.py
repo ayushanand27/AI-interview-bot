@@ -2,12 +2,18 @@
 
 import json
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import require_role
 from app.core.exceptions import BadRequestException
+from app.core.limiter import (
+    EMAIL_SEND_LIMIT,
+    LLM_GENERATE_LIMIT,
+    RECRUITER_WRITE_LIMIT,
+    limiter,
+)
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.common import BaseResponse
@@ -54,7 +60,9 @@ def _parse_questions_form(questions_json: str | None) -> list[AssessmentQuestion
     response_model=BaseResponse[GenerateQuestionsResponse],
     summary="Generate draft interview questions from a JD (no invite created)",
 )
+@limiter.limit(LLM_GENERATE_LIMIT)
 async def generate_questions(
+    request: Request,
     question_count: int = Form(...),
     difficulty: str = Form(...),
     jd_text: str = Form(""),
@@ -112,7 +120,9 @@ async def generate_questions(
     response_model=BaseResponse[CreateAssessmentResponse],
     summary="Create a JD-based interview assessment and invite link",
 )
+@limiter.limit(LLM_GENERATE_LIMIT)
 async def create_assessment(
+    request: Request,
     question_count: int = Form(...),
     difficulty: str = Form(...),
     expiry_hours: int = Form(...),
@@ -180,7 +190,9 @@ async def create_assessment(
     response_model=BaseResponse[ParseJdPdfResponse],
     summary="Extract job description text from an uploaded document",
 )
+@limiter.limit(RECRUITER_WRITE_LIMIT)
 async def parse_jd_pdf(
+    request: Request,
     # Frontend sends multipart field name "pdf" (PDF, Word, or TXT).
     pdf: UploadFile = File(...),
     _current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
@@ -266,7 +278,9 @@ async def update_assessment(
     response_model=BaseResponse[SendAssessmentInvitesResponse],
     summary="Email assessment invite link to candidates or institutions",
 )
+@limiter.limit(EMAIL_SEND_LIMIT)
 async def send_assessment_invites(
+    request: Request,
     token: str,
     body: SendAssessmentInvitesRequest,
     db: AsyncSession = Depends(get_db),

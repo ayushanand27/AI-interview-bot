@@ -1,13 +1,12 @@
 """Recruiter job postings + public apply + ATS shortlist APIs."""
 
-from __future__ import annotations
-
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import require_role
 from app.core.exceptions import BadRequestException, NotFoundException
+from app.core.limiter import JOB_APPLY_LIMIT, RECRUITER_WRITE_LIMIT, limiter
 from app.db.job_live_models import JobApplication
 from app.db.session import get_db
 from app.models.user import User, UserRole
@@ -31,7 +30,9 @@ def _apply_link(token: str) -> str:
 
 
 @router.post("", response_model=BaseResponse[JobSummary])
+@limiter.limit(RECRUITER_WRITE_LIMIT)
 async def create_job(
+    request: Request,
     body: CreateJobRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
@@ -93,7 +94,9 @@ async def public_job(token: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/public/{token}/apply", response_model=BaseResponse[dict])
+@limiter.limit(JOB_APPLY_LIMIT)
 async def apply_to_job(
+    request: Request,
     token: str,
     full_name: str = Form(...),
     email: str = Form(...),

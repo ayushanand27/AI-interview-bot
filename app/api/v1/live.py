@@ -1,18 +1,17 @@
 """Live interview room REST + WebSocket sync (demo MVP)."""
 
-from __future__ import annotations
-
 import json
 import logging
 from collections import defaultdict
 from typing import Any
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.dependencies import require_role
 from app.core.exceptions import NotFoundException
+from app.core.limiter import EMAIL_SEND_LIMIT, RECRUITER_WRITE_LIMIT, limiter
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.common import BaseResponse
@@ -46,7 +45,9 @@ def _join_link(token: str) -> str:
 
 
 @router.post("/rooms", response_model=BaseResponse[LiveRoomSummary])
+@limiter.limit(RECRUITER_WRITE_LIMIT)
 async def create_live_room(
+    request: Request,
     body: CreateLiveRoomRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.RECRUITER.value)),
@@ -146,7 +147,9 @@ async def run_live_tests(
     "/rooms/{token}/send-invites",
     response_model=BaseResponse[SendLiveInvitesResponse],
 )
+@limiter.limit(EMAIL_SEND_LIMIT)
 async def send_live_invites(
+    request: Request,
     token: str,
     body: SendLiveInvitesRequest,
     db: AsyncSession = Depends(get_db),
