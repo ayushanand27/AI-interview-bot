@@ -9,6 +9,7 @@
 # ─────────────────────────────────────────────────────────────
 
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 import bcrypt
 from jose import JWTError, jwt
 
@@ -126,23 +127,31 @@ def decode_refresh_token(token: str) -> dict:
         raise UnauthorizedException("Refresh token is invalid or expired")
 
 
-def create_refresh_token(user_id: int) -> str:
+def create_refresh_token(user_id: int) -> tuple[str, str]:
     """
     Creates a longer-lived refresh token (7 days).
     Used to get a new access token without re-login.
+
+    Returns (token, jti). Callers must persist jti as the user's
+    current_refresh_jti so refresh() can detect a stale/reused/revoked
+    token — otherwise a leaked refresh token stays valid for its full
+    7-day life even after rotation or logout.
     """
     now = datetime.now(timezone.utc)
     expire = now + timedelta(days=7)
+    jti = str(uuid4())
 
     payload = {
         "sub": str(user_id),
         "type": "refresh",
+        "jti": jti,
         "exp": expire,
         "iat": now,
     }
 
-    return jwt.encode(
+    token = jwt.encode(
         payload,
         settings.SECRET_KEY,
         algorithm=settings.ALGORITHM
     )
+    return token, jti

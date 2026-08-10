@@ -2,7 +2,9 @@ import base64
 from typing import Any, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
 
 from app.core.limiter import PROCTOR_ANALYZE_LIMIT, limiter
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,11 +27,56 @@ from app.proctoring.object_detector import (
     clear_object_detection_schedule,
 )
 from app.services.session_persistence import (
+    _get_sync_session_local,
     update_proctoring_summary,
     upsert_session_review_state,
 )
+from app.db.session_model import Session as DBSess
 
 router = APIRouter(tags=["Proctoring"])
+
+_http_bearer = HTTPBearer()
+
+
+def current_user_id(
+    credentials: HTTPAuthorizationCredentials = Depends(_http_bearer),
+) -> int:
+    """Lightweight sync JWT check (no DB round-trip) — safe to use on the
+    high-frequency /analyze path without blocking the event loop, unlike
+    the async get_current_user used elsewhere."""
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+        )
+        return int(payload["sub"])
+    except (JWTError, KeyError, ValueError, TypeError):
+        raise HTTPException(
+            status_code=401, detail="Token is invalid or expired"
+        ) from None
+
+
+def authorize_session(session_id: Optional[str], user_id: int) -> None:
+    """Reject proctoring calls for a session_id the caller doesn't own.
+
+    Both the open-practice flow (session_store) and the invite flow
+    (invite_service.py) persist to the same `sessions` table with
+    user_id always set, so a single check here covers both.
+    """
+    if not session_id or session_id == "default":
+        raise HTTPException(status_code=403, detail="A valid session_id is required")
+    try:
+        session_uuid = UUID(str(session_id))
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Invalid session_id") from None
+    SessionLocal = _get_sync_session_local()
+    with SessionLocal() as db:
+        row = db.get(DBSess, session_uuid)
+    if row is None or row.user_id != user_id:
+        raise HTTPException(
+            status_code=403, detail="Not authorized for this session"
+        )
 
 
 class FrameRequest(BaseModel):
@@ -162,10 +209,13 @@ def object_detector_status():
 
 @router.post("/analyze")
 @limiter.limit(PROCTOR_ANALYZE_LIMIT)
-def analyze_frame(request: Request, req: FrameRequest):
+def analyze_frame(
+    request: Request, req: FrameRequest, user_id: int = Depends(current_user_id)
+):
     import cv2
     import numpy as np
 
+    authorize_session(req.session_id, user_id)
     warning_mgr = get_warning_manager(req.session_id)
 
     try:
@@ -243,22 +293,37 @@ def analyze_frame(request: Request, req: FrameRequest):
 
 @router.get("/warnings")
 @limiter.limit(PROCTOR_ANALYZE_LIMIT)
-def get_warnings(request: Request, session_id: Optional[str] = None):
+def get_warnings(
+    request: Request,
+    session_id: Optional[str] = None,
+    user_id: int = Depends(current_user_id),
+):
+    authorize_session(session_id, user_id)
     warning_mgr = get_warning_manager(session_id)
     return warning_mgr.get_integrity_report()
 
 
 @router.get("/integrity-report")
 @limiter.limit(PROCTOR_ANALYZE_LIMIT)
-def integrity_report(request: Request, session_id: Optional[str] = None):
+def integrity_report(
+    request: Request,
+    session_id: Optional[str] = None,
+    user_id: int = Depends(current_user_id),
+):
+    authorize_session(session_id, user_id)
     warning_mgr = get_warning_manager(session_id)
     return warning_mgr.get_integrity_report()
 
 
 @router.post("/audio-violation")
 @limiter.limit(PROCTOR_ANALYZE_LIMIT)
-def report_audio_violation(request: Request, body: AudioViolationRequest):
+def report_audio_violation(
+    request: Request,
+    body: AudioViolationRequest,
+    user_id: int = Depends(current_user_id),
+):
     """Client-reported integrity events (ambient audio, tab switch, etc.)."""
+    authorize_session(body.session_id, user_id)
     warning_mgr = get_warning_manager(body.session_id)
     violation = warning_mgr.record_client_violation(
         body.violation_type,
@@ -281,11 +346,16 @@ def report_audio_violation(request: Request, body: AudioViolationRequest):
 
 @router.post("/verify-environment")
 @limiter.limit(PROCTOR_ANALYZE_LIMIT)
-def verify_environment(request: Request, body: VerifyEnvironmentRequest):
+def verify_environment(
+    request: Request,
+    body: VerifyEnvironmentRequest,
+    user_id: int = Depends(current_user_id),
+):
     """
     Pre-interview environment check from the client.
     Logs findings to the session proctoring state and blocks unsafe setups.
     """
+    authorize_session(body.session_id, user_id)
     warning_mgr = get_warning_manager(body.session_id)
     warnings: list[str] = []
     block_reasons: list[str] = []
@@ -377,8 +447,13 @@ def verify_environment(request: Request, body: VerifyEnvironmentRequest):
 
 @router.post("/reset")
 @limiter.limit(PROCTOR_ANALYZE_LIMIT)
-def reset_session(request: Request, body: ResetRequest | None = None):
+def reset_session(
+    request: Request,
+    body: ResetRequest | None = None,
+    user_id: int = Depends(current_user_id),
+):
     session_id = body.session_id if body else None
+    authorize_session(session_id, user_id)
     removed = remove_warning_manager(session_id)
     clear_object_detection_schedule(session_id)
     if removed is not None:

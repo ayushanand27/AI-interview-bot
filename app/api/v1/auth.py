@@ -152,6 +152,23 @@ async def get_me(
     )
 
 
+# ── POST /auth/logout ─────────────────────────────────────
+@router.post(
+    "/logout",
+    response_model=BaseResponse[None],
+    status_code=200,
+    summary="Revoke the current refresh token",
+)
+async def logout(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Invalidates the caller's refresh token so it can't be used again."""
+    service = AuthService(db)
+    await service.logout(current_user)
+    return BaseResponse(success=True, message="Logged out", data=None)
+
+
 # ── GET /auth/verify-email ────────────────────────────────
 @router.get(
     "/verify-email",

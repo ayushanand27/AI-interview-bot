@@ -84,7 +84,8 @@ class AuthService:
 
         # ── Step 4: Generate tokens with new user's ID ────
         access_token = create_access_token(user_id=user.id, role=user.role.value)
-        refresh_token = create_refresh_token(user_id=user.id)
+        refresh_token, jti = create_refresh_token(user_id=user.id)
+        user.current_refresh_jti = jti
 
         # Expose the verify link when SMTP fails so signup is not a dead end.
         expose_link = (not settings.is_production) or (not email_sent)
@@ -132,7 +133,8 @@ class AuthService:
 
         # ── Step 4: Generate and return tokens ────────────
         access_token = create_access_token(user_id=user.id, role=user.role.value)
-        refresh_token = create_refresh_token(user_id=user.id)
+        refresh_token, jti = create_refresh_token(user_id=user.id)
+        user.current_refresh_jti = jti
 
         return {
             "user": user,
@@ -148,12 +150,24 @@ class AuthService:
         if not user.is_active:
             raise UnauthorizedException("Your account has been deactivated")
 
+        # Reject stale/reused/revoked refresh tokens — only the most
+        # recently issued jti per user is valid (rotation with reuse
+        # detection). A previous outstanding token becomes invalid the
+        # moment a newer one is issued, or on logout.
+        if not user.current_refresh_jti or payload.get("jti") != user.current_refresh_jti:
+            raise UnauthorizedException("Refresh token has been revoked or already used")
+
         access_token = create_access_token(user_id=user.id, role=user.role.value)
-        new_refresh = create_refresh_token(user_id=user.id)
+        new_refresh, new_jti = create_refresh_token(user_id=user.id)
+        user.current_refresh_jti = new_jti
         return {
             "access_token": access_token,
             "refresh_token": new_refresh,
         }
+
+    async def logout(self, user: User) -> None:
+        """Revoke the user's current refresh token."""
+        user.current_refresh_jti = None
 
     async def get_user_by_id(self, user_id: int) -> User:
         """Fetches a single user by ID — used by /me endpoint."""

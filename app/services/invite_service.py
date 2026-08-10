@@ -163,10 +163,12 @@ class InviteService:
         if user is None:
             return None
 
+        refresh_token, jti = create_refresh_token(user_id=user.id)
+        user.current_refresh_jti = jti
         return InviteRegisterResponse(
             session_id=UUID(verification.session_id),
             access_token=create_access_token(user_id=user.id, role=user.role.value),
-            refresh_token=create_refresh_token(user_id=user.id),
+            refresh_token=refresh_token,
         )
 
     async def _attach_candidate_to_invite(
@@ -236,7 +238,8 @@ class InviteService:
         )
 
         access_token = create_access_token(user_id=user.id, role=user.role.value)
-        refresh_token = create_refresh_token(user_id=user.id)
+        refresh_token, jti = create_refresh_token(user_id=user.id)
+        user.current_refresh_jti = jti
 
         return InviteRegisterResponse(
             session_id=session_id,

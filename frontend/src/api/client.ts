@@ -461,6 +461,14 @@ export const authApi = {
 
 
 
+  logout() {
+
+    return request<ApiEnvelope<null>>("/api/v1/auth/logout", { method: "POST" });
+
+  },
+
+
+
   async verifyEmail(token: string) {
 
     const response = await fetch(

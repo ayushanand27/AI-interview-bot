@@ -64,6 +64,12 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # ── Refresh token rotation ────────────────────────────
+    # The jti of the most recently issued refresh token. Any refresh
+    # token presented with a different jti is stale (already rotated,
+    # or revoked via logout) and is rejected.
+    current_refresh_jti: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
     # ── Timestamps ────────────────────────────────────────
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

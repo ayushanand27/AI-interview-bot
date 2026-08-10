@@ -95,6 +95,7 @@ function RecruiterDashboardRoute() {
   }, []);
 
   function handleLogout() {
+    void authApi.logout().catch(() => {});
     setAccessToken(null);
     setRefreshToken(null);
     window.location.href = "/recruiter";
@@ -328,6 +329,7 @@ function CandidatePracticeApp() {
   }
 
   function handleLogout() {
+    void authApi.logout().catch(() => {});
     releaseInterviewMediaStream();
     setAccessTokenState(null);
     setRefreshToken(null);
