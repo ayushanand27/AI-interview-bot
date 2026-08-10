@@ -123,6 +123,27 @@ async def app_exception_handler(request: Request, exc: AppException):
     )
 
 
+_FIELD_LABELS = {
+    "title": "Title",
+    "jd_text": "Job description",
+    "name": "Name",
+    "full_name": "Name",
+    "phone": "Phone number",
+    "emails": "Email list",
+    "meet_url": "Meet/Zoom URL",
+    "message": "Message",
+    "url": "URL",
+}
+
+
+def _humanize_field(field: str) -> str:
+    return _FIELD_LABELS.get(field, field.replace("_", " ").strip().capitalize() or "This field")
+
+
+def _pluralize_chars(n: int) -> str:
+    return "character" if n == 1 else "characters"
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Return a clear, non-blank message for invalid email/body fields."""
@@ -131,14 +152,32 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         loc = err.get("loc") or ()
         field = str(loc[-1]) if loc else "field"
         msg = str(err.get("msg") or "Invalid value")
+        err_type = str(err.get("type") or "")
         lower = msg.lower()
+        label = _humanize_field(field)
         if "email" in lower or field == "email":
             messages.append("Please enter a valid email address.")
         elif "password" in field.lower():
             messages.append(msg.replace("Value error, ", "").strip() or msg)
+        elif err_type == "missing":
+            messages.append(f"{label} is required.")
+        elif err_type in ("string_too_short", "too_short"):
+            limit = (err.get("ctx") or {}).get("min_length")
+            messages.append(
+                f"{label} must be at least {limit} {_pluralize_chars(limit)}."
+                if limit is not None
+                else f"{label} is too short."
+            )
+        elif err_type in ("string_too_long", "too_long"):
+            limit = (err.get("ctx") or {}).get("max_length")
+            messages.append(
+                f"{label} must be at most {limit} {_pluralize_chars(limit)}."
+                if limit is not None
+                else f"{label} is too long."
+            )
         else:
             clean = msg.replace("Value error, ", "").strip()
-            messages.append(f"{field}: {clean}" if field not in clean else clean)
+            messages.append(f"{label}: {clean}" if field not in clean else clean)
     # Deduplicate while preserving order
     seen: set[str] = set()
     unique = []

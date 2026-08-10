@@ -199,12 +199,17 @@ export default function JobsLivePanel({
   }
 
   async function createJob() {
+    const title = jobTitle.trim();
+    if (title.length < 2) {
+      onError("Job title must be at least 2 characters.");
+      return;
+    }
     setBusy(true);
     onError(null);
     try {
       const jdText = await resolveJdText();
       const res = await jobsLiveApi.createJob({
-        title: jobTitle,
+        title,
         jd_text: jdText,
       });
       setJobTitle("");
@@ -389,6 +394,9 @@ export default function JobsLivePanel({
             value={jobTitle}
             onChange={(e) => setJobTitle(e.target.value)}
             placeholder="Backend Engineer"
+            minLength={2}
+            maxLength={255}
+            required
           />
           <div className="rp-tabs rp-tabs-spaced" style={{ marginBottom: "0.5rem" }}>
             <button
@@ -443,7 +451,7 @@ export default function JobsLivePanel({
           <button
             type="button"
             className="rp-primary rp-create-job-btn"
-            disabled={busy || parsingJd}
+            disabled={busy || parsingJd || jobTitle.trim().length < 2}
             onClick={() => void createJob()}
           >
             {parsingJd
