@@ -21,6 +21,12 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run backend tests
+        env:
+          # Settings() has no defaults for these — the test suite never talks
+          # to a real DB/Groq, but importing app.core.config requires them.
+          DATABASE_URL: "sqlite+aiosqlite:///./ci_test.db"
+          SECRET_KEY: "ci-test-secret-key-not-for-production-use"
+          GROQ_API_KEY: "ci-test-placeholder-key"
         run: python -m pytest tests/ -q
 
   frontend:
