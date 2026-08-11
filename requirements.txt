@@ -1,3 +1,12 @@
+# torch is a transitive dep of ultralytics (YOLO phone-detection) and would
+# otherwise resolve to the default PyPI wheel, which bundles a full NVIDIA
+# CUDA toolkit (~2-3GB across a dozen nvidia-* packages) that is entirely
+# unused — this app runs on GPU-less infrastructure everywhere (t3.micro EC2,
+# GitHub Actions CI). Pin the CPU-only build instead: identical inference
+# behavior on a GPU-less machine either way, just without the dead weight.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.6.0+cpu
+
 # ── Web Framework ─────────────────────────────────────────
 fastapi==0.136.1
 uvicorn[standard]==0.34.0
@@ -39,6 +48,13 @@ email-validator==2.2.0
 greenlet==3.1.1
 
 # ── Proctoring ────────────────────────────────────────────
+# opencv-python needs libGL.so.1 (a GUI/X11 lib) to import on bare Linux,
+# even though nothing here opens a window — deploy/setup.sh already
+# installs libgl1 for EC2; CI installs the same package (see ci.yml).
+# Not switching to opencv-python-headless: mediapipe pulls in
+# opencv-contrib-python (non-headless) transitively regardless, so a
+# partial headless swap would leave two opencv variants fighting over the
+# same cv2/ files — not worth the risk to a live proctoring feature.
 opencv-python==4.10.0.84
 mediapipe==0.10.35
 ultralytics==8.3.59
@@ -54,3 +70,11 @@ pytesseract==0.3.13
 
 # ── AWS S3 (optional — local UPLOAD_DIR used when unset) ──
 boto3==1.35.99
+
+# ── Testing ───────────────────────────────────────────────
+# Not previously listed here at all — `pytest tests/` only ever worked
+# locally because pytest happened to already be installed globally on dev
+# machines. CI's `pip install -r requirements.txt` had no way to get it,
+# so every CI run failed immediately with "No module named pytest".
+pytest==8.3.4
+pytest-asyncio==0.25.2

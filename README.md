@@ -1,5 +1,7 @@
 # AI Interview Bot
 
+[![CI](https://github.com/ayushanand27/AI-interview-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/ayushanand27/AI-interview-bot/actions/workflows/ci.yml)
+
 AI-powered hiring flow: **Jobs → ATS shortlist → Assessment invites → Live coding rooms**. Candidates take proctored async assessments or join collaborative live rooms; recruiters create mixed question-type assessments and review results.
 
 **Repo:** https://github.com/ayushanand27/AI-interview-bot
@@ -165,7 +167,9 @@ PM2 → uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 1
 
 ## Security & hardening
 
-- **Rate limiting** (slowapi) on every endpoint that costs money or can be abused: auth (register/login/refresh), job/live/assessment creation, LLM question generation, all email-send endpoints, identity verification, DSAR export, and the public API docs.
+- **Rate limiting** (slowapi) on every endpoint that costs money or can be abused: auth (register/login/refresh), job/live/assessment creation, LLM question generation, all email-send endpoints, identity verification, DSAR export, live-room code execution, and the public API docs.
+- **Proctoring endpoints require auth + session ownership** — `/proctor/analyze`, `/warnings`, `/integrity-report`, `/audio-violation`, `/verify-environment`, `/reset` all verify the caller's JWT matches the session's owner (covers both the open-practice and invite flows, which share the same `sessions` table) before touching any proctoring data.
+- **Refresh tokens rotate with reuse detection** — each refresh issues a new token and invalidates the previous one (`users.current_refresh_jti`); a stale or leaked token stops working the moment a newer one is issued. `POST /auth/logout` revokes the current one outright.
 - **Security response headers**: HSTS (prod), X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and a Permissions-Policy that explicitly still allows camera/microphone for proctoring.
 - **Validation errors are humanized** server-side (`app/main.py`'s `validation_exception_handler`) so a raw Pydantic message never reaches a recruiter or candidate — every 422 response reads like "Title must be at least 2 characters," not a stack-trace-flavored string.
 - `/docs`, `/redoc`, `/openapi.json` stay public (useful for demoing the API) but are rate-limited rather than wide open.
@@ -376,7 +380,7 @@ scripts/       bootstrap_db, full_test, dev helpers
 docs/          AWS free-tier setup and ops notes
 ```
 
-Question-type fields live in invite `questions_json` (JSON) — no DB column migration required for MCQ/MSQ/numerical metadata. Invite `duration_minutes` and session `interview_started_at` use Alembic migration `0022`.
+Question-type fields live in invite `questions_json` (JSON) — no DB column migration required for MCQ/MSQ/numerical metadata. Invite `duration_minutes` and session `interview_started_at` use Alembic migration `0022`; refresh-token rotation (`users.current_refresh_jti`) uses migration `0023`.
 
 ---
 

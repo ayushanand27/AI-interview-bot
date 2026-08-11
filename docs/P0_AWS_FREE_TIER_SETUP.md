@@ -1,5 +1,11 @@
 # P0 — AWS Free Tier setup (Mumbai / `ap-south-1`)
 
+> **✅ Done — cutover complete.** Production now runs on RDS PostgreSQL + S3
+> (`/api/v1/status` shows `database_backend: postgres`, `storage_backend: s3`).
+> The checklist below is kept for reference / disaster-recovery, not as a
+> pending task. The RDS master password has also been rotated to a strong
+> random value (see the README's "RDS note").
+
 You do the AWS Console steps below. The app already supports **optional S3**,
 **retention cleanup**, **DSAR export/delete**, and **Postgres** without wiping
 production SQLite until you confirm RDS is ready.

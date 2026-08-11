@@ -10,6 +10,8 @@ venv/
 
 # Database / models (local artifacts)
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 smartskale.db
 interview_bot.db
