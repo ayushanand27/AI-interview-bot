@@ -71,6 +71,9 @@ pytesseract==0.3.13
 # ── AWS S3 (optional — local UPLOAD_DIR used when unset) ──
 boto3==1.35.99
 
+# ── Error tracking (optional — no-op unless SENTRY_DSN is set) ──
+sentry-sdk==2.19.2
+
 # ── Testing ───────────────────────────────────────────────
 # Not previously listed here at all — `pytest tests/` only ever worked
 # locally because pytest happened to already be installed globally on dev

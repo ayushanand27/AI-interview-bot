@@ -174,7 +174,8 @@ PM2 → uvicorn app.main:app --host 127.0.0.1 --port 8080 --workers 1
 - **Validation errors are humanized** server-side (`app/main.py`'s `validation_exception_handler`) so a raw Pydantic message never reaches a recruiter or candidate — every 422 response reads like "Title must be at least 2 characters," not a stack-trace-flavored string.
 - `/docs`, `/redoc`, `/openapi.json` stay public (useful for demoing the API) but are rate-limited rather than wide open.
 - Passwords hashed with `bcrypt` (12 rounds) directly — no `passlib`.
-- CI (`.github/workflows/ci.yml`) runs the backend test suite and a frontend typecheck/build/`npm audit` on every push and PR to `main`.
+- **Error tracking** — optional Sentry integration on both backend (`SENTRY_DSN`) and frontend (`VITE_SENTRY_DSN`); a no-op with no DSN set, so it's opt-in and free to leave off.
+- CI (`.github/workflows/ci.yml`) runs the backend test suite, frontend unit tests (Vitest + React Testing Library), and a frontend typecheck/build/`npm audit` on every push and PR to `main`.
 
 ---
 
@@ -241,7 +242,8 @@ Open **http://127.0.0.1:5173** (prefer `127.0.0.1` over LAN IP for camera).
 
 ```bash
 python -m pytest tests/ -q      # backend
-cd frontend && npm run build    # typecheck + frontend build
+cd frontend && npm test         # frontend unit tests (Vitest + React Testing Library)
+npm run build                   # typecheck + frontend build
 python scripts/full_test.py     # end-to-end smoke script
 ```
 
@@ -264,6 +266,7 @@ CI runs the same backend/frontend checks automatically on every push and PR to `
 | `APP_ENV` | `development` / `production` |
 | `UPLOAD_DIR` | Uploads path |
 | `S3_BUCKET` / `AWS_*` | Optional S3 object storage |
+| `SENTRY_DSN` (backend) / `VITE_SENTRY_DSN` (frontend) | Optional error tracking — unset = disabled |
 | `ATS_ENABLE_SEMANTIC` | Keep `false` on free tier (keyword ATS only) |
 | `ARTIFACT_RETENTION_DAYS` / `IDENTITY_RETENTION_DAYS` / `RECORDING_RETENTION_DAYS` | Cleanup TTLs |
 

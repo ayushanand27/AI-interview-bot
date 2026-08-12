@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     # Comma-separated list of allowed frontend origins
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 
+    # ── Error tracking (optional Sentry) ──────────────────
+    # Empty = disabled. Get a free DSN at sentry.io (new project → Python/FastAPI).
+    SENTRY_DSN: str = ""
+
     # ── Email (Gmail SMTP) ────────────────────────────────
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

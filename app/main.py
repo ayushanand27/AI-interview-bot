@@ -40,6 +40,18 @@ load_dotenv()
 
 logger = logging.getLogger("app.main")
 
+if settings.SENTRY_DSN:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.APP_ENV,
+        # Low sample rate — this is a free-tier deploy, not a high-traffic service.
+        traces_sample_rate=0.1,
+        send_default_pii=False,
+    )
+    logger.info("Sentry error tracking enabled (env=%s)", settings.APP_ENV)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
