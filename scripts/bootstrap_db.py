@@ -26,6 +26,7 @@ import app.db.invite_funnel_model  # noqa: F401, E402
 import app.db.interview_invite_model  # noqa: F401, E402
 import app.db.question_bank_model  # noqa: F401, E402
 import app.db.session_model  # noqa: F401, E402
+import app.db.job_live_models  # noqa: F401, E402
 import app.models.user  # noqa: F401, E402
 
 

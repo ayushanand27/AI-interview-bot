@@ -1,5 +1,6 @@
 """Live interview room REST + WebSocket sync (demo MVP)."""
 
+import asyncio
 import json
 import logging
 from collections import defaultdict
@@ -138,7 +139,9 @@ async def run_live_tests(
 ):
     room = await LiveInterviewService(db).get_room(token)
     tests = body.public_tests or list(room.public_tests_json or [])
-    summary = run_test_cases(
+    # run_test_cases uses sync httpx + sleep; offload to a thread to avoid blocking the event loop
+    summary = await asyncio.to_thread(
+        run_test_cases,
         language=body.language or room.language,
         source=body.source,
         tests=tests,

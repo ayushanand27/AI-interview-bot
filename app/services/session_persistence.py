@@ -81,7 +81,13 @@ def _sync_database_url() -> str:
 
 @lru_cache
 def _get_sync_session_local():
-    engine = create_engine(_sync_database_url(), pool_pre_ping=True)
+    engine = create_engine(
+        _sync_database_url(),
+        pool_pre_ping=True,
+        pool_size=2,
+        max_overflow=1,
+        pool_recycle=1800,
+    )
     return sync_sessionmaker(bind=engine, expire_on_commit=False)
 
 

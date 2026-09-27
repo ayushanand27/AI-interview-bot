@@ -1,6 +1,7 @@
 # app/api/v1/router.py
-# Master router — mounts all sub-routers under /api/v1
-# main.py imports only this file — add new route groups here
+# Core router — mounts auth, recruiter, status, and privacy under /api/v1.
+# NOTE: invite, jobs, live, and recruiter_assessment are mounted directly
+# in app/main.py (not here) to keep this file's import graph simple.
 
 from fastapi import APIRouter
 from app.api.v1 import auth

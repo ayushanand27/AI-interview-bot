@@ -256,7 +256,7 @@ CI runs the same backend/frontend checks automatically on every push and PR to `
 | Variable | Purpose |
 |---|---|
 | `GROQ_API_KEY` | Questions, judging, Whisper |
-| `GROQ_MODEL` | e.g. `llama-3.1-8b-instant` |
+| `GROQ_MODEL` | e.g. `openai/gpt-oss-20b` (default) |
 | `GROQ_WHISPER_MODEL` | e.g. `whisper-large-v3` |
 | `SECRET_KEY` | JWT signing |
 | `DATABASE_URL` | Postgres or SQLite URL |

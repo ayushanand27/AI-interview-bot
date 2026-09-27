@@ -14,6 +14,7 @@
 # ─────────────────────────────────────────────────────────────
 
 import sqlite3
+from collections.abc import AsyncGenerator
 
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
@@ -69,7 +70,7 @@ AsyncSessionLocal = async_sessionmaker(
 #   - yields the session to the route handler
 #   - after the request finishes, resumes and closes the session
 #   - if anything fails, rolls back to prevent corrupt data
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:  # type: ignore[override]
     """
     Provides a database session for a single request.
     Used as a FastAPI dependency — injected into routes.
