@@ -1,0 +1,21 @@
+{
+  "name": "AI Interview Bot",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "user": "ubuntu",
+  "install": "bash .cursor/cloud-agent-install.sh",
+  "start": "bash .cursor/cloud-agent-start.sh",
+  "terminals": [
+    {
+      "name": "backend",
+      "command": "cd /workspace && source .venv/bin/activate && python -m uvicorn app.main:app --host 127.0.0.1 --port 8080"
+    },
+    {
+      "name": "frontend",
+      "command": "cd /workspace/frontend && npm run dev"
+    }
+  ],
+  "ports": [8080, 5173]
+}
