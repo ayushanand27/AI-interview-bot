@@ -217,29 +217,46 @@ function detectPassiveRecordingExtensions(): DetectedExtension[] {
 async function detectExtensionsViaConnect(): Promise<DetectedExtension[]> {
   const detected: DetectedExtension[] = [];
 
-  if (
-    typeof window === "undefined" ||
-    !(window as Window & { chrome?: { runtime?: unknown } }).chrome?.runtime
-  ) {
+  type ChromeRuntime = {
+    connect: (id: string) => {
+      onDisconnect: { addListener: (cb: () => void) => void };
+      disconnect: () => void;
+    };
+    lastError?: { message?: string } | null;
+  };
+
+  const chromeRuntime = (
+    window as Window & { chrome?: { runtime?: ChromeRuntime } }
+  ).chrome?.runtime;
+
+  if (typeof window === "undefined" || typeof chromeRuntime?.connect !== "function") {
     return detected;
   }
 
-  const runtime = (
-    window as unknown as {
-      chrome: { runtime: { connect: (id: string) => { disconnect: () => void } } };
-    }
-  ).chrome.runtime;
-
   for (const [id, name] of Object.entries(KNOWN_RECORDING_EXTENSIONS)) {
-    try {
-      const port = runtime.connect(id);
-      if (port) {
-        detected.push({ id, name });
-        port.disconnect();
+    // chrome.runtime.connect() ALWAYS returns a Port object — never null.
+    // The only reliable signal is port.onDisconnect: Chrome sets runtime.lastError
+    // when the extension is not installed or does not accept external connections.
+    const present = await new Promise<boolean>((resolve) => {
+      let settled = false;
+      const done = (found: boolean) => {
+        if (!settled) { settled = true; resolve(found); }
+      };
+      try {
+        const port = chromeRuntime.connect(id);
+        port.onDisconnect.addListener(() => {
+          // Access lastError to suppress "Unchecked runtime.lastError" console warnings.
+          // If lastError is set, extension is not reachable (not installed).
+          const hadError = Boolean(chromeRuntime.lastError);
+          done(!hadError);
+        });
+        // No disconnect within 400 ms → extension accepted the connection
+        setTimeout(() => { port.disconnect(); done(true); }, 400);
+      } catch {
+        done(false);
       }
-    } catch {
-      // Not installed or blocks connections — safe
-    }
+    });
+    if (present) detected.push({ id, name });
   }
 
   return detected;
@@ -291,15 +308,18 @@ export async function detectScreenRecordingExtensions(): Promise<ExtensionScanRe
   const viaPassive = detectPassiveRecordingExtensions();
   const detected = mergeExtensions(viaConnect, viaManagement, viaPassive);
 
+  // scanSupported = true only when we have HIGH-CONFIDENCE detection:
+  // - management API available (privileged extension context), OR
+  // - passive DOM probes found injected extension content.
+  // chrome.runtime alone is NOT reliable for regular webpages: runtime.connect()
+  // can only detect extensions that have explicitly whitelisted this origin in
+  // externally_connectable — most recording extensions don't, so the connect path
+  // gives zero signal on a normal site and must not claim "no extensions found".
+  const hasManagementApi = Boolean(
+    (window as Window & { chrome?: { management?: unknown } }).chrome?.management,
+  );
   const scanSupported =
-    typeof window !== "undefined" &&
-    Boolean(
-      (window as Window & { chrome?: { runtime?: unknown; management?: unknown } })
-        .chrome?.runtime ||
-        (window as Window & { chrome?: { management?: unknown } }).chrome
-          ?.management ||
-        viaPassive.length > 0,
-    );
+    typeof window !== "undefined" && (hasManagementApi || viaPassive.length > 0);
 
   return { detected, scanSupported };
 }
