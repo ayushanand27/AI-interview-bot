@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     # ── Groq (questions, judging, transcription) ────────
     GROQ_API_KEY: str
-    GROQ_MODEL: str = "llama-3.1-8b-instant"
+    GROQ_MODEL: str = "openai/gpt-oss-20b"
     GROQ_WHISPER_MODEL: str = "whisper-large-v3"
 
     # ── Interview flow ────────────────────────────────────

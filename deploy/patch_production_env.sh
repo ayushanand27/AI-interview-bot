@@ -20,6 +20,8 @@ SMTP_EMAIL=""
 SMTP_PASSWORD=""
 FRONTEND_URL=""
 ALLOWED_ORIGINS=""
+GROQ_MODEL=""
+GROQ_API_KEY=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -27,6 +29,8 @@ while [[ $# -gt 0 ]]; do
     --smtp-password) SMTP_PASSWORD="$2"; shift 2 ;;
     --frontend-url) FRONTEND_URL="$2"; shift 2 ;;
     --allowed-origins) ALLOWED_ORIGINS="$2"; shift 2 ;;
+    --groq-model) GROQ_MODEL="$2"; shift 2 ;;
+    --groq-api-key) GROQ_API_KEY="$2"; shift 2 ;;
     *)
       echo "Unknown arg: $1"
       exit 1
@@ -71,6 +75,16 @@ if [[ -n "${FRONTEND_URL}" ]]; then
   fi
   upsert "ALLOWED_ORIGINS" "${ALLOWED_ORIGINS}"
   echo "==> Updated FRONTEND_URL / ALLOWED_ORIGINS"
+fi
+
+if [[ -n "${GROQ_MODEL}" ]]; then
+  upsert "GROQ_MODEL" "${GROQ_MODEL}"
+  echo "==> Updated GROQ_MODEL to ${GROQ_MODEL}"
+fi
+
+if [[ -n "${GROQ_API_KEY}" ]]; then
+  upsert "GROQ_API_KEY" "${GROQ_API_KEY}"
+  echo "==> Updated GROQ_API_KEY"
 fi
 
 upsert "SMTP_HOST" "smtp.gmail.com"
